@@ -1,7 +1,8 @@
 /*------------------------------------------------------------------------------
 * rtklib.h : RTKLIB constants, types and function prototypes
 *
-*          Copyright (C) 2007-2021 by T.TAKASU, All rights reserved.
+* Copyright (C) 2024-2025 Japan Aerospace Exploration Agency. All Rights Reserved.
+* Copyright (C) 2007-2021 by T.TAKASU, All rights reserved.
 *
 * options : -DENAGLO   enable GLONASS
 *           -DENAGAL   enable Galileo
@@ -14,7 +15,6 @@
 *           -DWIN32    use WIN32 API
 *           -DWIN_DLL  generate library as Windows DLL
 *
-* version : $Revision:$ $Date:$
 * history : 2007/01/13 1.0  rtklib ver.1.0.0
 *           2007/03/20 1.1  rtklib ver.1.1.0
 *           2008/07/15 1.2  rtklib ver.2.1.0
@@ -30,6 +30,9 @@
 *           2024/02/01 1.12 branch from ver.2.4.3b35 for MALIB
 *           2024/08/02 1.13 MALIB ver.1.1.0
 *                           add stat format
+*           2024/09/26 1.14 MALIB ver.1.1.1
+*           2024/12/20 1.15 MALIB ver.1.1.2
+*           2025/02/06 1.16 MALIB ver.1.1.3
 *-----------------------------------------------------------------------------*/
 #ifndef RTKLIB_H
 #define RTKLIB_H
@@ -54,16 +57,14 @@ extern "C" {
 
 /* constants -----------------------------------------------------------------*/
 
-#define VER_RTKLIB  "2.4.3"             /* library version */
+#define SOFTNAME    "MALIB"      /* software name */
 #define VER_MALIB   "1.1.0"             /* MALIB version */
-
-#define PATCH_LEVEL "b35"               /* patch level */
-#define PATCH_LEVEL_MALIB "draft_issue-9"
+#define PATCH_LEVEL_MALIB "feature/1.2.0" /* patch level */
 
 #define COPYRIGHT_MALIB \
             "Copyright (C) 2007-2023 T.Takasu\nAll rights reserved." \
-            "Copyright (C) 2023-2024, TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION. All Rights Reserved." \
-            "Copyright (C) 2023-2024, Japan Aerospace Exploration Agency. All Rights Reserved."
+            "Copyright (C) 2023-2025, TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION. All Rights Reserved." \
+            "Copyright (C) 2023-2025, Japan Aerospace Exploration Agency. All Rights Reserved."
 
 #define PI          3.1415926535897932  /* pi */
 #define D2R         (PI/180.0)          /* deg to rad */
@@ -72,6 +73,8 @@ extern "C" {
 #define SC2RAD      3.1415926535898     /* semi-circle to radian (IS-GPS) */
 #define AU          149597870691.0      /* 1 AU (m) */
 #define AS2R        (D2R/3600.0)        /* arc sec to radian */
+#define M2NS        (1E9/CLIGHT)        /* m to ns */
+#define NS2M        (CLIGHT/1E9)        /* ns to m */
 
 #define OMGE        7.2921151467E-5     /* earth angular velocity (IS-GPS) (rad/s) */
 
@@ -515,6 +518,92 @@ extern "C" {
 #define P2_50       8.881784197001252E-16 /* 2^-50 */
 #define P2_55       2.775557561562891E-17 /* 2^-55 */
 
+#define MAXBSNXSYS      7               /* BIAS-SINEX Supported GNSS(G,R,E,J,C,I,S) */
+#define SSR_VENDOR_L6   0               /* vendor type L6(MADOCA-PPP) */
+#define SSR_VENDOR_RTCM 1               /* vendor type RTCM3(JAXA-MADOCA) */
+#define MAXAGESSRL6     60.0            /* max age of ssr satellite code and phase bias (s) L6E MADOCA-PPP*/
+
+#define SATT_NORMAL     0               /* nominal attitude  */
+
+
+#define GM_EGM          3.986004415E14  /* earth grav. constant   (EGM96/2008) */
+#define DT_BETA_R       10.0            /* delta time for beta angle rate (s) */
+
+#define STYPE_NONE      0               /* satellite type: unknown */
+#define STYPE_GPSII     1               /* satellite type: GPS Block II */
+#define STYPE_GPSIIA    2               /* satellite type: GPS Block IIA */
+#define STYPE_GPSIIR    3               /* satellite type: GPS Block IIR */
+#define STYPE_GPSIIRM   4               /* satellite type: GPS Block IIR-M */
+#define STYPE_GPSIIF    5               /* satellite type: GPS Block IIF */
+#define STYPE_GPSIIIA   6               /* satellite type: GPS Block III-A */
+#define STYPE_GPSIIIB   7               /* satellite type: GPS Block III-B */
+#define STYPE_GLO       8               /* satellite type: GLONASS */
+#define STYPE_GLOM      9               /* satellite type: GLONASS-M */
+#define STYPE_GLOK      10              /* satellite type: GLONASS-K */
+#define STYPE_GAL       11              /* satellite type: Galileo IOV */
+#define STYPE_QZS       12              /* satellite type: QZSS Block IQ */
+#define STYPE_QZSIIQ    13              /* satellite type: QZSS Block IIQ */
+#define STYPE_QZSIIG    14              /* satellite type: QZSS Block IIG */
+#define STYPE_QZSIIIQ   15              /* satellite type: QZSS Block IIIQ */
+#define STYPE_QZSIIIG   16              /* satellite type: QZSS Block IIIG */
+#define STYPE_GAL_FOC   17              /* satellite type: Galileo FOC */
+#define STYPE_BDS_G     18              /* satellite type: BeiDou GEO */
+#define STYPE_BDS_I     19              /* satellite type: BeiDou IGSO */
+#define STYPE_BDS_M     20              /* satellite type: BeiDou MEO */
+#define STYPE_BDS_I_YS  21              /* satellite type: BeiDou IGSO(does not enter ON mode) */
+#define STYPE_BDS_M_YS  22              /* satellite type: BeiDou MEO(does not enter ON mode) */
+#define STYPE_BDS3_G    23              /* satellite type: BeiDou-3 GEO */
+#define STYPE_BDS3_I_C  24              /* satellite type: BeiDou-3 IGSO by CAST */
+#define STYPE_BDS3_I_S  25              /* satellite type: BeiDou-3 IGSO by SECM */
+#define STYPE_BDS3_M_C  26              /* satellite type: BeiDou-3 MEO  by CAST */
+#define STYPE_BDS3_M_S  27              /* satellite type: BeiDou-3 MEO  by SECM */
+
+#define STYPE_QZS_I_YS  30              /* satellite type: QZSS Block IQ(enable beta angle 15 and 17.5[deg]) */
+#define STYPE_LEO       31              /* satellite type: LEO */
+#define STYPE_MAX       32              /* max satellite type */
+
+#define MAXNP_EVENT     6               /* max number of event parameters */
+
+#define EVENT_NONE      0               /* orbit event: no event */
+#define EVENT_ATT_EC    1               /* orbit event: ATT_EC */
+#define EVENT_ATT_YS    2               /* orbit event: ATT_YS */
+#define EVENT_ATT_EC_YS 3               /* orbit event: ATT_EC_YS */
+#define EVENT_ATT_YS_EC 4               /* orbit event: ATT_YS_EC */
+
+#define TOW_LSB         30.0            /* epoch time 30s */
+#define MAXTRP          2880            /* all time data, (1hour/1day) */
+#define TYPE_TRP        0               /* data type of troposphere */
+#define TYPE_ION        1               /* data type of ionosphere */
+#define MAX_DIST_TRP    100.0           /* max distance for tropospheric correction (km) */
+#define MAX_DIST_ION    50.0            /* max distance for ionospheric correction (km) */
+#define MODE_PLANE      0               /* interpolation mode planer fitting */
+#define MODE_DISTWGT    1               /* interpolation mode weighted average of distance */
+
+#define SVR_CYCLE       10              /* server cycle (ms) */
+#define MAXSITES        256             /* max number of stat input streams */
+
+#define LOGIN_PROMPT    "*** LCLCMBRT MONITOR CONSOLE (" SOFTNAME " ver." VER_MALIB ") ***"
+#define LOGIN_USER      "admin"         /* console login user */
+#define LOGIN_PASSWD    "root"          /* console login password */
+#define INACT_TIMEOUT   300             /* console inactive timeout (s) */
+
+#define ESC_CLEAR       "\033[H\033[2J" /* ansi/vt100 escape: erase screen */
+#define ESC_RESET       "\033[0m"       /* ansi/vt100 escape: reset attribute */
+#define ESC_BOLD        "\033[1m"       /* ansi/vt100 escape: bold */
+
+#define RTCM3PREAMB     0xD3            /* rtcm ver.3 frame preamble */
+#define MAXBLK          32              /* max number of block */
+#define MAXTRPSTA       512             /* max number of tropospheric station blocks */
+#define MAXIONSTA       256             /* max number of ionospheric station blocks */
+#define MAX_REJ_SITES   5               /* max number of reject sites */
+#define BTYPE_GRID      0               /* block type grid */
+#define BTYPE_STA       1               /* block type station */
+
+#define ION_BLKSIZE     2.0             /* ionosphere block size */
+#define TRP_BLKSIZE     4.0             /* troposphere block size */
+
+#define MAX_STANAME     16              /* max length of station name */
+
 #ifdef WIN32
 #define rtk_thread_t    HANDLE
 #define rtk_lock_t      CRITICAL_SECTION
@@ -805,32 +894,105 @@ typedef struct {        /* SSR correction type */
     float  stdpb[MAXCODE]; /* std-dev of phase biases (m) */
     double yaw_ang,yaw_rate; /* yaw angle and yaw rate (deg,deg/s) */
     uint8_t update;     /* update flag (0:no update,1:update) */
+    int vendor;         /* vendor type(0:L6(MADOCA-PPP),1:RTCM3(JAXA-MADOCA)) */
 } ssr_t;
 
 typedef struct {        /* stec data type */
+    gtime_t gt[2];                     /* update time {satellite,station} */
+    char staname[10];                  /* selected station */
+    double scb[MAXSAT][MAXCODE];       /* satellite code biases */
+    double spb[MAXSAT][MAXCODE];       /* satellite phase biases  */
+    double rsyscb[MAXBSNXSYS][MAXCODE];/* system code biases of each station */
+    double rsatcb[MAXSAT][MAXCODE];    /* satellite code biases of each station */
+    int vscb[MAXSAT][MAXCODE];         /* valid flag(0:invlalid,1:valid) */
+    int vspb[MAXSAT][MAXCODE];         /* valid flag(0:invlalid,1:valid) */
+    int vrsyscb[MAXBSNXSYS][MAXCODE];  /* valid flag(0:invlalid,1:valid) */
+    int vrsatcb[MAXSAT][MAXCODE];      /* valid flag(0:invlalid,1:valid) */
+} osb_t;
+
+typedef struct {        /* site type */
+    char   name[8];     /* site name */
+    double ecef[3];     /* site position(ecef-x,y,z) [m] */
+} spos_t;
+
+typedef struct {        /* ionospheric data type */
     gtime_t time;       /* time (GPST) */
     unsigned char sat;  /* satellite number */
     double ion;         /* slant ionos delay (m) */
-    float std;          /* std-dev (m) */
-    float azel[2];      /* azimuth/elevation (rad) */
-    unsigned char flag; /* fix flag */
-} stec_t;
+    double std;         /* std-dev (m) */
+    double azel[2];     /* estimate azimuth/elevation (rad) */
+    unsigned char qflag; /* Q flag */
+    double ipp[3];      /* ionospheric pierce point(x,y,z) [m] */
+} ion_t;
 
 typedef struct {        /* trop data type */
     gtime_t time;       /* time (GPST) */
     double trp[3];      /* zenith tropos delay/gradient (m) */
-    float std[3];       /* std-dev (m) */
-} trop_t;
+    double std[3];      /* std-dev (m) */
+    unsigned char qflag; /* Q flag */
+} trp_t;
 
 typedef struct {        /* ppp corrections type */
-    int nsta;           /* number of stations */
-    char stas[MAXSTA][8]; /* station names */
-    double rr[MAXSTA][3]; /* station ecef positions (m) */
-    int ns[MAXSTA],nsmax[MAXSTA]; /* number of stec data */
-    int nt[MAXSTA],ntmax[MAXSTA]; /* number of trop data */
-    stec_t *stec[MAXSTA]; /* stec data */
-    trop_t *trop[MAXSTA]; /* trop data */
-} pppcorr_t;
+    spos_t site;        /* site data */
+    ion_t iond[MAXSAT]; /* ionospheric data */
+}siteion_t;
+
+typedef struct {        /* station stat corrections */
+    spos_t site;        /* site data */
+    trp_t trpd;         /* tropospheric data */
+}sitetrp_t;
+
+typedef struct {        /* station stat corrections */
+    gtime_t time[MAXSITES]; /* time (GPST) */
+    int  nsi,nst;       /* number of stat corrections stations */
+    siteion_t sion[MAXSITES]; /* ionospheric corrections sites */
+    sitetrp_t strp[MAXSITES]; /* tropospheric corrections sites */
+}stat_t;
+
+typedef struct {        /* single station stat corrections */
+    gtime_t time;       /* time (GPST) */
+    siteion_t sion;     /* ionospheric corrections site */
+    sitetrp_t strp;     /* tropospheric corrections site */
+}sstat_t;
+
+typedef struct {        /* local combination options */
+    gtime_t ts;         /* start time */
+    gtime_t te;         /* stop time */
+    int ni;             /* number of iteration */
+    double maxres[MAX_REJ_SITES]; /* max residual */
+    double eratio;      /* residual error ratio */
+    char *gridfile;     /* input grid setting file name */ 
+    char *stafile;      /* input station setting file name */ 
+    char *istfile;      /* input stream setting file name (only lclcmbrt) */ 
+    char *infile;       /* input file name */
+    char *outpath;      /* output file path */ 
+    char *outlog;       /* output log file name */
+    char *clogfile;     /* output command log file name */
+} lclopt_t;
+
+typedef struct {        /* block info type */
+    int btype;          /* block type (0:grid,1:station) */
+    int bn;             /* block number */
+    double bs;          /* block size */
+    int gpitch;         /* grid pitch (0:16grid,1:64grid) */
+    unsigned int mask[2]; /* grid mask */
+    int n;              /* number of valid grid/station */
+    double bpos[3];     /* block base position {lat,lon,hgt} (rad,m) */
+    double grid[MAXTRPSTA][3]; /* grid/station position {lat,lon,hgt} (rad,m) */
+    int gp[MAXTRPSTA];  /* valid grid point index */
+} blkinf_t;
+
+typedef struct {        /* block type */
+    double idist,tdist; /* distance (km) for interpolation threshold */
+    int extp;           /* flag enable extrapolation check on planer fitting mode */
+    int interp;         /* interpolation mode (0:planer fitting,1:weighted average of distance)*/
+    int inum,tnum;      /* number of ionospheric/tropospheric correction data */
+    blkinf_t tblkinf[MAXBLK]; /* tropospheric block info */
+    blkinf_t iblkinf[MAXBLK]; /* ionospheric block info */
+    sitetrp_t tstat[MAXBLK][MAXTRPSTA]; /* tropospheric block correction data */
+    siteion_t istat[MAXBLK][MAXTRPSTA]; /* ionospheric block correction data */
+    int outin,outtn;    /* ionospheric/trop output control */
+} lclblock_t;
 
 typedef struct {        /* navigation data type */
     int n,nmax;         /* number of broadcast ephemeris */
@@ -869,7 +1031,12 @@ typedef struct {        /* navigation data type */
     sbsion_t sbsion[MAXBAND+1]; /* SBAS ionosphere corrections */
     dgps_t dgps[MAXSAT]; /* DGPS corrections */
     ssr_t ssr[MAXSAT];  /* SSR corrections */
-    pppcorr_t pppcorr;  /* ppp corrections */
+    stat_t stat;        /* stat corrections */
+    osb_t osb;          /* Observable-specific Signal Bias data */
+    char biapath [MAXSTRPATH]; /* bias sinex file path */
+    char fcbpath [MAXSTRPATH]; /* fcb file path */
+    char pr_biapath [MAXSTRPATH]; /* previous bias sinex file path */
+    char pr_fcbpath [MAXSTRPATH]; /* previous fcb file path */
 } nav_t;
 
 typedef struct {        /* station parameter type */
@@ -968,7 +1135,7 @@ typedef struct {        /* RTCM control struct type */
     uint32_t nmsg2[100]; /* message count of RTCM 2 (1-99:1-99,0:other) */
     uint32_t nmsg3[400]; /* message count of RTCM 3 (1-299:1001-1299,300-329:4070-4099,0:ohter) */
     char opt[256];      /* RTCM dependent options */
-    pppcorr_t cor;      /* ppp corrections */
+    lclblock_t lclblk;  /* output of iono/trop corrections */
 } rtcm_t;
 
 typedef struct {        /* RINEX control struct type */
@@ -1057,6 +1224,12 @@ typedef struct {        /* processing options type */
     pcv_t pcvr[2];      /* receiver antenna parameters {rov,base} */
     uint8_t exsats[MAXSAT]; /* excluded satellites (1:excluded,2:included) */
     int  ign_chierr;    /* ignore chi-square error mode (0:off,1:on) */
+    int  bds2bias;      /* estimate of bias for each BeiDou2 satellite type (0:off,1:on) */
+    int  sattmode;      /* 0:nominal */
+    int  pppsatcb;      /* satellite code bias selection (0:auto,1:ssr,2:bia,3:dcb) */
+    int  pppsatpb;      /* satellite phase bias selection (0:auto,1:ssr,3:fcb) */
+    int  unbias   ;     /* (0:use uncorrected code bias,1:do not use uncorrected code bias) */
+    double maxbiasdt;   /* bias sinex  and fcb  code/phase bias timeout(s) */
     int  maxaveep;      /* max averaging epoches */
     int  initrst;       /* initialize by restart */
     int  outsingle;     /* output single by dgps/float/fix/ppp outage */
@@ -1068,8 +1241,8 @@ typedef struct {        /* processing options type */
     int16_t elmaskopt[360]; /* elevation mask pattern */
     char pppopt[256];   /* ppp option */
     char rtcmopt[256];  /* rtcm options */
-    int  pppsig[5];     /* signal selection [0]GPS IIR-M,[1]GPS IIF,[2]GPS IIIA,[3]QZS-1/2,[4]GAL */
-
+    int  pppsig[6];     /* signal selection [0]GPS IIR-M,[1]GPS IIF,[2]GPS IIIA,[3]QZS-1/2,[4]BDS-3,[5]GAL */
+    char staname[32];   /* station name */
 } prcopt_t;
 
 typedef struct {        /* solution options type */
@@ -1108,6 +1281,8 @@ typedef struct {        /* file options type */
     char elmask [MAXSTRPATH]; /* elevation mask file */
     char solstat[MAXSTRPATH]; /* solution statistics file */
     char trace  [MAXSTRPATH]; /* debug trace file */
+    char bia    [MAXSTRPATH]; /* bias sinex data file */
+    char fcb    [MAXSTRPATH]; /* fcb data file */
 } filopt_t;
 
 typedef struct {        /* RINEX options type */
@@ -1296,9 +1471,10 @@ typedef struct {        /* RTK server type */
     uint8_t *sbuf[2];   /* output buffers {sol1,sol2} */
     uint8_t *pbuf[3];   /* peek buffers {rov,base,corr} */
     sol_t solbuf[MAXSOLBUF]; /* solution buffer */
-    uint32_t nmsg[3][10]; /* input message counts */
+    uint32_t nmsg[3][12]; /* input message counts */
     raw_t  raw [3];     /* receiver raw control {rov,base,corr} */
     rtcm_t rtcm[3];     /* RTCM control {rov,base,corr} */
+    sstat_t sstat;      /* single stat control */
     gtime_t ftime[3];   /* download time {rov,base,corr} */
     char files[3][MAXSTRPATH]; /* download paths {rov,base,corr} */
     obs_t obs[3][MAXOBSBUF]; /* observation data {rov,base,corr} */
@@ -1317,6 +1493,42 @@ typedef struct {        /* RTK server type */
     double bl_reset;    /* baseline length to reset (km) */
     rtk_lock_t lock;    /* lock flag */
 } rtksvr_t;
+
+typedef struct {        /* input monitor stream type */
+    char sta[32];       /* station */
+    int  fmt;           /* format */
+    int  stat;          /* input stream status */
+    int  dis;           /* disable flag */
+    int  type_str;      /* input stream type */
+    int  type_log;      /* log stream type */
+    char path_str[MAXSTRPATH]; /* input stream path */
+    char path_log[MAXSTRPATH]; /* log stream path */
+    stream_t str;       /* input stream */
+    stream_t log;       /* log stream */
+    gtime_t tcon;       /* connet time */
+    gtime_t time;       /* time tag of last stat data */
+    unsigned int cnt;   /* input data count {stat} */
+    sstat_t sstat;      /* stat correction */
+    uint8_t buff[4096]; /* stat message buffer */
+    int nbyte;          /* number of stat message */
+    double rr[3];       /* position(ecef) */
+} instat_t;
+
+typedef struct {        /* stream local combination server */
+    gtime_t ts;         /* update time */
+    int btype;          /* block type */
+    int state;          /* state (0:stop,1:run) */
+    int navsys;         /* system nav data */
+    int ninp;           /* number of input monitor streams */
+    unsigned int cnt;   /* count {rtcm} */
+    instat_t ins[MAXSITES]; /* input stat streams */
+    stat_t stat;        /* input of iono/trop corrections */
+    rtcm_t rtcm;        /* output of iono/trop corrections */
+    stream_t ostr;      /* output stream for combined data */
+    stream_t olog;      /* log stream for combined data */
+    rtk_thread_t thread;/* server thread */
+    rtk_lock_t lock;    /* mutex for lock */
+} lclcmbsvr_t;
 
 typedef struct {        /* GIS data point type */
     double pos[3];      /* point data {lat,lon,height} (rad,m) */
@@ -1346,6 +1558,51 @@ typedef struct {        /* GIS type */
     gisd_t *data[MAXGISLAYER]; /* gis data list */
     double bound[4];    /* boundary {lat0,lat1,lon0,lon1} */
 } gis_t;
+
+typedef struct event_tag {  /* orbit event list type */
+    gtime_t time;           /* event time (gpst) */
+    int type;               /* event type */
+    double p [MAXNP_EVENT]; /* event parameters */
+    double s [MAXNP_EVENT]; /* standard deviation of event parameters */
+    double p0[MAXNP_EVENT]; /* event parameters checkpoint */
+    double s0[MAXNP_EVENT]; /* standard deviation checkpoint */
+    int ix,nx;              /* index/number of estimated parameters */
+    struct event_tag *next; /* pointer to next */
+} event_t;
+
+typedef struct {        /* BIAS data record type */
+    int type;           /* bias type(0:DSB,1:ISB,2:OSB)*/
+    gtime_t t0,t1;      /* start, end time */
+    int code[2];        /* signal CODE_xxx */
+    double val, valstd; /* estimated value, std */
+    double slp, slpstd; /* estimated slope, std */
+} bia_t;
+
+typedef struct {        /* satellite BIAS data record type */
+    int ncb[MAXSAT],ncbmax[MAXSAT]; /* number of code biases */
+    int rcb[MAXSAT];    /* bookmark of code biases */
+    int npb[MAXSAT],npbmax[MAXSAT]; /* number of phase biases */
+    int rpb[MAXSAT];    /* bookmark of phase biases */
+    bia_t *cb[MAXSAT];  /* code biases data record */
+    bia_t *pb[MAXSAT];  /* phase biases data record */
+} biasat_t;
+
+typedef struct {        /* station BIAS data record type */
+    char name[10];      /* station name */
+    int nsyscb[MAXBSNXSYS],nsyscbmax[MAXBSNXSYS]; /* number of system code biases */
+    int rsyscb[MAXBSNXSYS]; /* bookmark of system code biases */
+    int nsatcb[MAXSAT],nsatcbmax[MAXSAT]; /* number of satellite code biases */
+    int rsatcb[MAXSAT]; /* bookmark of satellite code biases */
+    bia_t *syscb[MAXBSNXSYS]; /* system code biases data record */
+    bia_t *satcb[MAXSAT]; /* satellite code biases data record */
+} biasta_t;
+
+typedef struct {        /* BIAS-SINEX data type */
+    int nsta;           /* number of stations */
+    biasat_t sat;       /* satellite biases data record */
+    biasta_t sta[MAXSTA]; /* station biases data record */
+    int refcode[MAXBSNXSYS][2]; /* reference observables */
+} biass_t;
 
 typedef void fatalfunc_t(const char *); /* fatal callback function type */
 
@@ -1450,6 +1707,7 @@ double dms2deg(const double *dms);
 /* input and output functions ------------------------------------------------*/
 void readpos(const char *file, const char *rcv, double *pos);
 int sortobs(obs_t *obs);
+void signal_replace(obsd_t *obs, int idx, char f, char *c);
 void uniqnav(nav_t *nav);
 int screent(gtime_t time, gtime_t ts, gtime_t te, double tint);
 int readnav(const char *file, nav_t *nav);
@@ -1576,7 +1834,6 @@ int getseleph(int sys);
 void readsp3(const char *file, nav_t *nav, int opt);
 int readsap(const char *file, gtime_t time, nav_t *nav);
 int readdcb(const char *file, nav_t *nav, const sta_t *sta);
-int readfcb(const char *file, nav_t *nav);
 void alm2pos(gtime_t time, const alm_t *alm, double *rs, double *dts);
 
 /* NORAD TLE (two line element) functions ------------------------------------*/
@@ -1753,7 +2010,7 @@ int pntpos(const obsd_t *obs, int n, const nav_t *nav, const prcopt_t *opt,
 /* precise positioning -------------------------------------------------------*/
 void rtkinit(rtk_t *rtk, const prcopt_t *opt);
 void rtkfree(rtk_t *rtk);
-int rtkpos(rtk_t *rtk, const obsd_t *obs, int nobs, const nav_t *nav);
+int rtkpos(rtk_t *rtk, const obsd_t *obs, int nobs, nav_t *nav);
 int rtkopenstat(const char *file, int level);
 void rtkclosestat(void);
 int rtkoutstat(rtk_t *rtk, char *buff);
@@ -1765,13 +2022,6 @@ int pppoutstat(rtk_t *rtk, char *buff);
 
 int ppp_ar(rtk_t *rtk, const obsd_t *obs, int n, int *exc, const nav_t *nav,
            const double *azel, double *x, double *P);
-extern int pppcorr_read(pppcorr_t *corr, const char *file);
-extern void pppcorr_free(pppcorr_t *corr);
-extern int pppcorr_trop(const pppcorr_t *corr, gtime_t time, const double *pos,
-                        double *ztd, double *std);
-extern int pppcorr_stec(const pppcorr_t *corr, gtime_t time, const double *pos,
-                        const double *el,double *ion, double *std);
-extern int input_stat(rtcm_t *rtcm, unsigned char data, rtksvr_t *svr);
 
 /* post-processing positioning -----------------------------------------------*/
 int postpos(gtime_t ts, gtime_t te, double ti, double tu, const prcopt_t *popt,
@@ -1825,6 +2075,29 @@ void dl_test(gtime_t ts, gtime_t te, double ti, const url_t *urls, int nurl,
 int gis_read(const char *file, gis_t *gis, int layer);
 void gis_free(gis_t *gis);
 
+/* BIAS-SINEX functions ------------------------------------------------------*/
+int getsysno(int sat);
+biass_t *getbiass(void);
+void addbia(const bia_t *bia, bia_t **ary, int *n, int *nmax);
+int readbsnx(const char *file);
+void outbsnxh(FILE *fp,gtime_t ts,gtime_t te,const char* agency);
+void outbsnxrefh(FILE *fp);
+void outbsnxrefb(FILE *fp, int type, char* reftext);
+void outbsnxreff(FILE *fp);
+void outbsnxcomh(FILE *fp);
+void outbsnxcomb(FILE *fp, char* comtext);
+void outbsnxcomf(FILE *fp);
+void outbsnxsol(FILE *fp);
+int udosb_sat(osb_t *osb, gtime_t gt, int mode);
+int udosb_station(osb_t *osb, gtime_t gt, int mode, char *name);
+
+/* read fcb functions ------------------------------------------------------*/
+int readfcb(const char *file);
+int udfcb_sat(osb_t *osb, gtime_t gt, int mode);
+
+/* code/phase bias functions -------------------------------------------------*/
+void updatbiass(gtime_t t, prcopt_t *popt, nav_t *nav);
+
 /* application defined functions ---------------------------------------------*/
 extern int showmsg(const char *format,...);
 extern void settspan(gtime_t ts, gtime_t te);
@@ -1836,6 +2109,50 @@ extern int decode_qzss_l6emsg(rtcm_t *rtcm);
 extern int input_qzssl6e(rtcm_t *rtcm, const uint8_t data);
 extern int input_qzssl6ef(rtcm_t *rtcm, FILE *fp);
 extern int mcssr_sel_biascode(const int sys, const int code);
+
+
+
+
+
+
+
+/* local correction data combination common functions ------------------------*/
+extern int initgridsta(const char *setfile, lclblock_t *lclblk, int btype);
+extern void grid_intp_trop(const gtime_t gt, const stat_t *stat,
+                           lclblock_t *lclblk);
+extern void sta_sel_trop(const gtime_t time, const stat_t *stat,
+                         lclblock_t *lslblk);
+extern void grid_intp_iono(const gtime_t gt, const stat_t *stat,
+                           lclblock_t *lclblk, double maxres, int *nrej, 
+                           int *ncnt);
+extern void sta_sel_iono(const gtime_t gt, const stat_t *stat,
+                         lclblock_t *lslblk);
+extern void output_lclcmb(rtcm_t *rtcm, int btype, stream_t *ostr);
+
+/* local correction common functions -----------------------------------------*/
+extern void initblkinf(blkinf_t *b);
+extern int getstano(stat_t *stat, const char* sta);
+extern int input_stat(sstat_t *sstat, const char data, char *buff, int *nbyte);
+extern int input_statf(sstat_t *sstat, FILE *fp, char *buff, int *nbyte);
+extern double posdist(const double *ecef1, const double *ecef2);
+extern int get_trop_sta(gtime_t time, const trp_t *trpd, double *trp,
+                        double *std);
+extern int get_iono_sta(gtime_t time, const ion_t *iond, double *ion,
+                        double *std, double *el);
+extern int corr_trop_distwgt(const stat_t *stat, gtime_t time,
+                             const double *llh,double maxdist, double *trp,
+                             double *std);
+extern int corr_iono_distwgt(const stat_t *stat, gtime_t time,
+                             const double *llh,const double *el, double maxdist,
+                             double *ion, double *std, double maxres, int *nrej,
+                             int *ncnt);
+extern int block2stat(rtcm_t *rtcm, stat_t *stat);
+
+/* rtcm3 local correction message encoder/decoder functions ------------------*/
+extern int encode_lcltrop(rtcm_t *rtcm, int type);
+extern int encode_lcliono(rtcm_t *rtcm, int type);
+extern int decode_lcltrop(rtcm_t *rtcm, int type);
+extern int decode_lcliono(rtcm_t *rtcm, int type);
 
 #ifdef __cplusplus
 }

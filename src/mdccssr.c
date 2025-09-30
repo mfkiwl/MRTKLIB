@@ -6,7 +6,6 @@
 * references :
 *     [1]  CAO IS-QZSS-MDC-004, May, 2025
 *
-* version : $Revision:$ $Date:$
 * history : 2024/02/01 1.0  new, for MALIB from TETC original tools.
 *           2025/08/31 1.1  add vendor type setting
 *                           change the sign of the phase bias correction to 
@@ -87,7 +86,7 @@ static const uint8_t cssr_sig_cmp[16]={
 };
 static const uint8_t cssr_sig_qzs[16]={
     CODE_L1C,CODE_L1S,CODE_L1L,CODE_L1X,CODE_L2S,CODE_L2L,CODE_L2X,CODE_L5I,
-    CODE_L5Q,CODE_L5X,CODE_L6I,CODE_L6Q,CODE_L6X,CODE_L1A,       0,       0
+    CODE_L5Q,CODE_L5X,CODE_L6S,CODE_L6L,CODE_L6E,CODE_L1E,       0,       0
 };
 
 const uint8_t cssr_sig_rsv[16]={0};
@@ -298,7 +297,9 @@ static int decode_mcssr_oc(mcssr_t *mc, ssr_t *ssr, int i, int apply)
 
     i = decode_mcssr_head(mc, &sync, &iod, &ep, &udint, i, MCSSR_ST_OC);
     if(mc->tow0 < 0) {
-        trace(2,"decode_mcssr_oc: unprocessed mask\n");
+        trace(2,"decode_mcssr_oc: %s,unprocessed mask\n",
+            time_str(mc->gt,3));
+        apply=0;
         return -1;
     }
     if(mc->ep0 > ep) ep += 3600;
@@ -355,7 +356,9 @@ static int decode_mcssr_cc(mcssr_t *mc, ssr_t *ssr, int i, int apply)
 
     i = decode_mcssr_head(mc, &sync, &iod, &ep, &udint, i, MCSSR_ST_CC);
     if(mc->tow0 < 0) {
-        trace(2,"decode_mcssr_cc: unprocessed mask\n");
+        trace(2,"decode_mcssr_cc: %s,unprocessed mask\n",
+            time_str(mc->gt,3));
+        apply=0;
         return -1;
     }
     if(mc->ep0 > ep) ep += 3600;
@@ -404,7 +407,9 @@ static int decode_mcssr_cb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
 
     i = decode_mcssr_head(mc, &sync, &iod, &ep, &udint, i, MCSSR_ST_CB);
     if(mc->tow0 < 0) {
-        trace(2,"decode_mcssr_cb: unprocessed mask\n");
+        trace(2,"decode_mcssr_cb: %s,unprocessed mask\n",
+            time_str(mc->gt,3));
+        apply=0;
         return -1;
     }
     if(mc->ep0 > ep) ep += 3600;
@@ -502,8 +507,7 @@ static int decode_mcssr_pb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
             ssr[sat-1].iod[5]   = iod;
             ssr[sat-1].yaw_ang  = 0.0;
             ssr[sat-1].yaw_rate = 0.0;
-            /* Note. Invert the value based on the process in corr_phase_bias_ssr() */
-            for (k=0;k<MAXCODE;k++) ssr[sat-1].pbias[k] = -(float)pbias[k];
+            for (k=0;k<MAXCODE;k++) ssr[sat-1].pbias[k] = (float)pbias[k];
             ssr[sat-1].update=1;
         }
     }
@@ -842,6 +846,12 @@ extern int mcssr_sel_biascode(const int sys, const int code)
             case CODE_L5I:                  /* E5aI */
             case CODE_L5Q:                  /* E5aQ */
             case CODE_L5X: return CODE_L5X; /* E5aI+Q */
+            case CODE_L7I:                  /* E5bI */
+            case CODE_L7Q:                  /* E5bQ */
+            case CODE_L7X: return CODE_L7X; /* E5bI+Q */
+            case CODE_L6B:                  /* E6B */
+            case CODE_L6C:                  /* E6C */
+            case CODE_L6X: return CODE_L6B; /* E6B+C */
         }
         break;
     case SYS_QZS:
@@ -856,7 +866,8 @@ extern int mcssr_sel_biascode(const int sys, const int code)
             case CODE_L5I:                  /* L5I */
             case CODE_L5Q:                  /* L5Q */
             case CODE_L5X: return CODE_L5X; /* L5X */
-        }
+            case CODE_L1E: return CODE_L1E; /* L1C/B */
+	}
         break;
     }
     return CODE_NONE;

@@ -1,13 +1,14 @@
 /*------------------------------------------------------------------------------
 * ppp_ar.c : ppp ambiguity resolution
 *
+* Copyright (C) 2024-2025 Japan Aerospace Exploration Agency. All Rights Reserved.
+*
 * reference :
 *    [1] H.Okumura, C-gengo niyoru saishin algorithm jiten (in Japanese),
 *        Software Technology, 1991
 *
 *          Copyright (C) 2012-2015 by T.TAKASU, All rights reserved.
 *
-* version : $Revision:$ $Date:$
 * history : 2013/03/11  1.0  new
 *           2015/05/15  1.1  refine complete algorithms
 *           2015/05/31  1.2  delete WL-ambiguity resolution by ILS
@@ -15,12 +16,10 @@
 *           2015/11/26  1.3  support option opt->pppopt=-TRACE_AR
 *           2024/02/01  1.4  port from previous version of MALIB
 *                            support option opt->arsys in gen_sat_sd()
+*           2024/12/20  1.5  delete L5-receiver-dcb estimation
+*                            add BeiDou-2 ISB estimation
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
-
-#if 0
-static const char rcsid[]="$Id:$";
-#endif
 
 #define MIN_AMB_RES 4         /* min number of ambiguities for ILS-AR */
 #define MIN_ARC_GAP 300.0     /* min arc gap (s) */
@@ -42,7 +41,7 @@ static const char rcsid[]="$Id:$";
 #define NC(opt)     (NSYS)
 #define NT(opt)     ((opt)->tropopt<TROPOPT_EST?0:((opt)->tropopt==TROPOPT_EST?1:3))
 #define NI(opt)     ((opt)->ionoopt==IONOOPT_EST?MAXSAT:0)
-#define ND(opt)     ((opt)->nf>=3?1:0)
+#define ND(opt)     ((opt)->navsys&SYS_CMP?3:0)
 #define NR(opt)     (NP(opt)+NC(opt)+NT(opt)+NI(opt)+ND(opt))
 #define IB(s,f,opt) (NR(opt)+MAXSAT*(f)+(s)-1)
 

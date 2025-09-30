@@ -1,9 +1,9 @@
 /*------------------------------------------------------------------------------
 * options.c : options functions
 *
-*          Copyright (C) 2010-2021 by T.TAKASU, All rights reserved.
+* Copyright (C) 2024-2025 Japan Aerospace Exploration Agency. All Rights Reserved.
+* Copyright (C) 2010-2021 by T.TAKASU, All rights reserved.
 *
-* version : $Revision:$ $Date:$
 * history : 2010/07/20  1.1  moved from postpos.c
 *                            added api:
 *                                searchopt(),str2opt(),opt2str(),opt2buf(),
@@ -31,6 +31,9 @@
 *           2021/05/07  1.14 add file-elmaskfile
 *           2024/02/01  1.15 branch from ver.2.4.3b35 for MALIB
 *                            add pos2-arsys,pos2-ign_chierr
+*           2024/12/20  1.16 add pos2-sigbds3,pos2-bds2bias,pos2-pppsatcb,
+*                             pos2-pppsatpb,pos2-uncorrbias,pos2-maxbiasdt,
+*                             file-fcbfile,file-biafile
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
 
@@ -68,8 +71,11 @@ static char snrmask_[NFREQ][1024];
 #define PHWOPT  "0:off,1:on,2:precise"
 #define SIGOPT1 "0:L1C/A-L2P,1:L1C/A-L2C"
 #define SIGOPT2 "0:L1C/A-L2P,1:L1C/A-L2C,2:L1C/A-L5"
-#define SIGOPT3 "0:L1C-L5,1:L1C/A-L2C"
-#define SIGOPT4 "0:E1C-E5a,1:E1C-E5b"
+#define SIGOPT3 "0:L1C-L5,1:L1C/A-L2C,2:L1C/B-L5,10:L1C/AandB-L5"
+#define SIGOPT4 "0:B1-B3,1:B1C-B2a"
+#define SIGOPT5 "0:E1C-E5a,1:E1C-E5b"
+#define SATCB   "0:auto,1:ssr,2:bia,3:dcb"
+#define SATPB   "0:auto,1:ssr,3:fcb"
 
 opt_t sysopts[]={
     {"pos1-posmode",    3,  (void *)&prcopt_.mode,       MODOPT },
@@ -122,8 +128,15 @@ opt_t sysopts[]={
     {"pos2-siggpsIIF",  0,  (void *)&prcopt_.pppsig[1],  SIGOPT2},
     {"pos2-siggpsIIIA", 0,  (void *)&prcopt_.pppsig[2],  SIGOPT2},
     {"pos2-sigqzs1_2",  0,  (void *)&prcopt_.pppsig[3],  SIGOPT3},
-    {"pos2-siggal   ",  0,  (void *)&prcopt_.pppsig[4],  SIGOPT4},
+    {"pos2-sigbds3"   , 0,  (void *)&prcopt_.pppsig[4],  SIGOPT4},
+    {"pos2-siggal   ",  0,  (void *)&prcopt_.pppsig[5],  SIGOPT5},
     {"pos2-ign_chierr", 3,  (void *)&prcopt_.ign_chierr, SWTOPT },
+    {"pos2-bds2bias"  , 3,  (void *)&prcopt_.bds2bias  , SWTOPT },
+    {"pos2-pppsatcb"  , 0,  (void *)&prcopt_.pppsatcb  , SATCB  },
+    {"pos2-pppsatpb"  , 0,  (void *)&prcopt_.pppsatpb  , SATPB  },
+    {"pos2-uncorrbias", 0,  (void *)&prcopt_.unbias,     ""     },
+    {"pos2-maxbiasdt",  0,  (void *)&prcopt_.maxbiasdt,  "s"    },
+    {"pos2-sattmode"  , 0,  (void *)&prcopt_.sattmode  , ""     },
     
     {"out-solformat",   3,  (void *)&solopt_.posf,       SOLOPT },
     {"out-outhead",     3,  (void *)&solopt_.outhead,    SWTOPT },
@@ -200,6 +213,8 @@ opt_t sysopts[]={
     {"file-geexefile",  2,  (void *)&filopt_.geexe,      ""     },
     {"file-solstatfile",2,  (void *)&filopt_.solstat,    ""     },
     {"file-tracefile",  2,  (void *)&filopt_.trace,      ""     },
+    {"file-fcbfile",    2,  (void *)&filopt_.fcb,        ""     },
+    {"file-biafile",    2,  (void *)&filopt_.bia,        ""     },
     
     {"",0,NULL,""} /* terminator */
 };

@@ -1,14 +1,14 @@
 /*------------------------------------------------------------------------------
 * rtksvr.c : rtk server functions
 *
-*          Copyright (C) 2007-2021 by T.TAKASU, All rights reserved.
+* Copyright (C) 2024-2025 Japan Aerospace Exploration Agency. All Rights Reserved.
+* Copyright (C) 2007-2021 by T.TAKASU, All rights reserved.
 *
 * references :
 *     [1]  CAO IS-QZSS-MDC-002, November, 2023
 *
 * options : -DWIN32    use WIN32 API
 *
-* version : $Revision:$ $Date:$
 * history : 2009/01/07  1.0  new
 *           2009/06/02  1.1  support glonass
 *           2010/07/25  1.2  support correction input/log stream
@@ -51,6 +51,7 @@
 *           2024/02/01  1.25 branch from ver.2.4.3b35 for MALIB
 *                            fix bug update_ssr(),rtksrvinit()
 *           2024/08/02  1.26 support stat format
+*           2025/02/06  1.27 update stat format support local correction data
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
 
@@ -312,6 +313,31 @@ static void update_ssr(rtksvr_t *svr, int index)
     }
     svr->nmsg[index][7]++;
 }
+/* update stat corrections ---------------------------------------------------*/
+static void update_stat(rtksvr_t *svr, int index)
+{
+    int stano;
+    char staname[8];
+    stat_t *stat=&svr->nav.stat;
+    sstat_t *sstat=&svr->sstat;
+
+    /* update stat corrections */
+    sprintf(staname,"sta%d",index);
+    stano = getstano(stat, staname);
+
+    stat->time[stano]=sstat->time;
+    memcpy(&stat->sion[stano],&sstat->sion,sizeof(ion_t)*MAXSAT);
+    memcpy(&stat->strp[stano],&sstat->strp,sizeof(trp_t));
+    
+    svr->nmsg[index][10]++;
+}
+/* update local corrections ---------------------------------------------------*/
+static void update_lcl(rtksvr_t *svr, int index)
+{
+    if(block2stat(&svr->rtcm[index], &svr->nav.stat) == 0) return;
+
+    svr->nmsg[index][11]++;
+}
 /* update rtk server struct --------------------------------------------------*/
 static void update_svr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav,
                        int ephsat, int ephset, sbsmsg_t *sbsmsg, int index,
@@ -341,6 +367,12 @@ static void update_svr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav,
     else if (ret==10) { /* ssr message */
         update_ssr(svr,index);
     }
+    else if (ret==11) { /* stat message */
+        update_stat(svr,index);
+    }
+    else if (ret==12) { /* local message */
+        update_lcl(svr,index);
+    }
     else if (ret==-1) { /* error */
         svr->nmsg[index][9]++;
     }
@@ -351,8 +383,10 @@ static int decoderaw(rtksvr_t *svr, int index)
     obs_t *obs={0};
     nav_t *nav={0};
     sbsmsg_t *sbsmsg=NULL;
-    int i,ret,ephsat=0,ephset=0,fobs=0;
+    int i,ret=0,ephsat=0,ephset=0,fobs=0;
     static int init_flg=1;
+    static char buff[3][4096];
+    static int nbyte[3]={0};
     
     tracet(4,"decoderaw: index=%d\n",index);
     
@@ -385,7 +419,7 @@ static int decoderaw(rtksvr_t *svr, int index)
         }
         else if (svr->format[index]==STRFMT_STAT) {
             /* decode stat */
-            ret = input_stat(svr->rtcm+index,svr->buff[index][i],svr);
+            ret=input_stat(&svr->sstat,svr->buff[index][i],buff[index],&nbyte[index]);
         }
         else {
             ret=input_raw(svr->raw+index,svr->rtcm+index,svr->format[index],svr->buff[index][i]);
@@ -704,8 +738,6 @@ extern int rtksvrinit(rtksvr_t *svr)
     eph_t  eph0 ={0,-1,-1};
     geph_t geph0={0,-1};
     seph_t seph0={0};
-    stec_t stec0={{0}};
-    trop_t trop0={{0}};
     int i,j;
     
     tracet(3,"rtksvrinit:\n");
@@ -724,7 +756,7 @@ extern int rtksvrinit(rtksvr_t *svr)
     for (i=0;i<2;i++) svr->sbuf[i]=NULL;
     for (i=0;i<3;i++) svr->pbuf[i]=NULL;
     for (i=0;i<MAXSOLBUF;i++) svr->solbuf[i]=sol0;
-    for (i=0;i<3;i++) for (j=0;j<10;j++) svr->nmsg[i][j]=0;
+    for (i=0;i<3;i++) for (j=0;j<12;j++) svr->nmsg[i][j]=0;
     for (i=0;i<3;i++) svr->ftime[i]=time0;
     for (i=0;i<3;i++) svr->files[i][0]='\0';
     svr->moni=NULL;
@@ -747,18 +779,7 @@ extern int rtksvrinit(rtksvr_t *svr)
     svr->nav.ng=NSATGLO*2;
     svr->nav.ns=NSATSBS*2;
     
-    svr->nav.pppcorr.nsta=0;
-    for (i=0;i<MAXSTA;i++) {
-        if (!(svr->nav.pppcorr.stec[i]=(stec_t *)malloc(sizeof(stec_t)*MAXOBS*2))||
-            !(svr->nav.pppcorr.trop[i]=(trop_t *)malloc(sizeof(trop_t)*2))) {
-            tracet(1,"rtksvrinit: malloc error(pppcorr)\n");
-            return 0;
-        }
-        for (j=0;j<MAXOBS*2;j++) svr->nav.pppcorr.stec[i][j]=stec0;
-        for (j=0;j<2;j++)        svr->nav.pppcorr.trop[i][j]=trop0;
-        svr->nav.pppcorr.ns[i]=0;
-        svr->nav.pppcorr.nt[i]=0;
-    }
+    memset(&svr->nav.stat,0,sizeof(stat_t));
 
     for (i=0;i<3;i++) for (j=0;j<MAXOBSBUF;j++) {
         if (!(svr->obs[i][j].data=(obsd_t *)malloc(sizeof(obsd_t)*MAXOBS))) {
@@ -892,7 +913,7 @@ extern int rtksvrstart(rtksvr_t *svr, int cycle, int buffsize, int *strs,
             sprintf(errmsg,"rtk server malloc error");
             return 0;
         }
-        for (j=0;j<10;j++) svr->nmsg[i][j]=0;
+        for (j=0;j<12;j++) svr->nmsg[i][j]=0;
         for (j=0;j<MAXOBSBUF;j++) svr->obs[i][j].n=0;
         strcpy(svr->cmds_periodic[i],!cmds_periodic[i]?"":cmds_periodic[i]);
         

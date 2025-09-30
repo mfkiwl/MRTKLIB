@@ -409,3 +409,5 @@ navigation satellite system).[RTKLIB manual](https://www.rtklib.com/prog/manual_
 TBD...
 
 ## Annotation
+To ensure optimal performance, we recommend the following system configuration:
+・ Operating System : Ubuntu 20.04

@@ -1,9 +1,9 @@
 /*------------------------------------------------------------------------------
 * rnx2rtkp.c : read rinex obs/nav files and compute receiver positions
 *
-*          Copyright (C) 2007-2023 by T.TAKASU, All rights reserved.
+* Copyright (C) 2024 Japan Aerospace Exploration Agency. All Rights Reserved.
+* Copyright (C) 2007-2023 by T.TAKASU, All rights reserved.
 *
-* version : $Revision: 1.1 $ $Date: 2008/07/17 21:55:16 $
 * history : 2007/01/16  1.0 new
 *           2007/03/15  1.1 add library mode
 *           2007/05/08  1.2 separate from postpos.c
@@ -21,6 +21,8 @@
 *           2024/02/01  1.13 branch from ver.2.4.3b35 for MALIB
 *                            add option -ign_chierr
 *           2024/08/02  1.14 change initial value of glomodear
+*           2024/09/26  1.15 update version info
+*           2024/12/20  1.16 add option -sta
 *-----------------------------------------------------------------------------*/
 #include <stdarg.h>
 #include "rtklib.h"
@@ -75,6 +77,7 @@ static const char *help[]={
 " -l lat lon hgt reference (base) receiver latitude/longitude/height (deg/m)",
 "           rover latitude/longitude/height for fixed or ppp-fixed mode",
 " -ign_chierr ignore chi-square error mode [off]",
+" -sta staname   station name[RINEX MARKER NAME]",
 " -y level  output soltion status (0:off,1:states,2:residuals) [0]",
 " -x level  debug trace level (0:off) [0]",
 " -ver      print version"
@@ -100,7 +103,7 @@ static void printhelp(void)
 /* print version -------------------------------------------------------------*/
 static void printver(void)
 {
-    fprintf(stderr,"%s ver.%s %s\n",PROGNAME,VER_MALIB,PATCH_LEVEL_MALIB);
+    fprintf(stderr,"%s(%s ver.%s %s)\n",PROGNAME,SOFTNAME,VER_MALIB,PATCH_LEVEL_MALIB);
     exit(0);
 }
 /* rnx2rtkp main -------------------------------------------------------------*/
@@ -119,7 +122,7 @@ int main(int argc, char **argv)
     prcopt.refpos=1;
     prcopt.glomodear=0;
     solopt.timef=0;
-    sprintf(solopt.prog ,"%s ver.%s %s",PROGNAME,VER_MALIB,PATCH_LEVEL_MALIB);
+    sprintf(solopt.prog ,"%s(%s ver.%s %s)",PROGNAME,SOFTNAME,VER_MALIB,PATCH_LEVEL_MALIB);
     sprintf(filopt.trace,"%s.trace",PROGNAME);
     
     /* load options from configuration file */
@@ -186,6 +189,7 @@ int main(int argc, char **argv)
             matcpy(prcopt.ru,prcopt.rb,3,1);
         }
         else if (!strcmp(argv[i],"-ign_chierr")) prcopt.ign_chierr = 1;
+        else if (!strcmp(argv[i],"-sta")&&i+1<argc) strcpy(prcopt.staname,argv[++i]);
         else if (!strcmp(argv[i],"-y")&&i+1<argc) solopt.sstat=atoi(argv[++i]);
         else if (!strcmp(argv[i],"-x")&&i+1<argc) solopt.trace=atoi(argv[++i]);
         else if (!strcmp(argv[i],"-ver")) printver();

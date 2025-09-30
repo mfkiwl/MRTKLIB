@@ -1,6 +1,7 @@
 /*------------------------------------------------------------------------------
 * ephemeris.c : satellite ephemeris and clock functions
 *
+* Copyright (C) 2024 Japan Aerospace Exploration Agency. All Rights Reserved.
 *          Copyright (C) 2010-2021 by T.TAKASU, All rights reserved.
 *
 * references :
@@ -26,8 +27,9 @@
 *     [10] RTCM Standard 10403.3, Differential GNSS (Global Navigation
 *         Satellite Systems) Services - version 3, October 7, 2016
 *     [11] CAO IS-QZSS-MDC-002, November, 2023
+*     [12] RTCM Paper 107-2014-SC104-818, Proposal of new RTCM SSR Messages
+*          SSR Stage 1: Galileo, QZSS, SBAS, BDS, 2014
 *
-* version : $Revision:$ $Date:$
 * history : 2010/07/28 1.1  moved from rtkcmn.c
 *                           added api:
 *                               eph2clk(),geph2clk(),seph2clk(),satantoff()
@@ -74,6 +76,7 @@
 *           2021/05/21 1.15 fix typos
 *           2024/02/01 1.16 branch from ver.2.4.3b35 for MALIB
 *                           change constant MAXAGESSR 90.0 -> 60.0
+*           2024/12/20 1.17 update seleph() to use toes % 8192 for BeiDou
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
 
@@ -443,7 +446,8 @@ static eph_t *seleph(gtime_t time, int sat, int iode, const nav_t *nav)
     
     for (i=0;i<nav->n;i++) {
         if (nav->eph[i].sat!=sat) continue;
-        if (iode>=0&&nav->eph[i].iode!=iode) continue;
+        if (sys!=SYS_CMP&&iode>=0&&nav->eph[i].iode!=iode) continue;
+        if (sys==SYS_CMP&&iode>=0&&(int)nav->eph[i].toes % 8192!=iode) continue; /* DF470 ref [12] */
         if (sys==SYS_GAL) {
             sel=getseleph(SYS_GAL);
             if (sel==0&&!(nav->eph[i].code&(1<<9))) continue; /* I/NAV */

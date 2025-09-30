@@ -1,12 +1,12 @@
 /*------------------------------------------------------------------------------
 * rtcm3.c : RTCM ver.3 message decorder functions
 *
-*          Copyright (C) 2009-2021 by T.TAKASU, All rights reserved.
+* Copyright (C) 2024-2025 Japan Aerospace Exploration Agency. All Rights Reserved.
+* Copyright (C) 2009-2021 by T.TAKASU, All rights reserved.
 *
 * references :
 *     see rtcm.c
 *
-* version : $Revision:$ $Date:$
 * history : 2012/05/14 1.0  separated from rtcm.c
 *           2012/12/12 1.1  support gal/qzs ephemeris, gal/qzs ssr, msm
 *                           add station id consistency test for obs data
@@ -50,6 +50,11 @@
 *           2021/01/04 1.23 support GLO extended SVH, SVA and flags in MT1020
 *           2024/02/01 1.24 branch from ver.2.4.3b35 for MALIB
 *                           support MT4050 QZSS LEX signal raw data(MSJ)(ref [19])
+*           2024/12/20 1.25 update SSR signal and tracking mode IDs
+*                           update BeiDou iode for MADOCA-PPP
+*                           add vendor type setting
+*           2025/02/06 1.26 support MT2001-2016 trop/iono correction data
+*                           fix bug decode_ssr7()
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
 
@@ -127,28 +132,26 @@ const char *msm_sig_irn[32]={
 };
 /* SSR signal and tracking mode IDs ------------------------------------------*/
 const uint8_t ssr_sig_gps[32]={
-    CODE_L1C,CODE_L1P,CODE_L1W,CODE_L1S,CODE_L1L,CODE_L2C,CODE_L2D,CODE_L2S,
-    CODE_L2L,CODE_L2X,CODE_L2P,CODE_L2W,       0,       0,CODE_L5I,CODE_L5Q,
-    CODE_L5X,CODE_L1X
+    CODE_L1C,CODE_L1P,CODE_L1W,CODE_L1Y,CODE_L1M,CODE_L2C,CODE_L2D,CODE_L2S,
+    CODE_L2L,CODE_L2X,CODE_L2P,CODE_L2W,CODE_L2Y,CODE_L2M,CODE_L5I,CODE_L5Q,
+    CODE_L5X
 };
 const uint8_t ssr_sig_glo[32]={
     CODE_L1C,CODE_L1P,CODE_L2C,CODE_L2P,CODE_L4A,CODE_L4B,CODE_L6A,CODE_L6B,
     CODE_L3I,CODE_L3Q
 };
 const uint8_t ssr_sig_gal[32]={
-    CODE_L1A,CODE_L1B,CODE_L1C,CODE_L1X,       0,CODE_L5I,CODE_L5Q,CODE_L5X,
-    CODE_L7I,CODE_L7Q,       0,CODE_L8I,CODE_L8Q,       0,CODE_L6A,CODE_L6B,
-    CODE_L6C
+    CODE_L1A,CODE_L1B,CODE_L1C,CODE_L1X,CODE_L1Z,CODE_L5I,CODE_L5Q,CODE_L5X,
+    CODE_L7I,CODE_L7Q,CODE_L7X,CODE_L8I,CODE_L8Q,CODE_L8X,CODE_L6A,CODE_L6B,
+    CODE_L6C,CODE_L6X,CODE_L6Z
 };
 const uint8_t ssr_sig_qzs[32]={
-    CODE_L1C,CODE_L1S,CODE_L1L,CODE_L2S,CODE_L2L,       0,CODE_L5I,CODE_L5Q,
-           0,CODE_L6S,CODE_L6L,       0,       0,       0,       0,       0,
-           0,CODE_L6E
+    CODE_L1C,CODE_L1S,CODE_L1L,CODE_L2S,CODE_L2L,CODE_L2X,CODE_L5I,CODE_L5Q,
+    CODE_L5X,CODE_L6S,CODE_L6L,CODE_L6X,CODE_L1X
 };
 const uint8_t ssr_sig_cmp[32]={
-    CODE_L2I,CODE_L2Q,       0,CODE_L6I,CODE_L6Q,       0,CODE_L7I,CODE_L7Q,
-           0,CODE_L1D,CODE_L1P,       0,CODE_L5D,CODE_L5P,       0,CODE_L1A,
-           0,       0,CODE_L6A
+    CODE_L2I,CODE_L2Q,CODE_L2X,CODE_L7I,CODE_L7Q,CODE_L7X,CODE_L6I,CODE_L6Q,
+    CODE_L6X,CODE_L1D,CODE_L1P,CODE_L1X,CODE_L5D,CODE_L5P,CODE_L5X
 };
 const uint8_t ssr_sig_sbs[32]={
     CODE_L1C,CODE_L5I,CODE_L5Q
@@ -1582,6 +1585,7 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
     for (j=0;j<nsat&&i+121+np+ni+nj<=rtcm->len*8;j++) {
         prn     =getbitu(rtcm->buff,i,np)+offp; i+=np;
         iode    =getbitu(rtcm->buff,i,ni);      i+=ni;
+        if (sys==SYS_CMP) iode*=8;
         iodcrc  =getbitu(rtcm->buff,i,nj);      i+=nj;
         deph [0]=getbits(rtcm->buff,i,22)*1E-4; i+=22;
         deph [1]=getbits(rtcm->buff,i,20)*4E-4; i+=20;
@@ -1594,6 +1598,7 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
             trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
+        rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
         rtcm->ssr[sat-1].t0 [0]=rtcm->time;
         rtcm->ssr[sat-1].udi[0]=udint;
         rtcm->ssr[sat-1].iod[0]=iod;
@@ -1645,6 +1650,7 @@ static int decode_ssr2(rtcm_t *rtcm, int sys, int subtype)
             trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
+        rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
         rtcm->ssr[sat-1].t0 [1]=rtcm->time;
         rtcm->ssr[sat-1].udi[1]=udint;
         rtcm->ssr[sat-1].iod[1]=iod;
@@ -1702,6 +1708,7 @@ static int decode_ssr3(rtcm_t *rtcm, int sys, int subtype)
             trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
+        rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
         rtcm->ssr[sat-1].t0 [4]=rtcm->time;
         rtcm->ssr[sat-1].udi[4]=udint;
         rtcm->ssr[sat-1].iod[4]=iod;
@@ -1758,6 +1765,7 @@ static int decode_ssr4(rtcm_t *rtcm, int sys, int subtype)
             trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
+        rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
         rtcm->ssr[sat-1].t0 [0]=rtcm->ssr[sat-1].t0 [1]=rtcm->time;
         rtcm->ssr[sat-1].udi[0]=rtcm->ssr[sat-1].udi[1]=udint;
         rtcm->ssr[sat-1].iod[0]=rtcm->ssr[sat-1].iod[1]=iod;
@@ -1808,6 +1816,7 @@ static int decode_ssr5(rtcm_t *rtcm, int sys, int subtype)
             trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
+        rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
         rtcm->ssr[sat-1].t0 [3]=rtcm->time;
         rtcm->ssr[sat-1].udi[3]=udint;
         rtcm->ssr[sat-1].iod[3]=iod;
@@ -1850,6 +1859,7 @@ static int decode_ssr6(rtcm_t *rtcm, int sys, int subtype)
             trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
+        rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
         rtcm->ssr[sat-1].t0 [2]=rtcm->time;
         rtcm->ssr[sat-1].udi[2]=udint;
         rtcm->ssr[sat-1].iod[2]=iod;
@@ -1953,6 +1963,7 @@ static int decode_ssr7(rtcm_t *rtcm, int sys, int subtype)
             trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
+        rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
         rtcm->ssr[sat-1].t0 [5]=rtcm->time;
         rtcm->ssr[sat-1].udi[5]=udint;
         rtcm->ssr[sat-1].iod[5]=iod;
@@ -1964,7 +1975,7 @@ static int decode_ssr7(rtcm_t *rtcm, int sys, int subtype)
             rtcm->ssr[sat-1].stdpb[k]=(float)stdpb[k];
         }
     }
-    return 20;
+    return sync?0:10;
 }
 /* get signal index ----------------------------------------------------------*/
 static void sigindex(int sys, const uint8_t *code, int n, const char *opt,
@@ -2740,6 +2751,18 @@ extern int decode_rtcm3(rtcm_t *rtcm)
         case 4073: ret=decode_type4073(rtcm); break;
         case 4076: ret=decode_type4076(rtcm); break;
         case 4050: ret=decode_type4050(rtcm); break;
+        case 2001: ret=decode_lcltrop(rtcm,type); break;   /* tentative */
+        case 2002: ret=decode_lcliono(rtcm,type); break;   /* tentative */
+        case 2003: ret=decode_lcliono(rtcm,type); break;   /* tentative */
+        case 2004: ret=decode_lcliono(rtcm,type); break;   /* tentative */
+        case 2005: ret=decode_lcliono(rtcm,type); break;   /* tentative */
+        case 2006: ret=decode_lcliono(rtcm,type); break;   /* tentative */
+        case 2011: ret=decode_lcltrop(rtcm,type); break;   /* tentative */
+        case 2012: ret=decode_lcliono(rtcm,type); break;   /* tentative */
+        case 2013: ret=decode_lcliono(rtcm,type); break;   /* tentative */
+        case 2014: ret=decode_lcliono(rtcm,type); break;   /* tentative */
+        case 2015: ret=decode_lcliono(rtcm,type); break;   /* tentative */
+        case 2016: ret=decode_lcliono(rtcm,type); break;   /* tentative */
     }
     if (ret>=0) {
         if      (1001<=type&&type<=1299) rtcm->nmsg3[type-1000]++; /*   1-299 */

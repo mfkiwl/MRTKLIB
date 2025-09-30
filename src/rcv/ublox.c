@@ -1,8 +1,9 @@
 /*------------------------------------------------------------------------------
 * ublox.c : ublox receiver dependent functions
 *
-*          Copyright (C) 2007-2023 by T.TAKASU, All rights reserved.
-*          Copyright (C) 2014 by T.SUZUKI, All rights reserved.
+* Copyright (C) 2024 Japan Aerospace Exploration Agency. All Rights Reserved.
+* Copyright (C) 2007-2023 by T.TAKASU, All rights reserved.
+* Copyright (C) 2014 by T.SUZUKI, All rights reserved.
 *
 * reference :
 *     [1] ublox-AG, GPS.G3-X-03002-D, ANTARIS Positioning Engine NMEA and UBX
@@ -18,7 +19,6 @@
 *     [6] u-blox D9 QZS 1.01, UBX-21031777-R01 C1-Public, u-blox D9
 *         QZSS correction service receiver Interface Description, Sep, 2021
 *
-* version : $Revision: 1.2 $ $Date: 2008/07/14 00:05:05 $
 * history : 2007/10/08 1.0  new
 *           2008/06/16 1.1  separate common functions to rcvcmn.c
 *           2009/04/01 1.2  add range check of prn number

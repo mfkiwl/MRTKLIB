@@ -1,12 +1,12 @@
 /*------------------------------------------------------------------------------
 * rtkrcv.c : rtk-gps/gnss receiver console ap
 *
-*          Copyright (C) 2009-2021 by T.TAKASU, All rights reserved.
+* Copyright (C) 2024-2025 Japan Aerospace Exploration Agency. All Rights Reserved.
+* Copyright (C) 2009-2021 by T.TAKASU, All rights reserved.
 *
 * notes   :
 *     current version does not support win32 without pthread library
 *
-* version : $Revision:$ $Date:$
 * history : 2009/12/13 1.0  new
 *           2010/07/18 1.1  add option -m
 *           2010/08/12 1.2  fix bug on ftp/http
@@ -41,6 +41,9 @@
 *                           add option -rst
 *           2024/08/02 1.25 add stat format option
 *                           fix bug confwrite() con_close()
+*           2024/09/26 1.26 update version info
+*           2024/12/20 1.27 add option -sta
+*           2025/02/06 1.28 support Bias-SINEX and FCB files correction
 *-----------------------------------------------------------------------------*/
 #include <stdlib.h>
 #include <signal.h>
@@ -128,7 +131,7 @@ static char sta_name[256]="";           /* station name */
 static prcopt_t prcopt;                 /* processing options */
 static solopt_t solopt[2]={{0}};        /* solution options */
 static filopt_t filopt  ={""};          /* file options */
-gtime_t rst = {0};                      /* raw/rtcm data start time */
+static gtime_t rst = {0};                      /* raw/rtcm data start time */
 
 /* help text -----------------------------------------------------------------*/
 static const char *usage[]={
@@ -350,7 +353,7 @@ static int login(vt_t *vt)
     if (!*passwd||!vt->type) return 1;
     
     while (!(intflg&2)) {
-        if (!vt_printf(vt,"password: ",PRGNAME)) return 0;
+        if (!vt_printf(vt,"password: ",PROGNAME)) return 0;
         vt->blind=1;
         if (!vt_gets(vt,buff,sizeof(buff))||vt->brk) {
             vt->blind=0;
@@ -654,17 +657,17 @@ static void prsolution(vt_t *vt, const sol_t *sol, const double *rb)
 static void prstatus(vt_t *vt)
 {
     rtk_t rtk;
-    const char *svrstate[]={"stop","run"},*type[]={"rover","base","corr"};
+    const char *svrstate[]={"stop","run"};
     const char *sol[]={"-","fix","float","SBAS","DGPS","single","PPP",""};
     const char *mode[]={
          "single","DGPS","kinematic","static","moving-base","fixed",
          "PPP-kinema","PPP-static"
     };
     const char *freq[]={"-","L1","L1+L2","L1+L2+L3","L1+L2+L3+L4","L1+L2+L3+L4+L5",""};
-    rtcm_t rtcm[3];
+    static rtcm_t rtcm[3];
     int i,j,n,thread,cycle,state,rtkstat,nsat0,nsat1,prcout,nave;
     int cputime,nb[3]={0},nmsg[3][10]={{0}};
-    char tstr[64],s[1024],*p;
+    char tstr[64],s[1024],*p,tmp[64];
     double runtime,rt[3]={0},dop[4]={0},rr[3],bl1=0.0,bl2=0.0;
     double azel[MAXSAT*2],pos[3],vel[3],*del;
     
@@ -703,7 +706,8 @@ static void prstatus(vt_t *vt)
     dops(n,azel,0.0,dop);
     
     vt_printf(vt,"\n%s%-28s: %s%s\n",ESC_BOLD,"Parameter","Value",ESC_RESET);
-    vt_printf(vt,"%-28s: %s %s\n","malib version",VER_MALIB,PATCH_LEVEL_MALIB);
+    sprintf(tmp,"%s version",SOFTNAME);
+    vt_printf(vt,"%-28s: %s %s\n",tmp,VER_MALIB,PATCH_LEVEL_MALIB);
     vt_printf(vt,"%-28s: %d\n","rtk server thread",thread);
     vt_printf(vt,"%-28s: %s\n","rtk server state",svrstate[state]);
     vt_printf(vt,"%-28s: %d\n","processing cycle (ms)",cycle);
@@ -714,7 +718,7 @@ static void prstatus(vt_t *vt)
     vt_printf(vt,"%-28s: %d\n","missing obs data count",prcout);
     vt_printf(vt,"%-28s: %d,%d\n","bytes in input buffer",nb[0],nb[1]);
     for (i=0;i<3;i++) {
-        sprintf(s,"# of input data %s",type[i]);
+        sprintf(s,"# of input%d data",i+1);
         vt_printf(vt,"%-28s: obs(%d),nav(%d),gnav(%d),ion(%d),sbs(%d),pos(%d),dgps(%d),ssr(%d),err(%d)\n",
                 s,nmsg[i][0],nmsg[i][1],nmsg[i][6],nmsg[i][2],nmsg[i][3],
                 nmsg[i][4],nmsg[i][5],nmsg[i][7],nmsg[i][9]);
@@ -735,7 +739,8 @@ static void prstatus(vt_t *vt)
         if (rtcm[i].nmsg3[0]>0) {
             sprintf(p,"%sother3(%d)",p>s?",":"",rtcm[i].nmsg3[0]);
         }
-        vt_printf(vt,"%-15s %-9s: %s\n","# of rtcm messages",type[i],s);
+        sprintf(tmp,"# of rtcm%d messages",i+1);
+        vt_printf(vt,"%-28s: %s\n",tmp,s);
     }
     vt_printf(vt,"%-28s: %s\n","solution status",sol[rtkstat]);
     time2str(rtk.sol.time,tstr,9);
@@ -949,8 +954,8 @@ static void prerror(vt_t *vt)
 static void prstream(vt_t *vt)
 {
     const char *ch[]={
-        "input rover","input base","input corr","output sol1","output sol2",
-        "log rover","log base","log corr","monitor"
+        "input1","input2","input3","output1","output2",
+        "log1","log2","log3","monitor"
     };
     const char *type[]={
         "-","serial","file","tcpsvr","tcpcli","ntripsvr","ntripcli","ftp",
@@ -1314,7 +1319,7 @@ static void cmd_save(char **args, int narg, vt_t *vt)
     }
     if (!confwrite(vt,file)) return;
     time2str(utc2gpst(timeget()),s,0);
-    sprintf(comment,"%s options (%s, v.%s %s)",PRGNAME,s,VER_MALIB,PATCH_LEVEL_MALIB);
+    sprintf(comment,"%s options (%s, %s ver.%s %s)",PRGNAME,s,SOFTNAME,VER_MALIB,PATCH_LEVEL_MALIB);
     setsysopts(&prcopt,solopt,&filopt);
     if (!saveopts(file,"w",comment,rcvopts)||!saveopts(file,"a",NULL,sysopts)) {
         vt_printf(vt,"options save error: %s\n",file);
@@ -1351,7 +1356,7 @@ static void cmd_help(char **args, int narg, vt_t *vt)
     int i;
     
     if (narg<2) {
-        vt_printf(vt,"%s (ver.%s %s)\n",PRGNAME,VER_MALIB,PATCH_LEVEL_MALIB);
+        vt_printf(vt,"%s (%s ver.%s %s)\n",PRGNAME,SOFTNAME,VER_MALIB,PATCH_LEVEL_MALIB);
         for (i=0;*helptxt[i];i++) vt_printf(vt,"%s\n",helptxt[i]);
     }
     else if (strstr(str,args[1])==str) {
@@ -1395,8 +1400,8 @@ static void *con_thread(void *arg)
     
     trace(3,"console_thread:\n");
     
-    vt_printf(con->vt,"\n%s** %s ver.%s %s console (h:help) **%s\n",ESC_BOLD,
-              PRGNAME,VER_MALIB,PATCH_LEVEL_MALIB,ESC_RESET);
+    vt_printf(con->vt,"\n%s** %s(%s ver.%s %s) console (h:help) **%s\n",ESC_BOLD,
+              PRGNAME,SOFTNAME,VER_MALIB,PATCH_LEVEL_MALIB,ESC_RESET);
     
     if (!login(con->vt)) {
         vt_close(con->vt);
@@ -1669,6 +1674,7 @@ int main(int argc, char **argv)
     int i,start=0,port=0,outstat=0,trace=0,sock=0;
     char *dev="",file[MAXSTR]="";
     double ee[]={2000,12,31,23,59,59};
+    char staname[32]="";
     
     for (i=1;i<argc;i++) {
         if      (!strcmp(argv[i],"-s")) start=1;
@@ -1679,7 +1685,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i],"-w")&&i+1<argc) strcpy(passwd,argv[++i]);
         else if (!strcmp(argv[i],"-r")&&i+1<argc) outstat=atoi(argv[++i]);
         else if (!strcmp(argv[i],"-t")&&i+1<argc) trace=atoi(argv[++i]);
-        else if (!strcmp(argv[i],"-sta")&&i+1<argc) strcpy(sta_name,argv[++i]);
+        else if (!strcmp(argv[i],"-sta")&&i+1<argc) strcpy(staname,argv[++i]);
         else if (!strcmp(argv[i],"-v")||!strcmp(argv[i],"-ver")) printver();
         else if (!strcmp(argv[i],"-rst")&&i+2<argc) {
             sscanf(argv[++i],"%lf/%lf/%lf",ee,ee+1,ee+2);
@@ -1705,6 +1711,15 @@ int main(int argc, char **argv)
     }
     getsysopts(&prcopt,solopt,&filopt);
     
+    if(strlen(svr.nav.biapath)==0 && strlen(filopt.bia)>0){
+        strcpy(svr.nav.biapath,filopt.bia);
+    }
+    if(strlen(svr.nav.fcbpath)==0 && strlen(filopt.fcb)>0){
+        strcpy(svr.nav.fcbpath,filopt.fcb);
+    }
+    if(strlen(staname)>0){
+        strncpy(prcopt.staname,staname,sizeof(prcopt.staname));
+    }
     /* read navigation data */
     if (!readnav(NAVIFILE,&svr.nav)) {
         fprintf(stderr,"no navigation data: %s\n",NAVIFILE);

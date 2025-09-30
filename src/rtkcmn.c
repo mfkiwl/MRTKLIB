@@ -1,7 +1,8 @@
 /*------------------------------------------------------------------------------
 * rtkcmn.c : rtklib common functions
 *
-*          Copyright (C) 2007-2021 by T.TAKASU, All rights reserved.
+* Copyright (C) 2024 Japan Aerospace Exploration Agency. All Rights Reserved.
+* Copyright (C) 2007-2021 by T.TAKASU, All rights reserved.
 *
 * options : -DLAPACK   use LAPACK/BLAS
 *           -DMKL      use Intel MKL
@@ -36,7 +37,6 @@
 *     [10] GLONASS/GPS/Galileo/Compass/SBAS NV08C receiver series BINR interface
 *         protocol specification ver.1.3, August, 2012
 *
-* version : $Revision: 1.1 $ $Date: 2008/07/17 21:48:06 $
 * history : 2007/01/12 1.0 new
 *           2007/03/06 1.1 input initial rover pos of pntpos()
 *                          update only effective states of filter()
@@ -151,6 +151,8 @@
 *           2024/02/01 1.49 branch from ver.2.4.3b35 for MALIB
 *                           add pos2-arsys,pos2-ign_chierr
 *           2024/08/02 1.50 change initial value of glomodear,bdsmodear
+*           2024/12/20 1.51 change API sunmoonpos_eci()
+*                           add signal_replace() from rtkpos.c
 *-----------------------------------------------------------------------------*/
 #define _POSIX_C_SOURCE 199506
 #include <stdarg.h>
@@ -230,7 +232,8 @@ const prcopt_t prcopt_default={ /* defaults processing options */
     {0},{0},{0},                /* baseline,ru,rb */
     {"",""},                    /* anttype */
     {{0}},{{0}},{0}             /* antdel,pcv,exsats */
-    ,0                          /* ign_chierr */
+    ,0,0                        /* ign_chierr,bds2bias */
+    ,0,0,0,0                    /* pppsatcb,pppsatpb,unbias,maxbiasdt */
 };
 const solopt_t solopt_default={ /* defaults solution output options */
     SOLF_LLH,TIMES_GPST,1,3,    /* posf,times,timef,timeu */
@@ -276,7 +279,7 @@ static char codepris[7][MAXFREQ][16]={  /* code priority for each freq-index */
     {"C"       ,"PYWCMNDLXS","QXI"     ,""       ,""       ,""      ,""}, /* GPS */
     {"CP"      ,"PC"        ,"QXI"     ,""       ,""       ,""      ,""}, /* GLO */
     {"CBX"     ,"QXI"       ,"QXI"     ,"CXB"    ,"QXI"    ,""      ,""}, /* GAL */
-    {"CLXS"    ,"LXS"       ,"QXI"     ,"SEZ"    ,""       ,""      ,""}, /* QZS */
+    {"CELXS"   ,"LXS"       ,"QXI"     ,"SEZ"    ,""       ,""      ,""}, /* QZS */
     {"C"       ,"IQX"       ,""        ,""       ,""       ,""      ,""}, /* SBS */
     {"IQDPXSLZ","IQXDPZ"    ,"DPX"     ,"IQXDPZ" ,"DPX"    ,""      ,""}, /* BDS */
     {"ABCX"    ,"ABCX"      ,""        ,""       ,""       ,""      ,""}  /* IRN */
@@ -544,7 +547,7 @@ extern int satexclude(int sat, double var, int svh, const prcopt_t *opt)
         if (opt->exsats[sat-1]==2) return 0; /* included satellite */
         if (!(sys&opt->navsys)) return 1; /* unselected sat sys */
     }
-    if (sys==SYS_QZS) svh&=0xFE; /* mask QZSS LEX health */
+    if (sys==SYS_QZS) svh&=0xEE; /* mask QZSS L1C/A,C/B health */
     
     if (sys==SYS_GLO) {
         if ((svh&9)||((svh>>1)&3)==2) { /* test Bn and extended SVH */
@@ -2935,6 +2938,35 @@ extern int sortobs(obs_t *obs)
     }
     return n;
 }
+
+/* signal replace --------------------------------------------------------------
+* replaces the observation data in the obs structure with the data specified
+* by the given frequency and signal code at the specified index
+* args   : obs_t *obs    IO     observation data
+*          int idx       I      observation index
+*          char f        I      freqency number
+*          char *c       I      code type
+*-----------------------------------------------------------------------------*/
+extern void signal_replace(obsd_t *obs, int idx, char f, char *c)
+{
+    int i,j;
+    char *code;
+
+    for(i=0;i<NFREQ+NEXOBS;i++){
+        code=code2obs(obs->code[i]);
+        for(j=0;c[j]!='\0';j++) if(code[0]==f && code[1]==c[j])break;
+        if(c[j]!='\0')break;
+    }
+    if(i<NFREQ+NEXOBS) {
+        obs->SNR[idx]=obs->SNR[i];obs->LLI[idx]=obs->LLI[i];obs->code[idx]=obs->code[i];
+        obs->L[idx]  =obs->L[i];  obs->P[idx]  =obs->P[i];  obs->D[idx]   =obs->D[i];
+    }
+    else {
+        obs->SNR[idx]=obs->LLI[idx]=obs->code[idx]=0;
+        obs->P[idx]  =obs->L[idx]  =obs->D[idx]   =0.0;
+    }
+}
+
 /* screen by time --------------------------------------------------------------
 * screening by time start, time end, and time interval
 * args   : gtime_t time  I      time
@@ -3952,7 +3984,7 @@ extern void antmodel_s(const pcv_t *pcv, double nadir, double *dant)
     trace(5,"antmodel_s: dant=%6.3f %6.3f\n",dant[0],dant[1]);
 }
 /* sun and moon position in eci (ref [4] 5.1.1, 5.2.1) -----------------------*/
-static void sunmoonpos_eci(gtime_t tut, double *rsun, double *rmoon)
+extern void sunmoonpos_eci(gtime_t tut, double *rsun, double *rmoon)
 {
     const double ep2000[]={2000,1,1,12,0,0};
     double t,f[5],eps,Ms,ls,rs,lm,pm,rm,sine,cose,sinp,cosp,sinl,cosl;

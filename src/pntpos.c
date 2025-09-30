@@ -1,9 +1,9 @@
 /*------------------------------------------------------------------------------
 * pntpos.c : standard positioning
 *
-*          Copyright (C) 2007-2020 by T.TAKASU, All rights reserved.
+* Copyright (C) 2024-2025 Japan Aerospace Exploration Agency. All Rights Reserved.
+* Copyright (C) 2007-2020 by T.TAKASU, All rights reserved.
 *
-* version : $Revision:$ $Date:$
 * history : 2010/07/28 1.0  moved from rtkcmn.c
 *                           changed api:
 *                               pntpos()
@@ -27,6 +27,7 @@
 *                           fix bug on ionosphere error variance in rescode()
 *           2024/02/01 1.9  branch from ver.2.4.3b35 for MALIB
 *                           add ignore chi-square error
+*           2024/12/20 1.10 enable GPS-QZS time offset estimation
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
 
@@ -34,11 +35,8 @@
 
 #define SQR(x)      ((x)*(x))
 
-#if 0 /* enable GPS-QZS time offset estimation */
-#define NX          (4+5)       /* # of estimated parameters */
-#else
-#define NX          (4+4)       /* # of estimated parameters */
-#endif
+#define NTO         5           /* number of time system offsets (GLO,GAL,QZS,BDS,IRN)*/
+#define NX          (4+NTO)     /* # of estimated parameters pos(3)+clk(1)+NTO */
 #define MAXITR      10          /* max number of iteration for point pos */
 #define ERR_ION     5.0         /* ionospheric delay Std (m) */
 #define ERR_TROP    3.0         /* tropspheric delay Std (m) */
@@ -319,11 +317,9 @@ static int rescode(int iter, const obsd_t *obs, int n, const double *rs,
         /* time system offset and receiver bias correction */
         if      (sys==SYS_GLO) {v[nv]-=x[4]; H[4+nv*NX]=1.0; mask[1]=1;}
         else if (sys==SYS_GAL) {v[nv]-=x[5]; H[5+nv*NX]=1.0; mask[2]=1;}
-        else if (sys==SYS_CMP) {v[nv]-=x[6]; H[6+nv*NX]=1.0; mask[3]=1;}
-        else if (sys==SYS_IRN) {v[nv]-=x[7]; H[7+nv*NX]=1.0; mask[4]=1;}
-#if 0 /* enable QZS-GPS time offset estimation */
-        else if (sys==SYS_QZS) {v[nv]-=x[8]; H[8+nv*NX]=1.0; mask[5]=1;}
-#endif
+        else if (sys==SYS_QZS) {v[nv]-=x[6]; H[6+nv*NX]=1.0; mask[3]=1;}
+        else if (sys==SYS_CMP) {v[nv]-=x[7]; H[7+nv*NX]=1.0; mask[4]=1;}
+        else if (sys==SYS_IRN) {v[nv]-=x[8]; H[8+nv*NX]=1.0; mask[5]=1;}
         else mask[0]=1;
         
         vsat[i]=1; resp[i]=v[nv]; (*ns)++;
@@ -387,7 +383,7 @@ static int estpos(const obsd_t *obs, int n, const double *rs, const double *dts,
     
     trace(3,"estpos  : n=%d\n",n);
     
-    v=mat(n+4,1); H=mat(NX,n+4); var=mat(n+4,1);
+    v=mat(n+NTO,1); H=mat(NX,n+NTO); var=mat(n+NTO,1);
     
     for (i=0;i<3;i++) x[i]=sol->rr[i];
     
@@ -423,6 +419,7 @@ static int estpos(const obsd_t *obs, int n, const double *rs, const double *dts,
             sol->dtr[2]=x[5]/CLIGHT; /* GAL-GPS time offset (s) */
             sol->dtr[3]=x[6]/CLIGHT; /* BDS-GPS time offset (s) */
             sol->dtr[4]=x[7]/CLIGHT; /* IRN-GPS time offset (s) */
+            sol->dtr[5]=x[8]/CLIGHT; /* IRN-GPS time system offset (s) */
             for (j=0;j<6;j++) sol->rr[j]=j<3?x[j]:0.0;
             for (j=0;j<3;j++) sol->qr[j]=(float)Q[j+j*NX];
             sol->qr[3]=(float)Q[1];    /* cov xy */

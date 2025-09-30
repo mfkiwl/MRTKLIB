@@ -1,15 +1,14 @@
 /*------------------------------------------------------------------------------
 * septentrio.c : Septentrio Binary Format (SBF) decoder
 *
-*          Copyright (C) 2020-2021 by Tomoji TAKASU
+* Copyright (C) 2024-2025 Japan Aerospace Exploration Agency. All Rights Reserved.
+* Copyright (C) 2020-2021 by Tomoji TAKASU
 *
 * reference :
 *     [1] Septentrio, mosaic-X5 reference guide applicable to version 4.8.0 of
 *         the firmware, June 4, 2020
 *     [2] Septentrio, AsteRx-m3 CLAS Reference Guide Applicable to version 4.12.1
 *         of the Firmware, April 14, 2021
-*
-* version : $Revision:$
 *
 * history : 2013/07/17  1.0  begin writing
 *           2013/10/24  1.1  GPS L1 working
@@ -45,12 +44,13 @@
 *           2024/03/01  1.15 improved performance of the decode_qzsrawl6()
 *           2024/08/02  1.16 suppress warnings
 *                            fix bug decode_ionutc()
+*           2025/07/31  1.17 fix bug signal type offset when SigIdxLo=31
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
 
 #define SBF_SYNC1       0x24    /* SBF block header 1 */
 #define SBF_SYNC2       0x40    /* SBF block header 2 */
-#define SBF_MAXSIG      36      /* SBF max signal number */
+#define SBF_MAXSIG      40      /* SBF max signal number */
 
 #define SBF_MEASEPOCH   4027    /* SBF GNSS measurements */
 #define SBF_MEASEXTRA   4000    /* SBF GNSS measurements extra info */
@@ -129,7 +129,10 @@ static uint8_t sig_tbl[SBF_MAXSIG+1][2]={ /* system, obs-code */
     {SYS_QZS, CODE_L1Z}, /* 33: QZS L1S */
     {SYS_CMP, CODE_L7D}, /* 34: BDS B2b */
     {      0,        0}, /* 35: reserved */
-    {SYS_IRN, CODE_L9A}  /* 36: IRN S */
+    {SYS_IRN, CODE_L9A}, /* 36: IRN S */
+    {      0,        0}, /* 37: reserved */
+    {SYS_QZS, CODE_L1E}, /* 38: QZS L1E(L1CB) */
+    {SYS_QZS, CODE_L5Z}  /* 39: QZS L5S */
 };
 /* signal number to freq-index and code --------------------------------------*/
 static int sig2idx(int sat, int sig, const char *opt, uint8_t *code)
@@ -216,7 +219,7 @@ static int decode_measepoch(raw_t *raw)
         info=U1(p+18);
         n2  =U1(p+19);
         fcn =0;
-        if (sig==31) sig+=(info>>3)*32;
+        if (sig==31) sig=(info>>3)+32;
         else if (sig>=8&&sig<=11) fcn=(info>>3)-8;
         
         if (ant!=ant_sel) {
@@ -265,7 +268,7 @@ static int decode_measepoch(raw_t *raw)
             sig =U1(p)&0x1f;
             ant =U1(p)>>5;
             info=U1(p+5);
-            if (sig==31) sig+=(info>>3)*32;
+            if (sig==31) sig=(info>>3)+32;
             
             if (ant!=ant_sel) {
                 trace(3,"sbf measepoch ant error: sat=%d ant=%d\n",sat,ant);
