@@ -398,10 +398,12 @@ navigation satellite system).[RTKLIB manual](https://www.rtklib.com/prog/manual_
 
 ## UPDATE HISTORY
 | Date       | version     | feature      |
-|:-----------|------------:|:------------:|
+|:-----------|------------:|:------------|
 | 2024/09/27 | 1.0.0       | first trail version MALIB |
 | 2025/02/28 | 1.1.0       | Add single-station atmospheric delay correction|
 |            |             | Delete unused files |
+| 2025/10/27 | 1.2.0_pre   | Pre-release version for upcoming v1.2.0|
+|            |             |(Detailed changes will be published in the official v1.2.0 release)|
 | TBD  |  TBD    | TBD            |
 |
 
@@ -409,5 +411,9 @@ navigation satellite system).[RTKLIB manual](https://www.rtklib.com/prog/manual_
 TBD...
 
 ## Annotation
-To ensure optimal performance, we recommend the following system configuration:
-・ Operating System : Ubuntu 20.04
+To ensure optimal performance, we recommend the following system configuration
+
+#### Operating System : Ubuntu 20.04
+The software is primarily developed and tested on native Ubuntu 20.04 environments. \
+However, it can also run on Windows environments via WSL (Windows Subsystem for Linux)
+using Ubuntu.
