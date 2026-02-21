@@ -61,6 +61,8 @@
 #include "mrtklib/mrtk_peph.h"
 #include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_bits.h"
+#include "mrtklib/mrtk_sys.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -1075,15 +1077,9 @@ int getcodepri(int sys, uint8_t code, const char *opt);
 
 /* matrix and vector functions are now declared in mrtklib/mrtk_mat.h */
 
-/* string functions ----------------------------------------------------------*/
-double  str2num(const char *s, int i, int n);
+/* str2num, reppath, reppaths moved to mrtklib/mrtk_sys.h */
 
 /* time functions are now declared in mrtklib/mrtk_time.h */
-
-int reppath(const char *path, char *rpath, gtime_t time, const char *rov,
-            const char *base);
-int reppaths(const char *path, char *rpaths[], int nmax, gtime_t ts,
-             gtime_t te, const char *rov, const char *base);
 
 /* coordinates transformation functions are now declared in mrtklib/mrtk_coords.h */
 
@@ -1114,10 +1110,7 @@ void tracepeph(int level, const nav_t *nav);
 void tracepclk(int level, const nav_t *nav);
 void traceb(int level, const uint8_t *p, int n);
 
-/* platform dependent functions ----------------------------------------------*/
-int execcmd(const char *cmd);
-int expath(const char *path, char *paths[], int nmax);
-void createdir(const char *path);
+/* execcmd, expath, createdir moved to mrtklib/mrtk_sys.h */
 
 /* positioning geometry functions are now declared in mrtklib/mrtk_coords.h */
 
@@ -1173,7 +1166,7 @@ int outrnxinavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
 int outrnxnavb(FILE *fp, const rnxopt_t *opt, const eph_t *eph);
 int outrnxgnavb(FILE *fp, const rnxopt_t *opt, const geph_t *geph);
 int outrnxhnavb(FILE *fp, const rnxopt_t *opt, const seph_t *seph);
-int rtk_uncompress(const char *file, char *uncfile);
+/* rtk_uncompress moved to mrtklib/mrtk_sys.h */
 int convrnx(int format, rnxopt_t *opt, const char *file, char **ofile);
 int init_rnxctr(rnxctr_t *rnx);
 void free_rnxctr(rnxctr_t *rnx);
@@ -1203,15 +1196,9 @@ int tle_name_read(const char *file, tle_t *tle);
 int tle_pos(gtime_t time, const char *name, const char *satno,
             const char *desig, const tle_t *tle, const erp_t *erp, double *rs);
 
+/* getbitu, getbits, setbitu, setbits, rtk_crc32, rtk_crc24q, rtk_crc16, decode_word
+ * moved to mrtklib/mrtk_bits.h */
 /* receiver raw data functions -----------------------------------------------*/
-uint32_t getbitu(const uint8_t *buff, int pos, int len);
-int32_t  getbits(const uint8_t *buff, int pos, int len);
-void setbitu(uint8_t *buff, int pos, int len, uint32_t data);
-void setbits(uint8_t *buff, int pos, int len, int32_t  data);
-uint32_t rtk_crc32(const uint8_t *buff, int len);
-uint32_t rtk_crc24q(const uint8_t *buff, int len);
-uint16_t rtk_crc16(const uint8_t *buff, int len);
-int decode_word (uint32_t word, uint8_t *data);
 int decode_frame(const uint8_t *buff, eph_t *eph, alm_t *alm, double *ion,
                  double *utc);
 int test_glostr(const uint8_t *buff);
