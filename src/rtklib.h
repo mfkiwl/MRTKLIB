@@ -56,6 +56,7 @@
 #include "mrtklib/mrtk_time.h"
 #include "mrtklib/mrtk_mat.h"
 #include "mrtklib/mrtk_coords.h"
+#include "mrtklib/mrtk_atmos.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -1685,16 +1686,8 @@ void createdir(const char *path);
 
 /* positioning geometry functions are now declared in mrtklib/mrtk_coords.h */
 
-/* atmosphere models ---------------------------------------------------------*/
-double ionmodel(gtime_t t, const double *ion, const double *pos,
-                const double *azel);
-double ionmapf(const double *pos, const double *azel);
-double ionppp(const double *pos, const double *azel, double re, double hion,
-              double *pppos);
-double tropmodel(gtime_t time, const double *pos, const double *azel,
-                 double humi);
-double tropmapf(gtime_t time, const double *pos, const double *azel,
-                double *mapfw);
+/* atmosphere model functions (ionmodel, ionmapf, ionppp, tropmodel, tropmapf)
+ * are now declared in mrtklib/mrtk_atmos.h */
 int iontec(gtime_t time, const nav_t *nav, const double *pos,
            const double *azel, int opt, double *delay, double *var);
 void readtec(const char *file, nav_t *nav, int opt);

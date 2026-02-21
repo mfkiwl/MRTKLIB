@@ -22,6 +22,7 @@ add_library(mrtklib STATIC
     src/mrtk_time.c
     src/mrtk_mat.c
     src/mrtk_coords.c
+    src/mrtk_atmos.c
 )
 target_include_directories(mrtklib PUBLIC include)
 set_target_properties(mrtklib PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
