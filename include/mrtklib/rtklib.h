@@ -57,6 +57,8 @@
 #include "mrtklib/mrtk_mat.h"
 #include "mrtklib/mrtk_coords.h"
 #include "mrtklib/mrtk_atmos.h"
+#include "mrtklib/mrtk_eph.h"
+#include "mrtklib/mrtk_peph.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -647,18 +649,7 @@ typedef struct {        /* observation data */
     obsd_t *data;       /* observation data records */
 } obs_t;
 
-typedef struct {        /* ERP (earth rotation parameter) data type */
-    double mjd;         /* mjd (days) */
-    double xp,yp;       /* pole offset (rad) */
-    double xpr,ypr;     /* pole offset rate (rad/day) */
-    double ut1_utc;     /* ut1-utc (s) */
-    double lod;         /* length of day (s/day) */
-} erpd_t;
-
-typedef struct {        /* ERP (earth rotation parameter) type */
-    int n,nmax;         /* number and max number of data */
-    erpd_t *data;       /* earth rotation parameter data */
-} erp_t;
+/* erpd_t and erp_t moved to mrtklib/mrtk_peph.h */
 
 typedef struct {        /* antenna parameter type */
     int sat;            /* satellite number (0:receiver) */
@@ -675,74 +666,11 @@ typedef struct {        /* antenna parameters type */
     pcv_t *pcv;         /* antenna parameters data */
 } pcvs_t;
 
-typedef struct {        /* GPS/GAL/QZS/BDS/IRN almanac type */
-    int sat;            /* satellite number */
-    int svh;            /* SV health (0:ok) */
-    int svconf;         /* AS and SV config */
-    int week;           /* GPS/QZS: GPS week, GAL: Galileo week */
-    gtime_t toa;        /* Toa */
-    double A,e,i0,OMG0,omg,M0,OMGd; /* SV orbit parameters */
-    double toas;        /* Toa (s) in week */
-    double f0,f1;       /* SV clock parameters (af0,af1) */
-} alm_t;
+/* alm_t, galm_t moved to mrtklib/mrtk_eph.h */
 
-typedef struct {        /* GLONASS almanac type */
-    int sat;            /* satellite number */
-    int Cn;             /* unhealthy flag (1:unhealthy) */
-    int Mn;             /* satellite type (0:GLONASS,1:GLONASS-M) */
-    int Hn;             /* carrier-frequency number */
-    gtime_t toa;        /* Toa */
-    double tn;          /* time of first acsending node passage (s) */
-    double lamn,din,eccn,omgn,dTn,ddTn; /* SV orbit parameters */
-    double taun;        /* SV clock parameters */
-} galm_t;
+/* eph_t moved to mrtklib/mrtk_eph.h */
 
-typedef struct {        /* GPS/GAL/QZS/BDS/IRN broadcast ephemeris type */
-    int sat;            /* satellite number */
-    int iode,iodc;      /* IODE,IODC */
-    int sva;            /* SV accuracy (URA index) */
-    int svh;            /* SV health (0:ok) */
-    int week;           /* GPS/QZS: gps week, GAL: galileo week */
-    int code;           /* GPS/QZS: code on L2 */
-                        /* GAL: data source defined as rinex 3.03 */
-                        /* BDS: data source (0:unknown,1:B1I,2:B1Q,3:B2I,4:B2Q,5:B3I,6:B3Q) */
-    int flag;           /* GPS/QZS: L2 P data flag */
-                        /* BDS: nav type (0:unknown,1:IGSO/MEO,2:GEO) */
-    gtime_t toe,toc,ttr; /* Toe,Toc,T_trans */
-                        /* SV orbit parameters */
-    double A,e,i0,OMG0,omg,M0,deln,OMGd,idot;
-    double crc,crs,cuc,cus,cic,cis;
-    double toes;        /* Toe (s) in week */
-    double fit;         /* fit interval (h) */
-    double f0,f1,f2;    /* SV clock parameters (af0,af1,af2) */
-    double tgd[6];      /* group delay parameters */
-                        /* GPS/QZS:tgd[0]=TGD */
-                        /* GAL:tgd[0]=BGD_E1E5a,tgd[1]=BGD_E1E5b */
-                        /* BDS:tgd[0]=TGD_B1I ,tgd[1]=TGD_B2I/B2b,tgd[2]=TGD_B1Cp */
-                        /*     tgd[3]=TGD_B2ap,tgd[4]=ISC_B1Cd   ,tgd[5]=ISC_B2ad */
-    int type;           /* ephemeris type */
-                        /* GPS/QZS: 0=LNAV,1=CNAV,2=CNAV-2 */
-                        /* GAL    : 0=INAV,1=FNAV */
-                        /* BDS    : 0=D1,1=D2,2=CNAV-1,3=CNAV-2,4=CNAV-3 */
-                        /* IRN    : 0=LNAV */
-    double Adot,ndot;   /* Adot,ndot for CNAV */
-} eph_t;
-
-typedef struct {        /* GLONASS broadcast ephemeris type */
-    int sat;            /* satellite number */
-    int iode;           /* IODE (0-6 bit of tb field) */
-    int frq;            /* FCN (frequency channel number) */
-    int svh;            /* extended SVH (b3:ln,b2:Cn_a,b1:Cn,b0:Bn) */
-    int flags;          /* status flags (b78:M,b6:P4,b5:P3,b4:P2,b23:P1,b01:P) */
-    int sva,age;        /* URA index (FT), age of operation (En) */
-    gtime_t toe;        /* epoch of ephemerides (gpst) */
-    gtime_t tof;        /* message frame time (gpst) */
-    double pos[3];      /* satellite position (ecef) (m) */
-    double vel[3];      /* satellite velocity (ecef) (m/s) */
-    double acc[3];      /* satellite acceleration (ecef) (m/s^2) */
-    double taun,gamn;   /* SV clock bias (s)/relative freq bias */
-    double dtaun;       /* delay between L1 and L2 (s) */
-} geph_t;
+/* geph_t moved to mrtklib/mrtk_eph.h */
 
 typedef struct {        /* precise ephemeris type */
     gtime_t time;       /* time (GPST) */
@@ -762,17 +690,7 @@ typedef struct {        /* precise clock type */
     float  std[MAXSAT][1]; /* satellite clock std (s) */
 } pclk_t;
 
-typedef struct {        /* SBAS ephemeris type */
-    int sat;            /* satellite number */
-    gtime_t t0;         /* reference epoch time (GPST) */
-    gtime_t tof;        /* time of message frame (GPST) */
-    int sva;            /* SV accuracy (URA index) */
-    int svh;            /* SV health (0:ok) */
-    double pos[3];      /* satellite position (m) (ecef) */
-    double vel[3];      /* satellite velocity (m/s) (ecef) */
-    double acc[3];      /* satellite acceleration (m/s^2) (ecef) */
-    double af0,af1;     /* satellite clock-offset/drift (s,s/s) */
-} seph_t;
+/* seph_t moved to mrtklib/mrtk_eph.h */
 
 typedef struct {        /* NORAL TLE data type */
     char name [32];     /* common name */
@@ -1660,8 +1578,7 @@ int savenav(const char *file, const nav_t *nav);
 void freeobs(obs_t *obs);
 void freenav(nav_t *nav, int opt);
 int readblq(const char *file, const char *sta, double *odisp);
-int readerp(const char *file, erp_t *erp);
-int geterp(const erp_t *erp, gtime_t time, double *val);
+/* readerp, geterp moved to mrtklib/mrtk_peph.h */
 int readelmask(const char *file, int16_t *elmask);
 
 /* debug trace functions -----------------------------------------------------*/
@@ -1746,15 +1663,8 @@ int open_rnxctr(rnxctr_t *rnx, FILE *fp);
 int input_rnxctr(rnxctr_t *rnx, FILE *fp);
 
 /* ephemeris and clock functions ---------------------------------------------*/
-double eph2clk (gtime_t time, const eph_t  *eph);
-double geph2clk(gtime_t time, const geph_t *geph);
-double seph2clk(gtime_t time, const seph_t *seph);
-void eph2pos(gtime_t time, const eph_t  *eph,  double *rs, double *dts,
-             double *var);
-void geph2pos(gtime_t time, const geph_t *geph, double *rs, double *dts,
-              double *var);
-void seph2pos(gtime_t time, const seph_t *seph, double *rs, double *dts,
-              double *var);
+/* eph2clk, geph2clk, seph2clk, eph2pos, geph2pos, seph2pos, alm2pos
+   moved to mrtklib/mrtk_eph.h */
 int peph2pos(gtime_t time, int sat, const nav_t *nav, int opt, double *rs,
              double *dts, double *var);
 void satantoff(gtime_t time, const double *rs, int sat, const nav_t *nav,
@@ -1768,7 +1678,6 @@ int getseleph(int sys);
 void readsp3(const char *file, nav_t *nav, int opt);
 int readsap(const char *file, gtime_t time, nav_t *nav);
 int readdcb(const char *file, nav_t *nav, const sta_t *sta);
-void alm2pos(gtime_t time, const alm_t *alm, double *rs, double *dts);
 
 /* NORAD TLE (two line element) functions ------------------------------------*/
 int tle_read(const char *file, tle_t *tle);
