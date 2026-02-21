@@ -1,15 +1,14 @@
 /**
  * @file mrtk_nav.h
- * @brief MRTKLIB Navigation Module — Navigation data types including nav_t
- *        and all its dependent struct types.
+ * @brief MRTKLIB Navigation Module — Navigation data types and satellite/nav
+ *        utility functions.
  *
  * This header provides the core navigation data structures extracted from
  * rtklib.h with zero algorithmic changes.  It includes pcv_t, peph_t, pclk_t,
- * TEC/SBAS/SSR types, and the central nav_t aggregation struct.
+ * TEC/SBAS/SSR types, the central nav_t aggregation struct, and satellite
+ * number/system conversion functions.
  *
- * @note No functions are moved in this header — only type definitions.
- *       All functions that operate on these types remain in their original
- *       .c files (preceph.c, sbas.c, rtkcmn.c, etc.).
+ * @note Functions declared here are implemented in mrtk_nav.c.
  */
 #ifndef MRTK_NAV_H
 #define MRTK_NAV_H
@@ -331,6 +330,83 @@ typedef struct {        /* navigation data type */
     char pr_biapath [MAXSTRPATH]; /* previous bias sinex file path */
     char pr_fcbpath [MAXSTRPATH]; /* previous fcb file path */
 } nav_t;
+
+/*============================================================================
+ * Satellite Number / System Functions
+ *===========================================================================*/
+
+/**
+ * @brief Convert satellite system+prn/slot number to satellite number.
+ * @param[in] sys  Satellite system (SYS_GPS, SYS_GLO, ...)
+ * @param[in] prn  Satellite prn/slot number
+ * @return Satellite number (0: error)
+ */
+int satno(int sys, int prn);
+
+/**
+ * @brief Convert satellite number to satellite system.
+ * @param[in]     sat  Satellite number (1-MAXSAT)
+ * @param[in,out] prn  Satellite prn/slot number (NULL: no output)
+ * @return Satellite system (SYS_GPS, SYS_GLO, ...)
+ */
+int satsys(int sat, int *prn);
+
+/**
+ * @brief Convert satellite id to satellite number.
+ * @param[in] id  Satellite id (nn, Gnn, Rnn, Enn, Jnn, Cnn, Inn or Snn)
+ * @return Satellite number (0: error)
+ */
+int satid2no(const char *id);
+
+/**
+ * @brief Convert satellite number to satellite id.
+ * @param[in]  sat  Satellite number
+ * @param[out] id   Satellite id (Gnn, Rnn, Enn, Jnn, Cnn, Inn or nnn)
+ */
+void satno2id(int sat, char *id);
+
+/**
+ * @brief Convert satellite and obs code to carrier frequency.
+ * @param[in] sat   Satellite number
+ * @param[in] code  Obs code (CODE_???)
+ * @param[in] nav   Navigation data for GLONASS (NULL: not used)
+ * @return Carrier frequency (Hz) (0.0: error)
+ */
+double sat2freq(int sat, uint8_t code, const nav_t *nav);
+
+/*============================================================================
+ * Navigation Data I/O Functions
+ *===========================================================================*/
+
+/**
+ * @brief Unique ephemerides in navigation data.
+ * @param[in,out] nav  Navigation data
+ */
+void uniqnav(nav_t *nav);
+
+/**
+ * @brief Read navigation data from file.
+ * @param[in]  file  File path
+ * @param[out] nav   Navigation data
+ * @return Status (1:ok, 0:no file)
+ */
+int readnav(const char *file, nav_t *nav);
+
+/**
+ * @brief Save navigation data to file.
+ * @param[in] file  File path
+ * @param[in] nav   Navigation data
+ * @return Status (1:ok, 0:file open error)
+ */
+int savenav(const char *file, const nav_t *nav);
+
+/**
+ * @brief Free navigation data memory.
+ * @param[in,out] nav  Navigation data
+ * @param[in]     opt  Option (0x01:eph, 0x02:geph, 0x04:seph,
+ *                     0x08:peph, 0x10:pclk, 0x20:alm, 0x40:tec)
+ */
+void freenav(nav_t *nav, int opt);
 
 #ifdef __cplusplus
 }

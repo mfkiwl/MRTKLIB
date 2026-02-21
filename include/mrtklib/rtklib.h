@@ -614,10 +614,7 @@ typedef struct {        /* option type */
     const char *comment; /* option comment/enum labels/unit */
 } opt_t;
 
-typedef struct {        /* SNR mask type */
-    int ena[2];         /* enable flag {rover,base} */
-    double mask[NFREQ][9]; /* mask (dBHz) at 5,10,...85 deg */
-} snrmask_t;
+/* snrmask_t moved to mrtklib/mrtk_obs.h */
 
 typedef struct {        /* processing options type */
     int mode;           /* positioning mode (PMODE_???) */
@@ -1062,21 +1059,10 @@ extern const sbsigpband_t igpband2[2][5]; /* SBAS IGP band 9-10 */
 extern const char *formatstrs[];     /* stream format strings */
 extern opt_t sysopts[];              /* system options table */
 
-/* satellites, systems, codes functions --------------------------------------*/
-int satno(int sys, int prn);
-int satsys(int sat, int *prn);
-int satid2no(const char *id);
-void satno2id(int sat, char *id);
-uint8_t obs2code(const char *obs);
-char *code2obs(uint8_t code);
-double code2freq(int sys, uint8_t code, int fcn);
-double sat2freq(int sat, uint8_t code, const nav_t *nav);
-int code2idx(int sys, uint8_t code);
+/* satno, satsys, satid2no, satno2id moved to mrtklib/mrtk_nav.h */
+/* obs2code, code2obs, code2freq, sat2freq, code2idx moved to mrtklib/mrtk_obs.h */
+/* testsnr, testelmask, setcodepri, getcodepri moved to mrtklib/mrtk_obs.h */
 int satexclude(int sat, double var, int svh, const prcopt_t *opt);
-int testsnr(int base, int freq, double el, double snr, const snrmask_t *mask);
-int testelmask(const double *azel, const int16_t *elmask);
-void setcodepri(int sys, int idx, const char *pri);
-int getcodepri(int sys, uint8_t code, const char *opt);
 
 /* matrix and vector functions are now declared in mrtklib/mrtk_mat.h */
 
@@ -1088,12 +1074,8 @@ int getcodepri(int sys, uint8_t code, const char *opt);
 
 /* input and output functions ------------------------------------------------*/
 /* readpos, readblq, readelmask moved to mrtklib/mrtk_station.h */
-/* sortobs, signal_replace, screent moved to mrtklib/mrtk_obs.h */
-void uniqnav(nav_t *nav);
-int readnav(const char *file, nav_t *nav);
-int savenav(const char *file, const nav_t *nav);
-void freeobs(obs_t *obs);
-void freenav(nav_t *nav, int opt);
+/* sortobs, signal_replace, screent, freeobs moved to mrtklib/mrtk_obs.h */
+/* uniqnav, readnav, savenav, freenav moved to mrtklib/mrtk_nav.h */
 /* readerp, geterp moved to mrtklib/mrtk_peph.h */
 
 /* debug trace functions -----------------------------------------------------*/

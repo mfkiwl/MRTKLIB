@@ -1,13 +1,13 @@
 /**
  * @file mrtk_obs.h
  * @brief MRTKLIB Observation Module — Observation data types and utility
- *        functions (sortobs, screent, signal_replace).
+ *        functions.
  *
  * This header provides the fundamental GNSS observation data types
- * (obsd_t, obs_t) extracted from rtklib.h with zero algorithmic changes.
+ * (obsd_t, obs_t, snrmask_t) and observation utility functions extracted
+ * from rtklib.h/rtkcmn.c with zero algorithmic changes.
  *
- * @note Functions declared here (sortobs, screent, signal_replace) are still
- *       implemented in rtkcmn.c; only the declarations are moved.
+ * @note Functions declared here are implemented in mrtk_obs.c.
  */
 #ifndef MRTK_OBS_H
 #define MRTK_OBS_H
@@ -45,6 +45,66 @@ typedef struct {
     obsd_t *data;       /* observation data records */
 } obs_t;
 
+/**
+ * @brief SNR mask type.
+ */
+typedef struct {
+    int ena[2];         /* enable flag {rover,base} */
+    double mask[NFREQ][9]; /* mask (dBHz) at 5,10,...85 deg */
+} snrmask_t;
+
+/*============================================================================
+ * Observation Code Functions
+ *===========================================================================*/
+
+/**
+ * @brief Convert obs code type string to obs code.
+ * @param[in] obs  Obs code string ("1C","1P","1Y",...)
+ * @return Obs code (CODE_???)
+ */
+uint8_t obs2code(const char *obs);
+
+/**
+ * @brief Convert obs code to obs code string.
+ * @param[in] code  Obs code (CODE_???)
+ * @return Obs code string ("1C","1P",...)
+ */
+char *code2obs(uint8_t code);
+
+/**
+ * @brief Convert system and obs code to frequency index.
+ * @param[in] sys   Satellite system (SYS_???)
+ * @param[in] code  Obs code (CODE_???)
+ * @return Frequency index (-1: error)
+ */
+int code2idx(int sys, uint8_t code);
+
+/**
+ * @brief Convert system and obs code to carrier frequency.
+ * @param[in] sys   Satellite system (SYS_???)
+ * @param[in] code  Obs code (CODE_???)
+ * @param[in] fcn   Frequency channel number for GLONASS
+ * @return Carrier frequency (Hz) (0.0: error)
+ */
+double code2freq(int sys, uint8_t code, int fcn);
+
+/**
+ * @brief Set code priority for multiple codes in a frequency.
+ * @param[in] sys  System (or of SYS_???)
+ * @param[in] idx  Frequency index (0- )
+ * @param[in] pri  Priority of codes (series of code characters)
+ */
+void setcodepri(int sys, int idx, const char *pri);
+
+/**
+ * @brief Get code priority for multiple codes in a frequency.
+ * @param[in] sys   System (SYS_???)
+ * @param[in] code  Obs code (CODE_???)
+ * @param[in] opt   Code options (NULL:no option)
+ * @return Priority (15:highest-1:lowest, 0:error)
+ */
+int getcodepri(int sys, uint8_t code, const char *opt);
+
 /*============================================================================
  * Observation Utility Functions
  *===========================================================================*/
@@ -74,6 +134,32 @@ void signal_replace(obsd_t *obs, int idx, char f, char *c);
  * @return 1:on, 0:off
  */
 int screent(gtime_t time, gtime_t ts, gtime_t te, double tint);
+
+/**
+ * @brief Test SNR mask.
+ * @param[in] base  Rover or base-station (0:rover, 1:base station)
+ * @param[in] idx   Frequency index (0:L1, 1:L2, 2:L3,...)
+ * @param[in] el    Elevation angle (rad)
+ * @param[in] snr   C/N0 (dBHz)
+ * @param[in] mask  SNR mask
+ * @return Status (1:masked, 0:unmasked)
+ */
+int testsnr(int base, int idx, double el, double snr,
+            const snrmask_t *mask);
+
+/**
+ * @brief Test elevation mask.
+ * @param[in] azel    Azimuth/elevation angle {az,el} (rad)
+ * @param[in] elmask  Elevation mask vector (360 x 1) (0.1 deg)
+ * @return Status (1:masked, 0:unmasked)
+ */
+int testelmask(const double *azel, const int16_t *elmask);
+
+/**
+ * @brief Free observation data memory.
+ * @param[in,out] obs  Observation data
+ */
+void freeobs(obs_t *obs);
 
 #ifdef __cplusplus
 }
