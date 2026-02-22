@@ -46,6 +46,7 @@ add_library(mrtklib STATIC
     src/mrtk_sol.c
     src/mrtk_bias_sinex.c
     src/mrtk_fcb.c
+    src/mrtk_pntpos.c
 )
 target_include_directories(mrtklib PUBLIC include)
 set_target_properties(mrtklib PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
@@ -61,7 +62,7 @@ target_link_libraries(mrtklib PUBLIC m)
 # The linker pulls only the object files referenced by each executable.
 add_library(rtklib STATIC
     src/lambda.c        src/lclcmn.c        src/mdccssr.c       src/options.c
-    src/pntpos.c        src/ppp.c           src/ppp_ar.c
+    src/ppp.c           src/ppp_ar.c
     src/rcvraw.c
     src/rtkcmn.c        src/rtkpos.c        src/rtksvr.c
     src/stream.c
