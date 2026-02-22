@@ -66,6 +66,7 @@
 #include "mrtklib/mrtk_astro.h"
 #include "mrtklib/mrtk_antenna.h"
 #include "mrtklib/mrtk_station.h"
+#include "mrtklib/mrtk_rinex.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -568,20 +569,7 @@ typedef struct {        /* RTCM control struct type */
     lclblock_t lclblk;  /* output of iono/trop corrections */
 } rtcm_t;
 
-typedef struct {        /* RINEX control struct type */
-    gtime_t time;       /* message time */
-    int    ver;         /* RINEX version * 100 */
-    char   type;        /* RINEX file type ('O','N',...) */
-    int    sys;         /* navigation system */
-    int    tsys;        /* time system */
-    char   tobs[8][MAXOBSTYPE][4]; /* rinex obs types */
-    obs_t  obs;         /* observation data */
-    nav_t  nav;         /* navigation data */
-    sta_t  sta;         /* station info */
-    int    ephsat;      /* input ephemeris satellite number */
-    int    ephset;      /* input ephemeris set (0-1) */
-    char   opt[256];    /* rinex dependent options */
-} rnxctr_t;
+/* rnxctr_t moved to mrtklib/mrtk_rinex.h */
 
 typedef struct {        /* download URL type */
     char type[32];      /* data type */
@@ -712,46 +700,7 @@ typedef struct {        /* file options type */
     char fcb    [MAXSTRPATH]; /* fcb data file */
 } filopt_t;
 
-typedef struct {        /* RINEX options type */
-    gtime_t ts,te;      /* time start/end */
-    double tint;        /* time interval (s) */
-    double ttol;        /* time tolerance (s) */
-    double tunit;       /* time unit for multiple-session (s) */
-    int rnxver;         /* RINEX version (x100) */
-    int navsys;         /* navigation system */
-    int obstype;        /* observation type */
-    int freqtype;       /* frequency type */
-    char mask[7][MAXCODE]; /* code mask {GPS,GLO,GAL,QZS,SBS,CMP,IRN} */
-    char staid [32];    /* station id for RINEX file name */
-    char prog  [32];    /* program */
-    char runby [32];    /* run-by */
-    char marker[64];    /* marker name */
-    char markerno[32];  /* marker number */
-    char markertype[32]; /* marker type (ver.3) */
-    char name[2][32];   /* observer/agency */
-    char rec [3][32];   /* receiver #/type/vers */
-    char ant [3][32];   /* antenna #/type */
-    double apppos[3];   /* approx position x/y/z */
-    double antdel[3];   /* antenna delta h/e/n */
-    double glo_cp_bias[4]; /* GLONASS code-phase biases (m) */
-    char comment[MAXCOMMENT][64]; /* comments */
-    char rcvopt[256];   /* receiver dependent options */
-    uint8_t exsats[MAXSAT]; /* excluded satellites */
-    int glofcn[32];     /* glonass fcn+8 */
-    int outiono;        /* output iono correction */
-    int outtime;        /* output time system correction */
-    int outleaps;       /* output leap seconds */
-    int autopos;        /* auto approx position */
-    int phshift;        /* phase shift correction */
-    int halfcyc;        /* half cycle correction */
-    int sep_nav;        /* separated nav files */
-    gtime_t tstart;     /* first obs time */
-    gtime_t tend;       /* last obs time */
-    gtime_t trtcm;      /* approx log start time for rtcm */
-    char tobs[7][MAXOBSTYPE][4]; /* obs types {GPS,GLO,GAL,QZS,SBS,CMP,IRN} */
-    double shift[7][MAXOBSTYPE]; /* phase shift (cyc) {GPS,GLO,GAL,QZS,SBS,CMP,IRN} */
-    int nobs[7];        /* number of obs types {GPS,GLO,GAL,QZS,SBS,CMP,IRN} */
-} rnxopt_t;
+/* rnxopt_t moved to mrtklib/mrtk_rinex.h */
 
 typedef struct {        /* satellite status type */
     uint8_t sys;        /* navigation system */
@@ -1108,30 +1057,13 @@ int tokyo2jgd(double *pos);
 int jgd2tokyo(double *pos);
 
 /* RINEX functions -----------------------------------------------------------*/
-int readrnx(const char *file, int rcv, const char *opt, obs_t *obs, nav_t *nav,
-            sta_t *sta);
-int readrnxt(const char *file, int rcv, gtime_t ts, gtime_t te, double tint,
-             const char *opt, obs_t *obs, nav_t *nav, sta_t *sta);
-int readrnxc(const char *file, nav_t *nav);
-int outrnxobsh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
-int outrnxobsb(FILE *fp, const rnxopt_t *opt, const obsd_t *obs, int n,
-               int epflag);
-int outrnxnavh (FILE *fp, const rnxopt_t *opt, const nav_t *nav);
-int outrnxgnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
-int outrnxhnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
-int outrnxlnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
-int outrnxqnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
-int outrnxcnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
-int outrnxinavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
-int outrnxnavb(FILE *fp, const rnxopt_t *opt, const eph_t *eph);
-int outrnxgnavb(FILE *fp, const rnxopt_t *opt, const geph_t *geph);
-int outrnxhnavb(FILE *fp, const rnxopt_t *opt, const seph_t *seph);
+/* readrnx, readrnxt, readrnxc, outrnxobsh, outrnxobsb, outrnxnavh, outrnxnavb,
+   outrnxgnavh, outrnxgnavb, outrnxhnavh, outrnxhnavb, outrnxlnavh,
+   outrnxqnavh, outrnxcnavh, outrnxinavh, init_rnxctr, free_rnxctr,
+   open_rnxctr, input_rnxctr, rnxopt_t, rnxctr_t
+   moved to mrtklib/mrtk_rinex.h */
 /* rtk_uncompress moved to mrtklib/mrtk_sys.h */
 int convrnx(int format, rnxopt_t *opt, const char *file, char **ofile);
-int init_rnxctr(rnxctr_t *rnx);
-void free_rnxctr(rnxctr_t *rnx);
-int open_rnxctr(rnxctr_t *rnx, FILE *fp);
-int input_rnxctr(rnxctr_t *rnx, FILE *fp);
 
 /* ephemeris and clock functions ---------------------------------------------*/
 /* eph2clk, geph2clk, seph2clk, eph2pos, geph2pos, seph2pos, alm2pos,

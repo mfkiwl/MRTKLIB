@@ -32,6 +32,7 @@ add_library(mrtklib STATIC
     src/mrtk_station.c
     src/mrtk_obs.c
     src/mrtk_nav.c
+    src/mrtk_rinex.c
 )
 target_include_directories(mrtklib PUBLIC include)
 set_target_properties(mrtklib PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
@@ -49,7 +50,7 @@ add_library(rtklib STATIC
     src/biassnx.c       src/geoid.c         src/ionex.c
     src/lambda.c        src/lclcmn.c        src/mdccssr.c       src/options.c
     src/pntpos.c        src/ppp.c           src/ppp_ar.c
-    src/rcvraw.c        src/readfcb.c       src/rinex.c
+    src/rcvraw.c        src/readfcb.c
     src/rtcm.c          src/rtcm2.c         src/rtcm3.c         src/rtcm3lcl.c
     src/rtcm3e.c        src/rtkcmn.c        src/rtkpos.c        src/rtksvr.c
     src/sbas.c          src/solution.c      src/stream.c        src/tides.c

@@ -1,135 +1,54 @@
-/*------------------------------------------------------------------------------
-* rinex.c : RINEX functions
-*
-*          Copyright (C) 2007-2020 by T.TAKASU, All rights reserved.
-*
-* reference :
-*     [1] W.Gurtner and L.Estey, RINEX The Receiver Independent Exchange Format
-*         Version 2.11, December 10, 2007
-*     [2] W.Gurtner and L.Estey, RINEX The Receiver Independent Exchange Format
-*         Version 3.00, November 28, 2007
-*     [3] IS-GPS-200D, Navstar GPS Space Segment/Navigation User Interfaces,
-*         7 March, 2006
-*     [4] W.Gurtner and L.Estey, RINEX The Receiver Independent Exchange Format
-*         Version 2.12, June 23, 2009
-*     [5] W.Gurtner and L.Estey, RINEX The Receiver Independent Exchange Format
-*         Version 3.01, June 22, 2009
-*     [6] J.Ray and W.Gurtner, RINEX extentions to handle clock information
-*         version 3.02, September 2, 2010
-*     [7] RINEX The Receiver Independent Exchange Format Version 3.02,
-*         International GNSS Service (IGS), RINEX Working Group and Radio
-*         Technical Commission for Maritime Services Special Committee 104
-*         (RTCM-SC104), December 10, 2012
-*     [8] RINEX The Receiver Independent Exchange Format Version 3.03,
-*         International GNSS Service (IGS), RINEX Working Group and Radio
-*         Technical Commission for Maritime Services Special Committee 104
-*         (RTCM-SC104), July 14, 2015
-*     [9] RINEX The Receiver Independent Exchange Format Version 3.04,
-*         International GNSS Service (IGS), RINEX Working Group and Radio
-*         Technical Commission for Maritime Services Special Committee 104
-*         (RTCM-SC104), November 23, 2018
-*     [10] RINEX The Receiver Independent Exchange Format Version 3.05,
-*         December 1, 2020
-*     [11] J.Ray et al., RINEX Extensions to Handle Clock Information version
-*         3.04, July 2017
-*     [12] RINEX The Receiver Independent Exchange Format Version 4.00,
-*         December 1, 2021
-*     [13] RINEX The Receiver Independent Exchange Format Version 4.01,
-*         July 10, 2023
-*
-* history : 2006/01/16 1.0  new
-*           2007/03/14 1.1  read P1 if no obstype of C1
-*           2007/04/27 1.2  add readrnxt() function
-*           2007/05/25 1.3  add support of file path with wild-card (*)
-*                           add support of compressed files
-*           2007/11/02 1.4  support sbas/geo satellite
-*                           support doppler observables
-*                           support rinex bug of week handover
-*                           add rinex obs/nav output functions
-*           2008/06/16 1.5  export readrnxf(), add compress()
-*                           separate sortobs(), uniqeph(), screent()
-*           2008/10/28 1.6  fix bug on reading rinex obs header types of observ
-*           2009/04/09 1.7  support rinex 2.11
-*                           change api of outrnxobsh(),outrnxobsb(),outrnxnavb()
-*           2009/06/02 1.8  add api outrnxgnavb()
-*           2009/08/15 1.9  support glonass
-*                           add slip save/restore functions
-*           2010/03/03 1.10 fix bug of array access by disabled satellite
-*           2010/07/21 1.11 support rinex ver.2.12, 3.00
-*                           support rinex extension for qzss
-*                           support geo navigation messages
-*                           added api:
-*                               setrnxcodepri(),outrnxhnavh(),outrnxhnavb(),
-*                           changed api:
-*                               readrnx(),readrnxt(),outrnxnavh(),outrnxgnavh()
-*           2010/05/29 1.12 fix bug on skipping invalid satellite data
-*                           fix bug on frequency number overflow
-*                           output P1 instead of C1 if rnxopt.rcvopt=-L1P
-*                           output C2 instead of P2 if rnxopt.rcvopt=-L2C
-*                           change api:
-*                               outrnxgnavh(),outrnxhnavh(),readrnx(),
-*                               readrnxt()
-*                           add api:
-*                               outrnxlnavh(), outrnxqnav()
-*                           move uniqeph(),uniqgeph,uniqseph()
-*           2010/08/19 1.13 suppress warning
-*           2012/03/01 1.14 add function to read cnes widelane fcb in rnxclk
-*                           support compass rinex nav
-*                           change api: setcodepri()
-*           2012/10/17 1.15 support ver.2.12, ver.3.01
-*                           add api init_rnxctr(),free_rnxctr(),open_rnxctr(),
-*                           input_rnxctr()
-*                           change api readrnxt(),readrnx()
-*                           delete api setrnxcodepri()
-*                           fix bug on message frame time in v.3 glonass nav
-*           2013/02/09 1.16 add reading geph.iode derived from toe
-*           2013/02/23 1.17 support rinex 3.02 (ref [7])
-*                           change api outrnxobsh()
-*                           add api outrnxcnavh()
-*                           fix bug on output of fit interval
-*           2013/05/08 1.18 fix bug on reading glo and geo nav in rinex 3
-*           2013/09/01 1.19 fix bug on reading galileo "C1" in rinex 2.12
-*           2013/12/16 1.20 reject C1 for 2.12
-*           2014/05/26 1.21 fix bug on reading gps "C2" in rinex 2.11 or 2.12
-*                           fix problem on type incompatibility
-*                           support beidou
-*           2014/08/29 1.22 fix bug on reading gps "C2" in rinex 2.11 or 2.12
-*           2014/10/20 1.23 recognize "C2" in 2.12 as "C2W" instead of "C2D"
-*           2014/12/07 1.24 add read rinex option -SYS=...
-*           2016/07/01 1.25 support RINEX 3.03
-*                           support IRNSS
-*           2016/09/17 1.26 fix bug on fit interval in QZSS RINEX nav
-*                           URA output value compliant to RINEX 3.03
-*           2016/10/10 1.27 add api outrnxinavh()
-*           2018/10/10 1.28 support galileo sisa value for rinex nav output
-*                           fix bug on handling beidou B1 code in rinex 3.03
-*           2019/08/19 1.29 support galileo sisa index for rinex nav input
-*           2020/11/30 1.30 support RINEX 3.04 (ref [9])
-*                           support phase shift in RINEX options rnxopt_t
-*                           support high-resolution (16bit) C/N0 in obsd_t
-*                           support dual sets of ephemerides in RINEX control
-*                             (for Galileo I/NAV and F/NAV)
-*                           no support RINEX 2 NAV extentions (QZS and BDS)
-*                           no support CNES/GRG clock extension in comments
-*                           fix bug on segfault to read NavIC/IRNSS OBS data
-*                           fix bug on segfault with # obs data >= MAXOBS
-*                           fix bug on reading/writing GLONASS slot/frq # lines
-*                           fix bug on reading SBAS UTC parameters in RINEX nav
-*                           fix bug on saving slip info in extended OBS slots
-*                           add iono/utc param. in separated output RINEX NAV
-*                           zero-padded satellite number (e.g. "G 1" -> "G01")
-*                           zero-padded month/date/hour/min/sec
-*                           use exponent letter D instead of E for RINEX NAV
-*                           use API code2idx() to get frequency index
-*                           use intger types in stdint.h
-*                           suppress warnings
-*           2021/01/04 1.31 supported RINEX 3.05 (ref [10])
-*                           changed type rnxctr_t.ver to int (version * 100)
-*                           add overflow test of SNR in reading RINEX OBS
-*           2022/08/27 1.32 support CLOCK RINEX 3.04 (ref [11])
-*           2025/03/17 1.33 support RINEX 4.00, 4.01 (ref [12],[13])
-*-----------------------------------------------------------------------------*/
-#include "rtklib.h"
+/**
+ * @file mrtk_rinex.c
+ * @brief MRTKLIB RINEX Module — RINEX file read/write functions.
+ *
+ * This file contains all RINEX file reading and writing functions
+ * originally in rinex.c, migrated to the mrtklib modular architecture.
+ *
+ * @note All functions in this module are pure cut-and-paste extractions
+ *       from rinex.c with zero algorithmic changes.
+ */
+#include "mrtklib/mrtk_rinex.h"
+#include "mrtklib/mrtk_sys.h"
+#include "mrtklib/mrtk_mat.h"
+
+#include <string.h>
+#include <stdlib.h>
+#include <math.h>
+
+/* local constants (duplicated to avoid rtklib.h dependency) */
+#define SYS_NONE    0x00
+#define SYS_GPS     0x01
+#define SYS_SBS     0x02
+#define SYS_GLO     0x04
+#define SYS_GAL     0x08
+#define SYS_QZS     0x10
+#define SYS_CMP     0x20
+#define SYS_IRN     0x40
+#define SYS_ALL     0xFF
+
+#define TSYS_GPS    0
+#define TSYS_UTC    1
+#define TSYS_GLO    2
+#define TSYS_GAL    3
+#define TSYS_QZS    4
+#define TSYS_CMP    5
+#define TSYS_IRN    6
+
+#define LLI_SLIP    0x01
+#define LLI_HALFC   0x02
+#define LLI_BOCTRK  0x04
+#define LLI_HALFA   0x40
+#define LLI_HALFS   0x80
+
+#ifdef WIN32
+#define FILEPATHSEP '\\'
+#else
+#define FILEPATHSEP '/'
+#endif
+
+/* forward declaration of rtklib function resolved at link time */
+extern void trace(int level, const char *format, ...);
 
 /* constants/macros ----------------------------------------------------------*/
 
@@ -1789,9 +1708,9 @@ static int readrnxfile(const char *file, gtime_t ts, gtime_t te, double tint,
 *                               (sys=G:GPS,R:GLO,E:GAL,J:QZS,C:BDS,I:IRN,S:SBS)
 *
 *-----------------------------------------------------------------------------*/
-extern int readrnxt(const char *file, int rcv, gtime_t ts, gtime_t te,
-                    double tint, const char *opt, obs_t *obs, nav_t *nav,
-                    sta_t *sta)
+int readrnxt(const char *file, int rcv, gtime_t ts, gtime_t te,
+             double tint, const char *opt, obs_t *obs, nav_t *nav,
+             sta_t *sta)
 {
     int i,n,stat=0;
     const char *p;
@@ -1826,8 +1745,8 @@ extern int readrnxt(const char *file, int rcv, gtime_t ts, gtime_t te,
     
     return stat;
 }
-extern int readrnx(const char *file, int rcv, const char *opt, obs_t *obs,
-                   nav_t *nav, sta_t *sta)
+int readrnx(const char *file, int rcv, const char *opt, obs_t *obs,
+            nav_t *nav, sta_t *sta)
 {
     gtime_t t={0};
     
@@ -1882,7 +1801,7 @@ static void combpclk(nav_t *nav)
 *          nav_t *nav    IO     navigation data    (NULL: no input)
 * return : number of precise clock
 *-----------------------------------------------------------------------------*/
-extern int readrnxc(const char *file, nav_t *nav)
+int readrnxc(const char *file, nav_t *nav)
 {
     gtime_t t={0};
     int i,n,index=0,stat=1;
@@ -1922,7 +1841,7 @@ extern int readrnxc(const char *file, nav_t *nav)
 * args   : rnxctr_t *rnx IO     RINEX control struct
 * return : status (1:ok,0:memory allocation error)
 *-----------------------------------------------------------------------------*/
-extern int init_rnxctr(rnxctr_t *rnx)
+int init_rnxctr(rnxctr_t *rnx)
 {
     gtime_t time0={0};
     obsd_t data0={{0}};
@@ -1967,7 +1886,7 @@ extern int init_rnxctr(rnxctr_t *rnx)
 * args   : rnxctr_t *rnx IO  RINEX control struct
 * return : none
 *-----------------------------------------------------------------------------*/
-extern void free_rnxctr(rnxctr_t *rnx)
+void free_rnxctr(rnxctr_t *rnx)
 {
     trace(3,"free_rnxctr:\n");
     
@@ -1983,7 +1902,7 @@ extern void free_rnxctr(rnxctr_t *rnx)
 * return : status (-2: end of file, 0: no message, 1: input observation data,
 *                   2: input navigation data)
 *-----------------------------------------------------------------------------*/
-extern int open_rnxctr(rnxctr_t *rnx, FILE *fp)
+int open_rnxctr(rnxctr_t *rnx, FILE *fp)
 {
     const char *rnxtypes="ONGLJHC";
     char type,tobs[NUMSYS][MAXOBSTYPE][4]={{""}};
@@ -2029,7 +1948,7 @@ extern int open_rnxctr(rnxctr_t *rnx, FILE *fp)
 *            rnx->nav.eph [sat-1]        : other ephemeris set1 (sat=sat-no)
 *            rnx->nav.eph [sat-1+MAXSAT] : other ephemeris set2 (sat=sat-no)
 *-----------------------------------------------------------------------------*/
-extern int input_rnxctr(rnxctr_t *rnx, FILE *fp)
+int input_rnxctr(rnxctr_t *rnx, FILE *fp)
 {
     eph_t eph={0};
     geph_t geph={0};
@@ -2229,7 +2148,7 @@ static void outrnx_glo_bias(FILE *fp, const rnxopt_t *opt)
 *          nav_t  *nav      I   navigation data
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxobsh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
+int outrnxobsh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 {
     double ep[6],pos[3]={0},del[3]={0};
     char date[32],*sys,*tsys="GPS";
@@ -2393,8 +2312,8 @@ static int obsindex(int rnxver, int sys, const uint8_t *code, const char *tobs,
 *          int    flag      I   epoch flag (0:ok,1:power failure,>1:event flag)
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxobsb(FILE *fp, const rnxopt_t *opt, const obsd_t *obs, int n,
-                      int flag)
+int outrnxobsb(FILE *fp, const rnxopt_t *opt, const obsd_t *obs, int n,
+               int flag)
 {
     const char *mask;
     double ep[6],dL;
@@ -2617,7 +2536,7 @@ static void out_leaps(FILE *fp, int sys, const rnxopt_t *opt, const nav_t *nav)
 *          nav_t  nav       I   navigation data (NULL: no input)
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
+int outrnxnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 {
     int i;
     char date[64],*sys;
@@ -2664,7 +2583,7 @@ extern int outrnxnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 *          eph_t  *eph      I   ephemeris
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxnavb(FILE *fp, const rnxopt_t *opt, const eph_t *eph)
+int outrnxnavb(FILE *fp, const rnxopt_t *opt, const eph_t *eph)
 {
     double ep[6],ttr;
     int week,sys,prn;
@@ -2784,7 +2703,7 @@ extern int outrnxnavb(FILE *fp, const rnxopt_t *opt, const eph_t *eph)
 *          nav_t  nav       I   navigation data (NULL: no input)
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxgnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
+int outrnxgnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 {
     int i;
     char date[64];
@@ -2820,7 +2739,7 @@ extern int outrnxgnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 *          geph_t  *geph    I   glonass ephemeris
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxgnavb(FILE *fp, const rnxopt_t *opt, const geph_t *geph)
+int outrnxgnavb(FILE *fp, const rnxopt_t *opt, const geph_t *geph)
 {
     gtime_t toe;
     double ep[6],tof;
@@ -2886,7 +2805,7 @@ extern int outrnxgnavb(FILE *fp, const rnxopt_t *opt, const geph_t *geph)
 *          nav_t  nav       I   navigation data (NULL: no input)
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxhnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
+int outrnxhnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 {
     int i;
     char date[64];
@@ -2922,7 +2841,7 @@ extern int outrnxhnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 *          seph_t  *seph    I   SBAS ephemeris
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxhnavb(FILE *fp, const rnxopt_t *opt, const seph_t *seph)
+int outrnxhnavb(FILE *fp, const rnxopt_t *opt, const seph_t *seph)
 {
     double ep[6];
     int prn;
@@ -2976,7 +2895,7 @@ extern int outrnxhnavb(FILE *fp, const rnxopt_t *opt, const seph_t *seph)
 *          nav_t  nav       I   navigation data (NULL: no input)
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxlnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
+int outrnxlnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 {
     int i;
     char date[64];
@@ -3010,7 +2929,7 @@ extern int outrnxlnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 *          nav_t  nav       I   navigation data (NULL: no input)
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxqnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
+int outrnxqnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 {
     int i;
     char date[64];
@@ -3044,7 +2963,7 @@ extern int outrnxqnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 *          nav_t  nav       I   navigation data (NULL: no input)
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxcnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
+int outrnxcnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 {
     int i;
     char date[64];
@@ -3078,7 +2997,7 @@ extern int outrnxcnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 *          nav_t  nav       I   navigation data (NULL: no input)
 * return : status (1:ok, 0:output error)
 *-----------------------------------------------------------------------------*/
-extern int outrnxinavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
+int outrnxinavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 {
     int i;
     char date[64];
