@@ -1,5 +1,5 @@
 # cleanup_testdata.cmake
-# Removes files extracted from data/MALIB_OSS_data.tar.gz.
+# Removes test data files used by regression tests.
 # Called as a CTest FIXTURES_CLEANUP script.
 #
 # Usage:

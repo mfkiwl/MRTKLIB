@@ -6,9 +6,10 @@ set -euo pipefail
 # This script:
 #   1. Builds recvbias from source
 #   2. Extracts test data from data/MALIB_OSS_data.tar.gz
-#   3. Downloads IONEX TEC data from CODE (Univ. of Bern) if not present
+#   3. Downloads IONEX TEC data from CODE (Univ. of Bern) if not already present
 #   4. Runs recvbias to generate reference receiver code biases
-#   5. Updates the data archive to include the TEC file for CTest
+#
+# The TEC file is kept permanently in data/ for reuse by CTest.
 #
 # Usage:
 #   bash test/data/regression/gen_ref_rb.sh            # without trace
@@ -70,12 +71,11 @@ cleanup() {
     for f in ${CLEANUP_FILES[@]+"${CLEANUP_FILES[@]}"}; do
         rm -f "$f"
     done
-    # Files extracted by tar (TEC file kept intentionally for archive update)
+    # Files extracted by tar (TEC file is kept permanently in data/)
     rm -f data/2024235L.209.l6
     rm -f data/MALIB_OSS_data_obsnav_240822-1100.*
     rm -f data/MALIB_OSS_data_l6e_240822-1100.*
     rm -f data/igs14*.atx
-    rm -f "data/${TEC_BASENAME}"
 }
 trap cleanup EXIT
 
@@ -110,24 +110,6 @@ if [[ ! -f "$TEC_FILE" ]]; then
 else
     echo "IONEX TEC file already present: $TEC_FILE"
 fi
-
-# Update data archive to include TEC file for CTest
-echo "Updating data archive to include TEC file..."
-cp data/MALIB_OSS_data.tar.gz data/MALIB_OSS_data.tar.gz.bak
-CLEANUP_FILES+=(data/MALIB_OSS_data.tar.gz.bak)
-
-tar -czf /tmp/MALIB_OSS_data.tar.gz \
-    ./data/MALIB_OSS_data_obsnav_240822-1100.obs \
-    ./data/MALIB_OSS_data_obsnav_240822-1100.nav \
-    ./data/MALIB_OSS_data_obsnav_240822-1100.sbf \
-    ./data/MALIB_OSS_data_obsnav_240822-1100.sbf.tag \
-    ./data/MALIB_OSS_data_l6e_240822-1100.sbf \
-    ./data/MALIB_OSS_data_l6e_240822-1100.sbf.tag \
-    ./data/2024235L.209.l6 \
-    ./data/igs14_20230719_KMD_add.atx \
-    ./data/${TEC_BASENAME}
-mv /tmp/MALIB_OSS_data.tar.gz data/MALIB_OSS_data.tar.gz
-echo "  Archive updated: data/MALIB_OSS_data.tar.gz"
 
 # Input files
 obs=data/MALIB_OSS_data_obsnav_240822-1100.obs
