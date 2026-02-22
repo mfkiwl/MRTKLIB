@@ -1,20 +1,26 @@
-/*------------------------------------------------------------------------------
-* geoid.c : geoid models
-*
-*          Copyright (C) 2007-2020 by T.TAKASU, All rights reserved.
-*
-* reference :
-*     [1] EGM96 The NASA GSFC and NIMA Joint Geopotential Model
-*     [2] Earth Gravitational Model 2008 (EGM2008)
-*
-* version : $Revision: 1.1 $ $Date: 2008/07/17 21:48:06 $
-* history : 2007/01/07 1.0  new
-*           2009/09/04 1.1  replace geoid data by global model
-*           2009/12/05 1.2  added api:
-*                               opengeoid(),closegeoid()
-*           2020/11/30 1.3  use integer types in stdint.h
-*-----------------------------------------------------------------------------*/
-#include "rtklib.h"
+/**
+ * @file mrtk_geoid.c
+ * @brief MRTKLIB Geoid Module — Geoid height models.
+ *
+ * Pure cut-and-paste extraction from geoid.c with zero algorithmic changes.
+ *
+ * Original: Copyright (C) 2007-2020 by T.TAKASU, All rights reserved.
+ *
+ * reference :
+ *     [1] EGM96 The NASA GSFC and NIMA Joint Geopotential Model
+ *     [2] Earth Gravitational Model 2008 (EGM2008)
+ */
+#include "mrtklib/mrtk_geoid.h"
+
+#include <stdio.h>
+#include <stdint.h>
+#include <math.h>
+
+/*--- local constants (duplicated to avoid rtklib.h dependency) -------------*/
+static const double R2D = 180.0 / 3.1415926535897932;
+
+/*--- forward declarations for legacy functions resolved at link time -------*/
+extern void trace(int level, const char *format, ...);
 
 static const double range[4];       /* embedded geoid area range {W,E,S,N} (deg) */
 static const float geoid[361][181]; /* embedded geoid heights (m) (lon x lat) */
@@ -195,7 +201,7 @@ static double geoidh_gsi(const double *pos)
 *          gsigeome_ver4 : GSI geoid 2000 1.0x1.5" (japanese area)
 *          (byte-order of binary files must be compatible to cpu)
 *-----------------------------------------------------------------------------*/
-extern int opengeoid(int model, const char *file)
+int opengeoid(int model, const char *file)
 {
     trace(3,"opengeoid: model=%d file=%s\n",model,file);
     
@@ -220,7 +226,7 @@ extern int opengeoid(int model, const char *file)
 * args   : none
 * return : none
 *-----------------------------------------------------------------------------*/
-extern void closegeoid(void)
+void closegeoid(void)
 {
     trace(3,"closegoid:\n");
     
@@ -236,7 +242,7 @@ extern void closegeoid(void)
 *          geoid model before calling the function. If the external geoid model
 *          is not open, the function uses embedded geoid model.
 *-----------------------------------------------------------------------------*/
-extern double geoidh(const double *pos)
+double geoidh(const double *pos)
 {
     double posd[2],h;
     

@@ -1,27 +1,39 @@
-/*------------------------------------------------------------------------------
-* tides.c : tidal displacement corrections
-*
-*          Copyright (C) 2015-2017 by T.TAKASU, All rights reserved.
-*
-* options : -DIERS_MODEL use IERS tide model
-*
-* references :
-*     [1] D.D.McCarthy, IERS Technical Note 21, IERS Conventions 1996, July 1996
-*     [2] D.D.McCarthy and G.Petit, IERS Technical Note 32, IERS Conventions
-*         2003, November 2003
-*     [3] D.A.Vallado, Fundamentals of Astrodynamics and Applications 2nd ed,
-*         Space Technology Library, 2004
-*     [4] J.Kouba, A Guide to using International GNSS Service (IGS) products,
-*         May 2009
-*     [5] G.Petit and B.Luzum (eds), IERS Technical Note No. 36, IERS
-*         Conventions (2010), 2010
-*
-* version : $Revision:$ $Date:$
-* history : 2015/05/10 1.0  separated from ppp.c
-*           2015/06/11 1.1  fix bug on computing days in tide_oload() (#128)
-*           2017/04/11 1.2  fix bug on calling geterp() in timdedisp()
-*-----------------------------------------------------------------------------*/
-#include "rtklib.h"
+/**
+ * @file mrtk_tides.c
+ * @brief MRTKLIB Tides Module — Tidal displacement corrections.
+ *
+ * Pure cut-and-paste extraction from tides.c with zero algorithmic changes.
+ *
+ * Original: Copyright (C) 2015-2017 by T.TAKASU, All rights reserved.
+ *
+ * options : -DIERS_MODEL use IERS tide model
+ *
+ * references :
+ *     [1] D.D.McCarthy, IERS Technical Note 21, IERS Conventions 1996, July 1996
+ *     [2] D.D.McCarthy and G.Petit, IERS Technical Note 32, IERS Conventions
+ *         2003, November 2003
+ *     [3] D.A.Vallado, Fundamentals of Astrodynamics and Applications 2nd ed,
+ *         Space Technology Library, 2004
+ *     [4] J.Kouba, A Guide to using International GNSS Service (IGS) products,
+ *         May 2009
+ *     [5] G.Petit and B.Luzum (eds), IERS Technical Note No. 36, IERS
+ *         Conventions (2010), 2010
+ */
+#include "mrtklib/mrtk_tides.h"
+#include "mrtklib/mrtk_mat.h"
+#include "mrtklib/mrtk_coords.h"
+#include "mrtklib/mrtk_astro.h"
+
+#include <math.h>
+
+/*--- local constants (duplicated to avoid rtklib.h dependency) -------------*/
+static const double PI       = 3.1415926535897932;
+static const double D2R      = 3.1415926535897932 / 180.0;
+static const double R2D      = 180.0 / 3.1415926535897932;
+static const double RE_WGS84 = 6378137.0;
+
+/*--- forward declarations for legacy functions resolved at link time -------*/
+extern void trace(int level, const char *format, ...);
 
 #define SQR(x)      ((x)*(x))
 
@@ -229,8 +241,8 @@ static void tide_pole(gtime_t tut, const double *pos, const double *erpv,
 *          see ref [4] 5.2.1, 5.2.2, 5.2.3
 *          ver.2.4.0 does not use ocean loading and pole tide corrections
 *-----------------------------------------------------------------------------*/
-extern void tidedisp(gtime_t tutc, const double *rr, int opt, const erp_t *erp,
-                     const double *odisp, double *dr)
+void tidedisp(gtime_t tutc, const double *rr, int opt, const erp_t *erp,
+              const double *odisp, double *dr)
 {
     gtime_t tut;
     double pos[2],E[9],drt[3],denu[3],rs[3],rm[3],gmst,erpv[5]={0};

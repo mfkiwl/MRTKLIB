@@ -67,6 +67,8 @@
 #include "mrtklib/mrtk_antenna.h"
 #include "mrtklib/mrtk_station.h"
 #include "mrtklib/mrtk_rinex.h"
+#include "mrtklib/mrtk_tides.h"
+#include "mrtklib/mrtk_geoid.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -299,12 +301,7 @@ extern "C" {
 #define STR_MODE_W  0x2                 /* stream mode: write */
 #define STR_MODE_RW 0x3                 /* stream mode: read/write */
 
-#define GEOID_EMBEDDED    0             /* geoid model: embedded geoid */
-#define GEOID_EGM96_M150  1             /* geoid model: EGM96 15x15" */
-#define GEOID_EGM2008_M25 2             /* geoid model: EGM2008 2.5x2.5" */
-#define GEOID_EGM2008_M10 3             /* geoid model: EGM2008 1.0x1.0" */
-#define GEOID_GSI2000_M15 4             /* geoid model: GSI geoid 2000 1.0x1.5" */
-#define GEOID_RAF09       5             /* geoid model: IGN RAF09 for France 1.5"x2" */
+/* GEOID_* constants moved to mrtklib/mrtk_geoid.h */
 
 #define COMMENTH    "%"                 /* comment line indicator for solution */
 #define MSG_DISCONN "$_DISCONNECT\r\n"  /* disconnect message */
@@ -1042,14 +1039,8 @@ int tropcorr(gtime_t time, const nav_t *nav, const double *pos,
 /* readpcv, searchpcv, antmodel, antmodel_s moved to mrtklib/mrtk_antenna.h */
 /* sunmoonpos, sunmoonpos_eci moved to mrtklib/mrtk_astro.h */
 
-/* earth tide models ---------------------------------------------------------*/
-void tidedisp(gtime_t tutc, const double *rr, int opt, const erp_t *erp,
-              const double *odisp, double *dr);
-
-/* geiod models --------------------------------------------------------------*/
-int opengeoid(int model, const char *file);
-void closegeoid(void);
-double geoidh(const double *pos);
+/* tidedisp moved to mrtklib/mrtk_tides.h */
+/* opengeoid, closegeoid, geoidh moved to mrtklib/mrtk_geoid.h */
 
 /* datum transformation ------------------------------------------------------*/
 int loaddatump(const char *file);
