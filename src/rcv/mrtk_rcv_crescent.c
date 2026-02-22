@@ -29,7 +29,97 @@
 *                           update reference [3]
 *           2021/05/21 1.11 fix typos in comments
 *-----------------------------------------------------------------------------*/
-#include "rtklib.h"
+#include "mrtklib/mrtk_rcvraw.h"
+#include "mrtklib/mrtk_time.h"
+#include "mrtklib/mrtk_bits.h"
+#include "mrtklib/mrtk_eph.h"
+#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_rtcm.h"
+#include "mrtklib/mrtk_mat.h"
+#include "mrtklib/mrtk_sys.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <ctype.h>
+
+/* Local constants (duplicated from rtklib.h to avoid dependency) */
+#define PI          3.1415926535897932  /* pi */
+#define D2R         (PI/180.0)         /* deg to rad */
+#define R2D         (180.0/PI)         /* rad to deg */
+#define CLIGHT      299792458.0        /* speed of light (m/s) */
+#define SC2RAD      3.1415926535898    /* semi-circle to radian (IS-GPS) */
+
+#define SYS_NONE    0x00
+#define SYS_GPS     0x01
+#define SYS_SBS     0x02
+#define SYS_GLO     0x04
+#define SYS_GAL     0x08
+#define SYS_QZS     0x10
+#define SYS_CMP     0x20
+#define SYS_IRN     0x40
+
+#define TSYS_GPS    0
+#define TSYS_UTC    1
+#define TSYS_GLO    2
+#define TSYS_GAL    3
+#define TSYS_QZS    4
+#define TSYS_CMP    5
+#define TSYS_IRN    6
+
+#define FREQ1       1.57542E9          /* L1/E1/B1C  frequency (Hz) */
+#define FREQ2       1.22760E9          /* L2         frequency (Hz) */
+#define FREQ5       1.17645E9          /* L5/E5a/B2a frequency (Hz) */
+#define FREQ6       1.27875E9          /* E6/L6      frequency (Hz) */
+#define FREQ7       1.20714E9          /* E5b/B2I    frequency (Hz) */
+#define FREQ8       1.191795E9         /* E5ab/B2ab  frequency (Hz) */
+#define FREQ9       2.492028E9         /* S          frequency (Hz) */
+#define FREQ1_GLO   1.60200E9          /* GLONASS G1 base frequency (Hz) */
+#define DFRQ1_GLO   0.56250E6          /* GLONASS G1 bias frequency (Hz/n) */
+#define FREQ2_GLO   1.24600E9          /* GLONASS G2 base frequency (Hz) */
+#define DFRQ2_GLO   0.43750E6          /* GLONASS G2 bias frequency (Hz/n) */
+#define FREQ3_GLO   1.202025E9         /* GLONASS G3 frequency (Hz) */
+#define FREQ1a_GLO  1.600995E9         /* GLONASS G1a frequency (Hz) */
+#define FREQ2a_GLO  1.248060E9         /* GLONASS G2a frequency (Hz) */
+#define FREQ1_CMP   1.561098E9         /* BDS B1I    frequency (Hz) */
+
+#define MINPRNGPS   1
+#define MAXPRNGPS   32
+#define MINPRNSBS   120
+#define MAXPRNSBS   158
+
+/* Power-of-2 constants */
+#define P2_5        0.03125
+#define P2_6        0.015625
+#define P2_11       4.882812500000000E-04
+#define P2_15       3.051757812500000E-05
+#define P2_17       7.629394531250000E-06
+#define P2_19       1.907348632812500E-06
+#define P2_20       9.536743164062500E-07
+#define P2_21       4.768371582031250E-07
+#define P2_23       1.192092895507810E-07
+#define P2_24       5.960464477539063E-08
+#define P2_27       7.450580596923828E-09
+#define P2_29       1.862645149230957E-09
+#define P2_30       9.313225746154785E-10
+#define P2_31       4.656612873077393E-10
+#define P2_32       2.328306436538696E-10
+#define P2_33       1.164153218269348E-10
+#define P2_34       5.820766091346740E-11
+#define P2_35       2.910383045673370E-11
+#define P2_38       3.637978807091710E-12
+#define P2_40       9.094947017729280E-13
+#define P2_43       1.136868377216160E-13
+#define P2_46       1.421085471520200E-14
+#define P2_50       8.881784197001252E-16
+#define P2_55       2.775557561562891E-17
+#define P2_59       1.734723475976810E-18
+
+/* Forward declarations for functions in rtklib (resolved at link time) */
+extern void trace   (int level, const char *format, ...);
+extern void traceb  (int level, const uint8_t *p, int n);
 
 #define CRESSYNC    "$BIN"      /* hemis bin sync code */
 

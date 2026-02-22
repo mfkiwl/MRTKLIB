@@ -56,6 +56,12 @@ add_library(mrtklib STATIC
     src/mrtk_ppp.c
     src/mrtk_postpos.c
     src/mrtk_options.c
+    src/mrtk_rcvraw.c
+    src/rcv/mrtk_rcv_binex.c     src/rcv/mrtk_rcv_crescent.c
+    src/rcv/mrtk_rcv_javad.c     src/rcv/mrtk_rcv_novatel.c
+    src/rcv/mrtk_rcv_nvs.c       src/rcv/mrtk_rcv_rt17.c
+    src/rcv/mrtk_rcv_septentrio.c src/rcv/mrtk_rcv_skytraq.c
+    src/rcv/mrtk_rcv_ss2.c       src/rcv/mrtk_rcv_ublox.c
 )
 target_include_directories(mrtklib PUBLIC include)
 set_target_properties(mrtklib PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
@@ -70,12 +76,8 @@ target_link_libraries(mrtklib PUBLIC m)
 # Contains the union of all src/ files used by rnx2rtkp and rtkrcv.
 # The linker pulls only the object files referenced by each executable.
 add_library(rtklib STATIC
-    src/rcvraw.c
     src/rtkcmn.c        src/rtksvr.c
     src/stream.c
-    src/rcv/binex.c     src/rcv/crescent.c  src/rcv/javad.c     src/rcv/novatel.c
-    src/rcv/nvs.c       src/rcv/rt17.c      src/rcv/septentrio.c src/rcv/skytraq.c
-    src/rcv/ss2.c       src/rcv/ublox.c
 )
 target_include_directories(rtklib PUBLIC src)
 target_compile_definitions(rtklib PUBLIC TRACE)
