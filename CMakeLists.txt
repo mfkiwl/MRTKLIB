@@ -86,6 +86,17 @@ set_tests_properties(regression_setup PROPERTIES
     TIMEOUT         30
 )
 
+# ── Fixture: download IONEX TEC file (for recvbias) ──────────────────────────
+add_test(NAME regression_download_tec
+    COMMAND ${CMAKE_COMMAND}
+        -DTESTDATA_DIR=${_TESTDATA}
+        -P ${_TESTCMAKE}/download_tec.cmake
+)
+set_tests_properties(regression_download_tec PROPERTIES
+    FIXTURES_SETUP  regression_data
+    TIMEOUT         60
+)
+
 add_test(NAME regression_cleanup
     COMMAND ${CMAKE_COMMAND}
         -DTESTDATA_DIR=${_TESTDATA}

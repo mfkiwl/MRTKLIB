@@ -9,7 +9,7 @@ set -euo pipefail
 #   3. Downloads IONEX TEC data from CODE (Univ. of Bern) if not already present
 #   4. Runs recvbias to generate reference receiver code biases
 #
-# The TEC file is kept permanently in data/ for reuse by CTest.
+# The TEC file is downloaded to data/ and cleaned up on exit.
 #
 # Usage:
 #   bash test/data/regression/gen_ref_rb.sh            # without trace
@@ -71,11 +71,12 @@ cleanup() {
     for f in ${CLEANUP_FILES[@]+"${CLEANUP_FILES[@]}"}; do
         rm -f "$f"
     done
-    # Files extracted by tar (TEC file is kept permanently in data/)
+    # Files extracted by tar and downloaded TEC file
     rm -f data/2024235L.209.l6
     rm -f data/MALIB_OSS_data_obsnav_240822-1100.*
     rm -f data/MALIB_OSS_data_l6e_240822-1100.*
     rm -f data/igs14*.atx
+    rm -f "data/${TEC_BASENAME}"
 }
 trap cleanup EXIT
 
