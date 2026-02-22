@@ -69,6 +69,8 @@
 #include "mrtklib/mrtk_rinex.h"
 #include "mrtklib/mrtk_tides.h"
 #include "mrtklib/mrtk_geoid.h"
+#include "mrtklib/mrtk_sbas.h"
+#include "mrtklib/mrtk_rtcm.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -533,38 +535,7 @@ typedef struct {        /* solution status buffer type */
     solstat_t *data;    /* solution status data */
 } solstatbuf_t;
 
-typedef struct {        /* RTCM control struct type */
-    int staid;          /* station id */
-    int stah;           /* station health */
-    int seqno;          /* sequence number for rtcm 2 or iods msm */
-    int outtype;        /* output message type */
-    gtime_t time;       /* message time */
-    gtime_t time_s;     /* message start time */
-    obs_t obs;          /* observation data (uncorrected) */
-    nav_t nav;          /* satellite ephemerides */
-    sta_t sta;          /* station parameters */
-    dgps_t *dgps;       /* output of dgps corrections */
-    ssr_t ssr[MAXSAT];  /* output of ssr corrections */
-    char msg[128];      /* special message */
-    char msgtype[256];  /* last message type */
-    char msmtype[7][128]; /* msm signal types */
-    int obsflag;        /* obs data complete flag (1:ok,0:not complete) */
-    int ephsat;         /* input ephemeris satellite number */
-    int ephset;         /* input ephemeris set (0-1) */
-    double cp[MAXSAT][NFREQ+NEXOBS]; /* carrier-phase measurement */
-    uint16_t lock[MAXSAT][NFREQ+NEXOBS]; /* lock time */
-    uint16_t loss[MAXSAT][NFREQ+NEXOBS]; /* loss of lock count */
-    gtime_t lltime[MAXSAT][NFREQ+NEXOBS]; /* last lock time */
-    int nbyte;          /* number of bytes in message buffer */ 
-    int nbit;           /* number of bits in word buffer */ 
-    int len;            /* message length (bytes) */
-    uint8_t buff[1200]; /* message buffer */
-    uint32_t word;      /* word buffer for rtcm 2 */
-    uint32_t nmsg2[100]; /* message count of RTCM 2 (1-99:1-99,0:other) */
-    uint32_t nmsg3[400]; /* message count of RTCM 3 (1-299:1001-1299,300-329:4070-4099,0:ohter) */
-    char opt[256];      /* RTCM dependent options */
-    lclblock_t lclblk;  /* output of iono/trop corrections */
-} rtcm_t;
+/* rtcm_t moved to mrtklib/mrtk_rtcm.h */
 
 /* rnxctr_t moved to mrtklib/mrtk_rinex.h */
 
@@ -1117,15 +1088,7 @@ int gen_ubx(const char *msg, uint8_t *buff);
 int gen_stq(const char *msg, uint8_t *buff);
 int gen_nvs(const char *msg, uint8_t *buff);
 
-/* RTCM functions ------------------------------------------------------------*/
-int init_rtcm(rtcm_t *rtcm);
-void free_rtcm(rtcm_t *rtcm);
-int input_rtcm2(rtcm_t *rtcm, uint8_t data);
-int input_rtcm3(rtcm_t *rtcm, uint8_t data);
-int input_rtcm2f(rtcm_t *rtcm, FILE *fp);
-int input_rtcm3f(rtcm_t *rtcm, FILE *fp);
-int gen_rtcm2(rtcm_t *rtcm, int type, int sync);
-int gen_rtcm3(rtcm_t *rtcm, int type, int subtype, int sync);
+/* RTCM functions moved to mrtklib/mrtk_rtcm.h */
 
 /* solution functions --------------------------------------------------------*/
 void initsolbuf(solbuf_t *solbuf, int cyclic, int nmax);
@@ -1168,19 +1131,7 @@ int convgpx(const char *infile, const char *outfile, gtime_t ts, gtime_t te,
             double tint, int qflg, double *offset, int outtrk, int outpnt,
             int outalt, int outtime);
 
-/* SBAS functions ------------------------------------------------------------*/
-int sbsreadmsg (const char *file, int sel, sbs_t *sbs);
-int sbsreadmsgt(const char *file, int sel, gtime_t ts, gtime_t te, sbs_t *sbs);
-void sbsoutmsg(FILE *fp, sbsmsg_t *sbsmsg);
-int sbsdecodemsg(gtime_t time, int prn, const uint32_t *words,
-                  sbsmsg_t *sbsmsg);
-int sbsupdatecorr(const sbsmsg_t *msg, nav_t *nav);
-int sbssatcorr(gtime_t time, int sat, const nav_t *nav, double *rs, double *dts,
-               double *var);
-int sbsioncorr(gtime_t time, const nav_t *nav, const double *pos,
-               const double *azel, double *delay, double *var);
-double sbstropcorr(gtime_t time, const double *pos, const double *azel,
-                   double *var);
+/* SBAS functions moved to mrtklib/mrtk_sbas.h */
 
 /* options functions ---------------------------------------------------------*/
 opt_t *searchopt(const char *name, const opt_t *opts);

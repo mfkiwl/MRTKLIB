@@ -1,45 +1,51 @@
-/*------------------------------------------------------------------------------
-* sbas.c : sbas functions
-*
-*          Copyright (C) 2007-2021 by T.TAKASU, All rights reserved.
-*
-* option : -DRRCENA  enable rrc correction
-*          
-* references :
-*     [1] RTCA/DO-229C, Minimum operational performanc standards for global
-*         positioning system/wide area augmentation system airborne equipment,
-*         RTCA inc, November 28, 2001
-*     [2] IS-QZSS v.1.1, Quasi-Zenith Satellite System Navigation Service
-*         Interface Specification for QZSS, Japan Aerospace Exploration Agency,
-*         July 31, 2009
-*
-* version : $Revision:$ $Date:$
-* history : 2007/10/14 1.0  new
-*           2009/01/24 1.1  modify sbspntpos() api
-*                           improve fast/ion correction update
-*           2009/04/08 1.2  move function crc24q() to rcvlog.c
-*                           support glonass, galileo and qzss
-*           2009/06/08 1.3  modify sbsupdatestat()
-*                           delete sbssatpos()
-*           2009/12/12 1.4  support glonass
-*           2010/01/22 1.5  support ems (egnos message service) format
-*           2010/06/10 1.6  added api:
-*                               sbssatcorr(),sbstropcorr(),sbsioncorr(),
-*                               sbsupdatecorr()
-*                           changed api:
-*                               sbsreadmsgt(),sbsreadmsg()
-*                           deleted api:
-*                               sbspntpos(),sbsupdatestat()
-*           2010/08/16 1.7  not reject udre==14 or give==15 correction message
-*                           (2.4.0_p4)
-*           2011/01/15 1.8  use api ionppp()
-*                           add prn mask of qzss for qzss L1SAIF
-*           2016/07/29 1.9  crc24q() -> rtk_crc24q()
-*           2020/11/30 1.10 use integer types in stdint.h
-*           2021/01/11 1.11 remove EXPORT
-*           2021/05/21 1.12 fix typos in comments
-*-----------------------------------------------------------------------------*/
-#include "rtklib.h"
+/**
+ * @file mrtk_sbas.c
+ * @brief MRTKLIB SBAS Module — SBAS message decoding and corrections.
+ *
+ * Pure cut-and-paste extraction from sbas.c with zero algorithmic changes.
+ *
+ * Original: Copyright (C) 2007-2021 by T.TAKASU, All rights reserved.
+ *
+ * option : -DRRCENA  enable rrc correction
+ *
+ * references :
+ *     [1] RTCA/DO-229C, Minimum operational performanc standards for global
+ *         positioning system/wide area augmentation system airborne equipment,
+ *         RTCA inc, November 28, 2001
+ *     [2] IS-QZSS v.1.1, Quasi-Zenith Satellite System Navigation Service
+ *         Interface Specification for QZSS, Japan Aerospace Exploration Agency,
+ *         July 31, 2009
+ */
+#include "mrtklib/mrtk_sbas.h"
+#include "mrtklib/mrtk_bits.h"
+#include "mrtklib/mrtk_sys.h"
+#include "mrtklib/mrtk_atmos.h"
+
+#include <string.h>
+#include <stdlib.h>
+#include <math.h>
+
+/*--- local constants (duplicated to avoid rtklib.h dependency) -------------*/
+#define SYS_NONE    0x00
+#define SYS_GPS     0x01
+#define SYS_SBS     0x02
+#define SYS_GLO     0x04
+#define SYS_QZS     0x10
+
+static const double PI       = 3.1415926535897932;
+static const double D2R      = 3.1415926535897932 / 180.0;
+static const double R2D      = 180.0 / 3.1415926535897932;
+static const double CLIGHT   = 299792458.0;
+static const double RE_WGS84 = 6378137.0;
+
+#define P2_11       4.882812500000000E-04 /* 2^-11 */
+#define P2_31       4.656612873077393E-10 /* 2^-31 */
+#define P2_39       1.818989403545856E-12 /* 2^-39 */
+#define MAXSBSAGEF  30.0                  /* max age of SBAS fast correction (s) */
+#define MAXSBSAGEL  1800.0                /* max age of SBAS long term corr (s) */
+
+/*--- forward declarations for legacy functions resolved at link time -------*/
+extern void trace(int level, const char *format, ...);
 
 /* constants -----------------------------------------------------------------*/
 
@@ -423,7 +429,7 @@ static int decode_sbstype26(const sbsmsg_t *msg, sbsion_t *sbsion)
 *               seph[prn-MINPRNSBS+1]          : sat prn current epehmeris 
 *               seph[prn-MINPRNSBS+1+MAXPRNSBS]: sat prn previous epehmeris 
 *-----------------------------------------------------------------------------*/
-extern int sbsupdatecorr(const sbsmsg_t *msg, nav_t *nav)
+int sbsupdatecorr(const sbsmsg_t *msg, nav_t *nav)
 {
     int type=getbitu(msg->msg,8,6),stat=-1;
     
@@ -543,7 +549,7 @@ static int cmpmsgs(const void *p1, const void *p2)
 *          to read. others are skipped
 *          .sbs, .SBS, .ems, .EMS
 *-----------------------------------------------------------------------------*/
-extern int sbsreadmsgt(const char *file, int sel, gtime_t ts, gtime_t te,
+int sbsreadmsgt(const char *file, int sel, gtime_t ts, gtime_t te,
                        sbs_t *sbs)
 {
     char *efiles[MAXEXFILE]={0},*ext;
@@ -575,7 +581,7 @@ extern int sbsreadmsgt(const char *file, int sel, gtime_t ts, gtime_t te,
     }
     return sbs->n;
 }
-extern int sbsreadmsg(const char *file, int sel, sbs_t *sbs)
+int sbsreadmsg(const char *file, int sel, sbs_t *sbs)
 {
     gtime_t ts={0},te={0};
     
@@ -589,7 +595,7 @@ extern int sbsreadmsg(const char *file, int sel, sbs_t *sbs)
 *          sbsmsg_t *sbsmsg I   sbas messages
 * return : none
 *-----------------------------------------------------------------------------*/
-extern void sbsoutmsg(FILE *fp, sbsmsg_t *sbsmsg)
+void sbsoutmsg(FILE *fp, sbsmsg_t *sbsmsg)
 {
     int i,prn=sbsmsg->prn,type=sbsmsg->msg[1]>>2;
     
@@ -665,7 +671,7 @@ static void searchigp(gtime_t time, const double *pos, const sbsion_t *ion,
 *          in navigation data (nav->sbsion) must be set by callig 
 *          sbsupdatecorr()
 *-----------------------------------------------------------------------------*/
-extern int sbsioncorr(gtime_t time, const nav_t *nav, const double *pos,
+int sbsioncorr(gtime_t time, const nav_t *nav, const double *pos,
                       const double *azel, double *delay, double *var)
 {
     const double re=6378.1363,hion=350.0;
@@ -751,7 +757,7 @@ static void getmet(double lat, double *met)
 *          double   *var    O   variance of troposphric error (m^2)
 * return : slant tropospheric delay (m)
 *-----------------------------------------------------------------------------*/
-extern double sbstropcorr(gtime_t time, const double *pos, const double *azel,
+double sbstropcorr(gtime_t time, const double *pos, const double *azel,
                           double *var)
 {
     const double k1=77.604,k2=382000.0,rd=287.054,gm=9.784,g=9.80665;
@@ -861,7 +867,7 @@ static int sbsfastcorr(gtime_t time, int sat, const sbssat_t *sbssat,
 *          sbas clock correction is usually based on L1C/A code. TGD or DCB has
 *          to be considered for other codes
 *-----------------------------------------------------------------------------*/
-extern int sbssatcorr(gtime_t time, int sat, const nav_t *nav, double *rs,
+int sbssatcorr(gtime_t time, int sat, const nav_t *nav, double *rs,
                       double *dts, double *var)
 {
     double drs[3]={0},dclk=0.0,prc=0.0;
@@ -894,7 +900,7 @@ extern int sbssatcorr(gtime_t time, int sat, const nav_t *nav, double *rs,
 *          sbsmsg_t *sbsmsg O   sbas message
 * return : status (1:ok,0:crc error)
 *-----------------------------------------------------------------------------*/
-extern int sbsdecodemsg(gtime_t time, int prn, const uint32_t *words,
+int sbsdecodemsg(gtime_t time, int prn, const uint32_t *words,
                         sbsmsg_t *sbsmsg)
 {
     int i,j;

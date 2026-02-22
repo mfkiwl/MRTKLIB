@@ -47,20 +47,75 @@
 *                           support GLO extended SVH, SVA and flags in MT1020
 *           2025/02/06 1.24 support MT2001-2016 trop/iono correction data
 *-----------------------------------------------------------------------------*/
-#include "rtklib.h"
+#include "mrtklib/mrtk_rtcm.h"
+#include "mrtklib/mrtk_bits.h"
+#include "mrtklib/mrtk_sys.h"
+#include "mrtklib/mrtk_eph.h"
+#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_coords.h"
+
+#include <string.h>
+#include <stdlib.h>
+#include <math.h>
+
+/*--- local constants (duplicated to avoid rtklib.h dependency) -------------*/
+#define SYS_NONE    0x00
+#define SYS_GPS     0x01
+#define SYS_SBS     0x02
+#define SYS_GLO     0x04
+#define SYS_GAL     0x08
+#define SYS_QZS     0x10
+#define SYS_CMP     0x20
+#define SYS_IRN     0x40
+
+#define TSYS_GPS    0
+#define TSYS_UTC    1
+#define TSYS_GLO    2
+#define TSYS_GAL    3
+#define TSYS_QZS    4
+#define TSYS_CMP    5
+#define TSYS_IRN    6
+
+static const double CLIGHT   = 299792458.0;
+static const double FREQ1    = 1.57542E9;
+static const double FREQ2    = 1.22760E9;
+static const double FREQ1_GLO = 1.60200E9;
+static const double DFRQ1_GLO = 0.56250E6;
+static const double FREQ2_GLO = 1.24600E9;
+static const double DFRQ2_GLO = 0.43750E6;
+static const double D2R      = 3.1415926535897932 / 180.0;
+static const double SC2RAD   = 3.1415926535897932;
+
+/*--- forward declarations for legacy functions resolved at link time -------*/
+extern void trace(int level, const char *format, ...);
 
 /* constants and macros ------------------------------------------------------*/
 
 #define PRUNIT_GPS  299792.458          /* rtcm 3 unit of gps pseudorange (m) */
 #define PRUNIT_GLO  599584.916          /* rtcm 3 unit of glo pseudorange (m) */
 #define RANGE_MS    (CLIGHT*0.001)      /* range in 1 ms */
-#define P2_10       0.0009765625          /* 2^-10 */
-#define P2_28       3.725290298461914E-09 /* 2^-28 */
-#define P2_34       5.820766091346740E-11 /* 2^-34 */
-#define P2_41       4.547473508864641E-13 /* 2^-41 */
-#define P2_46       1.421085471520200E-14 /* 2^-46 */
-#define P2_59       1.734723475976810E-18 /* 2^-59 */
-#define P2_66       1.355252715606880E-20 /* 2^-66 */
+#define P2_5        0.03125
+#define P2_6        0.015625
+#define P2_10       0.0009765625
+#define P2_11       4.882812500000000E-04
+#define P2_19       1.907348632812500E-06
+#define P2_20       9.536743164062500E-07
+#define P2_24       5.960464477539063E-08
+#define P2_28       3.725290298461914E-09
+#define P2_29       1.862645149230957E-09
+#define P2_30       9.313225746154785E-10
+#define P2_31       4.656612873077393E-10
+#define P2_32       2.328306436538696E-10
+#define P2_33       1.164153218269348E-10
+#define P2_34       5.820766091346740E-11
+#define P2_40       9.094947017729280E-13
+#define P2_41       4.547473508864641E-13
+#define P2_43       1.136868377216160E-13
+#define P2_46       1.421085471520200E-14
+#define P2_50       8.881784197001252E-16
+#define P2_55       2.775557561562891E-17
+#define P2_59       1.734723475976810E-18
+#define P2_66       1.355252715606880E-20
 
 #define ROUND(x)    ((int)floor((x)+0.5))
 #define ROUND_U(x)  ((uint32_t)floor((x)+0.5))
@@ -2594,7 +2649,7 @@ static int encode_type4076(rtcm_t *rtcm, int subtype, int sync)
     return 0;
 }
 /* encode RTCM ver.3 message -------------------------------------------------*/
-extern int encode_rtcm3(rtcm_t *rtcm, int type, int subtype, int sync)
+int encode_rtcm3(rtcm_t *rtcm, int type, int subtype, int sync)
 {
     int ret=0;
     

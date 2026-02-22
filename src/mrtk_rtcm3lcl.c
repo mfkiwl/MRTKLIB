@@ -1,14 +1,43 @@
-/*------------------------------------------------------------------------------
-* rtcm3lcl.c : rtcm3 local correction message encoder/decoder functions
-*
-* Copyright (C) 2025 Japan Aerospace Exploration Agency. All Rights Reserved.
-*
-* references :
-*     see rtcm3.c
-*
-* history : 2025/02/06  1.0  new, for MALIB from madoca ver.2.0.2
-*-----------------------------------------------------------------------------*/
-#include "rtklib.h"
+/**
+ * @file mrtk_rtcm3lcl.c
+ * @brief MRTKLIB RTCM Module — RTCM3 local correction message functions.
+ *
+ * Pure cut-and-paste extraction from rtcm3lcl.c with zero algorithmic changes.
+ *
+ * Original: Copyright (C) 2025 Japan Aerospace Exploration Agency.
+ */
+#include "mrtklib/mrtk_rtcm.h"
+#include "mrtklib/mrtk_bits.h"
+#include "mrtklib/mrtk_sys.h"
+#include "mrtklib/mrtk_coords.h"
+#include "mrtklib/mrtk_atmos.h"
+
+#include <string.h>
+#include <math.h>
+
+/*--- local constants (duplicated to avoid rtklib.h dependency) -------------*/
+#define SYS_GPS     0x01
+#define SYS_GLO     0x04
+#define SYS_GAL     0x08
+#define SYS_QZS     0x10
+#define SYS_CMP     0x20
+
+#define TSYS_GAL    3
+
+static const double PI       = 3.1415926535897932;
+static const double D2R      = 3.1415926535897932 / 180.0;
+static const double R2D      = 180.0 / 3.1415926535897932;
+static const double RE_WGS84 = 6378137.0;
+
+#define TOW_LSB         30.0            /* epoch time 30s */
+#define BTYPE_GRID      0               /* block type grid */
+#define BTYPE_STA       1               /* block type station */
+#define ION_BLKSIZE     2.0             /* ionosphere block size */
+#define TRP_BLKSIZE     4.0             /* troposphere block size */
+
+/*--- forward declarations for legacy functions resolved at link time -------*/
+extern void trace(int level, const char *format, ...);
+extern void initblkinf(blkinf_t *b);
 
 #define ION_BAS_LSB 0.35      /* ionospheric delay base value resolution */
 #define ION_DET_LSB 0.002     /* ionospheric delay detail value resolution */
@@ -96,7 +125,7 @@ static int decode_lclhead(rtcm_t *rtcm, int type,blkinf_t *blkinf)
 *          int type         I    message type
 * return : status (12: success, other: error)
 *-----------------------------------------------------------------------------*/
-extern int decode_lcltrop(rtcm_t *rtcm, int type)
+int decode_lcltrop(rtcm_t *rtcm, int type)
 {
     int i,p=0,ctnum,tp=0;
     unsigned int lat,lon;
@@ -164,7 +193,7 @@ extern int decode_lcltrop(rtcm_t *rtcm, int type)
 *          int type         I    message type
 * return : status (12: success, other: error)
 *-----------------------------------------------------------------------------*/
-extern int decode_lcliono(rtcm_t *rtcm, int type)
+int decode_lcliono(rtcm_t *rtcm, int type)
 {
     int i, j, p=0, ns, nsat, sat, msys, minprn, ssat, cinum, tp=0;
     int prn[MAXSAT]={0};
@@ -319,7 +348,7 @@ static int encode_lclhead(rtcm_t *rtcm, int type,blkinf_t *blkinf)
 *          int type         I    message type
 * return : status (1: success, other: error)
 *-----------------------------------------------------------------------------*/
-extern int encode_lcltrop(rtcm_t *rtcm, int type)
+int encode_lcltrop(rtcm_t *rtcm, int type)
 {
     int i,p=0,n=0,tp=0;
     unsigned int base,detail,stdev,lat,lon;
@@ -410,7 +439,7 @@ extern int encode_lcltrop(rtcm_t *rtcm, int type)
 *          int type         I    message type
 * return : status (1: success, other: error)
 *-----------------------------------------------------------------------------*/
-extern int encode_lcliono(rtcm_t *rtcm, int type)
+int encode_lcliono(rtcm_t *rtcm, int type)
 {
     int i,j,p=0,n=0,nsat,msys,minprn,sys,prn,ssat,tp=0;
     double ion[MAXIONSTA][MAXOBS]={{0}},std[MAXIONSTA][MAXOBS]={{0}};

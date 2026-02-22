@@ -1,16 +1,36 @@
-/*------------------------------------------------------------------------------
-* rtcm2.c : rtcm ver.2 message functions
-*
-*          Copyright (C) 2009-2014 by T.TAKASU, All rights reserved.
-*
-* references :
-*     see rtcm.c
-*
-* version : $Revision:$ $Date:$
-* history : 2011/11/28 1.0  separated from rtcm.c
-*           2014/10/21 1.1  fix problem on week rollover in rtcm 2 type 14
-*-----------------------------------------------------------------------------*/
-#include "rtklib.h"
+/**
+ * @file mrtk_rtcm2.c
+ * @brief MRTKLIB RTCM Module — RTCM ver.2 message decoder.
+ *
+ * Pure cut-and-paste extraction from rtcm2.c with zero algorithmic changes.
+ *
+ * Original: Copyright (C) 2009-2014 by T.TAKASU, All rights reserved.
+ */
+#include "mrtklib/mrtk_rtcm.h"
+#include "mrtklib/mrtk_bits.h"
+#include "mrtklib/mrtk_sys.h"
+#include "mrtklib/mrtk_eph.h"
+
+#include <string.h>
+#include <stdlib.h>
+#include <math.h>
+
+/*--- local constants (duplicated to avoid rtklib.h dependency) -------------*/
+#define SYS_GPS     0x01
+#define SYS_GLO     0x04
+
+static const double SC2RAD   = 3.1415926535898;
+
+#define P2_5        0.03125
+#define P2_19       1.907348632812500E-06
+#define P2_29       1.862645149230957E-09
+#define P2_31       4.656612873077393E-10
+#define P2_33       1.164153218269348E-10
+#define P2_43       1.136868377216160E-13
+#define P2_55       2.775557561562891E-17
+
+/*--- forward declarations for legacy functions resolved at link time -------*/
+extern void trace(int level, const char *format, ...);
 
 /* adjust hourly rollover of rtcm 2 time -------------------------------------*/
 static void adjhour(rtcm_t *rtcm, double zcnt)
@@ -368,7 +388,7 @@ static int decode_type59(rtcm_t *rtcm)
     return 0;
 }
 /* decode rtcm ver.2 message -------------------------------------------------*/
-extern int decode_rtcm2(rtcm_t *rtcm)
+int decode_rtcm2(rtcm_t *rtcm)
 {
     double zcnt;
     int staid,seqno,stah,ret=0,type=getbitu(rtcm->buff,8,6);
