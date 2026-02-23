@@ -6,16 +6,18 @@ set -euo pipefail
 # This script performs two phases:
 #
 #   Phase 1 — Prepare test data archive (requires convbin)
-#     Cuts the full-day MIZU OBS to 1 hour using convbin, copies NAV/L6E/ATX
+#     Cuts the full-day MIZU OBS to 1 hour using convbin, copies NAV/L6E/L6D/ATX
 #     from upstream/madocalib/sample_data, and creates the tar.gz archive.
 #     Skipped if the archive already exists.
 #
 #   Phase 2 — Generate golden reference (requires rnx2rtkp)
-#     Extracts the archive and runs rnx2rtkp with the MADOCALIB PPP engine
-#     to produce the reference .pos file.
+#     Extracts the archive and runs rnx2rtkp for all 4 test scenarios:
+#       1. PPP          (sample.conf,          mdc-004 L6E)
+#       2. PPP-AR       (sample_pppar.conf,    mdc-004 L6E)
+#       3. PPP-AR 003   (sample_pppar.conf,    mdc-003 L6E)
+#       4. PPP-AR+iono  (sample_pppar_iono.conf, mdc-004 L6E+L6D)
 #
 # Data: MIZU station, 2025/04/01 Session A (00:00:00–00:59:30 GPST)
-#       L6E E1 (.204) + E2 (.206), IGS20 antenna calibration
 #
 # Prerequisites:
 #   1. cmake --preset default && cmake --build build
@@ -65,6 +67,10 @@ SRC_OBS="${UPSTREAM}/rinex/MIZU00JPN_R_20250910000_01D_30S_MO.rnx"
 SRC_NAV="${UPSTREAM}/rinex/BRDM00DLR_S_20250910000_01D_MN.rnx"
 SRC_L6E1="${UPSTREAM}/l6_is-qzss-mdc-004/2025/091/2025091A.204.l6"
 SRC_L6E2="${UPSTREAM}/l6_is-qzss-mdc-004/2025/091/2025091A.206.l6"
+SRC_L6E1_003="${UPSTREAM}/l6_is-qzss-mdc-003/2025/091/2025091A.204.l6"
+SRC_L6E2_003="${UPSTREAM}/l6_is-qzss-mdc-003/2025/091/2025091A.206.l6"
+SRC_L6D1="${UPSTREAM}/l6_is-qzss-mdc-004/2025/091/2025091A.200.l6"
+SRC_L6D2="${UPSTREAM}/l6_is-qzss-mdc-004/2025/091/2025091A.201.l6"
 SRC_ATX="${UPSTREAM}/igs20.atx"
 
 # Target files (in test data directory)
@@ -72,7 +78,14 @@ OBS="${DATADIR}/MIZU00JPN_R_20250910000_01D_30S_MO.obs"
 NAV="${DATADIR}/BRDM00DLR_S_20250910000_01D_MN.rnx"
 L6E1="${DATADIR}/2025091A.204.l6"
 L6E2="${DATADIR}/2025091A.206.l6"
+L6E1_003="${DATADIR}/2025091A.204.mdc003.l6"
+L6E2_003="${DATADIR}/2025091A.206.mdc003.l6"
+L6D1="${DATADIR}/2025091A.200.l6"
+L6D2="${DATADIR}/2025091A.201.l6"
 ATX="${DATADIR}/igs20.atx"
+
+# Common rnx2rtkp time options
+TS_TE=(-ts 2025/04/01 0:00:00 -te 2025/04/01 0:59:30 -ti 30)
 
 # ── Phase 1: Prepare test data archive ────────────────────────────────────────
 
@@ -95,7 +108,11 @@ else
     echo "Using convbin: $CONVBIN"
 
     # Verify upstream source files
-    for f in "$SRC_OBS" "$SRC_NAV" "$SRC_L6E1" "$SRC_L6E2" "$SRC_ATX"; do
+    for f in "$SRC_OBS" "$SRC_NAV" \
+             "$SRC_L6E1" "$SRC_L6E2" \
+             "$SRC_L6E1_003" "$SRC_L6E2_003" \
+             "$SRC_L6D1" "$SRC_L6D2" \
+             "$SRC_ATX"; do
         if [[ ! -f "$f" ]]; then
             echo "ERROR: Upstream file not found: $f" >&2
             echo "  Ensure upstream/madocalib is populated." >&2
@@ -117,11 +134,15 @@ else
     echo "  OBS cut: $obs_epochs epochs, $(du -sh "$OBS" | cut -f1)"
 
     # Copy remaining files
-    echo "Copying NAV, L6E, ATX..."
-    cp "$SRC_NAV"  "$NAV"
-    cp "$SRC_L6E1" "$L6E1"
-    cp "$SRC_L6E2" "$L6E2"
-    cp "$SRC_ATX"  "$ATX"
+    echo "Copying NAV, L6E (mdc-004), L6E (mdc-003), L6D, ATX..."
+    cp "$SRC_NAV"      "$NAV"
+    cp "$SRC_L6E1"     "$L6E1"
+    cp "$SRC_L6E2"     "$L6E2"
+    cp "$SRC_L6E1_003" "$L6E1_003"
+    cp "$SRC_L6E2_003" "$L6E2_003"
+    cp "$SRC_L6D1"     "$L6D1"
+    cp "$SRC_L6D2"     "$L6D2"
+    cp "$SRC_ATX"      "$ATX"
 
     # Create archive
     echo "Creating archive..."
@@ -130,13 +151,18 @@ else
         "$(basename "$NAV")" \
         "$(basename "$L6E1")" \
         "$(basename "$L6E2")" \
+        "$(basename "$L6E1_003")" \
+        "$(basename "$L6E2_003")" \
+        "$(basename "$L6D1")" \
+        "$(basename "$L6D2")" \
         "$(basename "$ATX")"
 
     archive_size=$(du -sh "$ARCHIVE" | cut -f1)
     echo "  Archive: $ARCHIVE ($archive_size)"
 
     # Clean up extracted files
-    rm -f "$OBS" "$NAV" "$L6E1" "$L6E2" "$ATX"
+    rm -f "$OBS" "$NAV" "$L6E1" "$L6E2" "$L6E1_003" "$L6E2_003" \
+          "$L6D1" "$L6D2" "$ATX"
 
     echo "=== Phase 1 complete ==="
 fi
@@ -164,34 +190,62 @@ echo "Extracting data..."
 tar -xzf "$ARCHIVE" -C "$DATADIR"
 
 # Verify inputs exist
-for f in "$OBS" "$NAV" "$L6E1" "$L6E2"; do
+for f in "$OBS" "$NAV" "$L6E1" "$L6E2" "$L6E1_003" "$L6E2_003" \
+         "$L6D1" "$L6D2"; do
     if [[ ! -f "$f" ]]; then
         echo "ERROR: Input file not found: $f" >&2
         exit 1
     fi
 done
 
-# Run rnx2rtkp (MADOCA-PPP)
-output="${DATADIR}/madocalib_MIZU_20250401-0000.pp.pos"
-echo "Running rnx2rtkp for MADOCA-PPP (Session A: 00:00–00:59)..."
-"$RNX2RTKP" \
-    -k conf/madocalib/rnx2rtkp.conf \
-    -ts 2025/04/01 0:00:00 -te 2025/04/01 0:59:30 -ti 30 \
-    ${TRACE_OPTS[@]+"${TRACE_OPTS[@]}"} \
-    -o "$output" \
+# Helper to run and verify
+run_rnx2rtkp() {
+    local label="$1" conf="$2" output="$3"
+    shift 3
+    echo "Running rnx2rtkp for ${label}..."
+    "$RNX2RTKP" \
+        -k "$conf" \
+        "${TS_TE[@]}" \
+        ${TRACE_OPTS[@]+"${TRACE_OPTS[@]}"} \
+        -o "$output" \
+        "$@"
+
+    if [[ ! -s "$output" ]]; then
+        echo "ERROR: Output file not generated or empty: $output" >&2
+        exit 1
+    fi
+    local lines
+    lines=$(wc -l < "$output")
+    echo "  $output ($lines lines)"
+}
+
+# 1. PPP (sample.conf — armode=off, freq=l1+2, iono=dual-freq)
+run_rnx2rtkp "MADOCA-PPP" \
+    conf/madocalib/rnx2rtkp.conf \
+    "${DATADIR}/madocalib_MIZU_20250401-0000.pp.pos" \
     "$OBS" "$NAV" "$L6E1" "$L6E2"
 
-# Verify output
-echo "Verifying output..."
-if [[ ! -s "$output" ]]; then
-    echo "ERROR: Output file not generated or empty: $output" >&2
-    exit 1
-fi
-lines=$(wc -l < "$output")
-echo "  $output ($lines lines)"
+# 2. PPP-AR mdc-004 (sample_pppar.conf — armode=continuous, freq=l1+2+3+4)
+run_rnx2rtkp "MADOCA PPP-AR (mdc-004)" \
+    conf/madocalib/rnx2rtkp_pppar.conf \
+    "${DATADIR}/madocalib_MIZU_20250401-0000.pppar.pos" \
+    "$OBS" "$NAV" "$L6E1" "$L6E2"
+
+# 3. PPP-AR mdc-003 (same config, different L6E data)
+run_rnx2rtkp "MADOCA PPP-AR (mdc-003)" \
+    conf/madocalib/rnx2rtkp_pppar.conf \
+    "${DATADIR}/madocalib_MIZU_20250401-0000.pppar_003.pos" \
+    "$OBS" "$NAV" "$L6E1_003" "$L6E2_003"
+
+# 4. PPP-AR + ionosphere correction (L6E + L6D)
+run_rnx2rtkp "MADOCA PPP-AR+iono" \
+    conf/madocalib/rnx2rtkp_pppar_iono.conf \
+    "${DATADIR}/madocalib_MIZU_20250401-0000.pppar_ion.pos" \
+    "$OBS" "$NAV" "$L6E1" "$L6E2" "$L6D1" "$L6D2"
 
 # Clean up extracted files
-rm -f "$OBS" "$NAV" "$L6E1" "$L6E2" "$ATX"
+rm -f "$OBS" "$NAV" "$L6E1" "$L6E2" "$L6E1_003" "$L6E2_003" \
+      "$L6D1" "$L6D2" "$ATX"
 
 echo "=== Phase 2 complete ==="
 echo "Reference data generated successfully."

@@ -348,9 +348,16 @@ set_tests_properties(rtkrcv_rt PROPERTIES
 # ═══════════════════════════════════════════════════════════════════════════════
 # MADOCALIB regression tests
 # ═══════════════════════════════════════════════════════════════════════════════
-# Data: MIZU station, 2025/04/01 Session A (00:00-00:59), L6E E1(.204)+E2(.206)
+# Data: MIZU station, 2025/04/01 Session A (00:00-00:59)
 # Source: upstream/madocalib/sample_data
 # Test data archive: tests/data/madocalib/madocalib_testdata.tar.gz
+#
+# Tests:
+#   madocalib_ppp         PPP (sample.conf)           L6E mdc-004
+#   madocalib_pppar       PPP-AR (sample_pppar.conf)  L6E mdc-004
+#   madocalib_pppar_003   PPP-AR (sample_pppar.conf)  L6E mdc-003
+#   madocalib_pppar_ion   PPP-AR+iono (sample_pppar_iono.conf) L6E+L6D mdc-004
+#   madocalib_cssr2ssr    CSSR→SSR conversion (cssr2ssr, not yet ported)
 set(_MDLDATA  ${CMAKE_SOURCE_DIR}/tests/data/madocalib)
 
 # ── Fixture: extract / clean madocalib test data archive ─────────────────────
@@ -370,6 +377,10 @@ add_test(NAME madocalib_cleanup
         ${_MDLDATA}/BRDM00DLR_S_20250910000_01D_MN.rnx \
         ${_MDLDATA}/2025091A.204.l6 \
         ${_MDLDATA}/2025091A.206.l6 \
+        ${_MDLDATA}/2025091A.204.mdc003.l6 \
+        ${_MDLDATA}/2025091A.206.mdc003.l6 \
+        ${_MDLDATA}/2025091A.200.l6 \
+        ${_MDLDATA}/2025091A.201.l6 \
         ${_MDLDATA}/igs20.atx"
 )
 set_tests_properties(madocalib_cleanup PROPERTIES
@@ -407,3 +418,110 @@ set_tests_properties(madocalib_ppp_check PROPERTIES
     FIXTURES_REQUIRED madocalib_data
     LABELS            "regression;madocalib;ppp"
 )
+
+# ── rnx2rtkp MADOCA PPP-AR regression (mdc-004) ─────────────────────────────
+add_test(NAME madocalib_pppar
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/madocalib/rnx2rtkp_pppar.conf
+        -ts 2025/04/01 0:00:00 -te 2025/04/01 0:59:30 -ti 30
+        -o ${CMAKE_BINARY_DIR}/out_madocalib_pppar.pos
+        ${_MDLDATA}/MIZU00JPN_R_20250910000_01D_30S_MO.obs
+        ${_MDLDATA}/BRDM00DLR_S_20250910000_01D_MN.rnx
+        ${_MDLDATA}/2025091A.204.l6
+        ${_MDLDATA}/2025091A.206.l6
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_pppar PROPERTIES
+    FIXTURES_REQUIRED madocalib_data
+    TIMEOUT           180
+    LABELS            "regression;madocalib;pppar"
+)
+
+add_test(NAME madocalib_pppar_check
+    COMMAND ${CMAKE_COMMAND}
+        -DOUTPUT=${CMAKE_BINARY_DIR}/out_madocalib_pppar.pos
+        -DREFERENCE=${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar.pos
+        -DTHRESHOLD=90
+        -P ${_TESTCMAKE}/compare_pos.cmake
+)
+set_tests_properties(madocalib_pppar_check PROPERTIES
+    DEPENDS           madocalib_pppar
+    FIXTURES_REQUIRED madocalib_data
+    LABELS            "regression;madocalib;pppar"
+)
+
+# ── rnx2rtkp MADOCA PPP-AR regression (mdc-003) ─────────────────────────────
+add_test(NAME madocalib_pppar_003
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/madocalib/rnx2rtkp_pppar.conf
+        -ts 2025/04/01 0:00:00 -te 2025/04/01 0:59:30 -ti 30
+        -o ${CMAKE_BINARY_DIR}/out_madocalib_pppar_003.pos
+        ${_MDLDATA}/MIZU00JPN_R_20250910000_01D_30S_MO.obs
+        ${_MDLDATA}/BRDM00DLR_S_20250910000_01D_MN.rnx
+        ${_MDLDATA}/2025091A.204.mdc003.l6
+        ${_MDLDATA}/2025091A.206.mdc003.l6
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_pppar_003 PROPERTIES
+    FIXTURES_REQUIRED madocalib_data
+    TIMEOUT           180
+    LABELS            "regression;madocalib;pppar"
+)
+
+add_test(NAME madocalib_pppar_003_check
+    COMMAND ${CMAKE_COMMAND}
+        -DOUTPUT=${CMAKE_BINARY_DIR}/out_madocalib_pppar_003.pos
+        -DREFERENCE=${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar_003.pos
+        -DTHRESHOLD=90
+        -P ${_TESTCMAKE}/compare_pos.cmake
+)
+set_tests_properties(madocalib_pppar_003_check PROPERTIES
+    DEPENDS           madocalib_pppar_003
+    FIXTURES_REQUIRED madocalib_data
+    LABELS            "regression;madocalib;pppar"
+)
+
+# ── rnx2rtkp MADOCA PPP-AR + ionosphere regression ──────────────────────────
+# Uses L6E (.204/.206) + L6D (.200/.201) for ionospheric correction
+add_test(NAME madocalib_pppar_ion
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/madocalib/rnx2rtkp_pppar_iono.conf
+        -ts 2025/04/01 0:00:00 -te 2025/04/01 0:59:30 -ti 30
+        -o ${CMAKE_BINARY_DIR}/out_madocalib_pppar_ion.pos
+        ${_MDLDATA}/MIZU00JPN_R_20250910000_01D_30S_MO.obs
+        ${_MDLDATA}/BRDM00DLR_S_20250910000_01D_MN.rnx
+        ${_MDLDATA}/2025091A.204.l6
+        ${_MDLDATA}/2025091A.206.l6
+        ${_MDLDATA}/2025091A.200.l6
+        ${_MDLDATA}/2025091A.201.l6
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_pppar_ion PROPERTIES
+    FIXTURES_REQUIRED madocalib_data
+    TIMEOUT           180
+    LABELS            "regression;madocalib;pppar"
+)
+
+add_test(NAME madocalib_pppar_ion_check
+    COMMAND ${CMAKE_COMMAND}
+        -DOUTPUT=${CMAKE_BINARY_DIR}/out_madocalib_pppar_ion.pos
+        -DREFERENCE=${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar_ion.pos
+        -DTHRESHOLD=90
+        -P ${_TESTCMAKE}/compare_pos.cmake
+)
+set_tests_properties(madocalib_pppar_ion_check PROPERTIES
+    DEPENDS           madocalib_pppar_ion
+    FIXTURES_REQUIRED madocalib_data
+    LABELS            "regression;madocalib;pppar"
+)
+
+# ── cssr2ssr regression (not yet ported) ─────────────────────────────────────
+# TODO: cssr2ssr binary is not yet integrated into MRTKLIB.
+#       When ported, add:
+#   add_test(NAME madocalib_cssr2ssr
+#       COMMAND $<TARGET_FILE:cssr2ssr>
+#           ${_MDLDATA}/2025091A.204.l6
+#           -o ${CMAKE_BINARY_DIR}/out_cssr2ssr.rtcm3
+#           -td 2025/04/01 -d
+#       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+#   )
