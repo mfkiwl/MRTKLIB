@@ -13,6 +13,9 @@ __astcache
 # CMake build directory
 build/
 
+# Python virtual environments
+scripts/.venv/
+
 # Test data extracted from tests/data/malib/MALIB_OSS_data.tar.gz
 # (extracted by ctest fixture; cleaned up automatically, but guarded here)
 tests/data/malib/MALIB_OSS_data_*.sbf

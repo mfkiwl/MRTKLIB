@@ -128,6 +128,29 @@ target_link_libraries(recvbias PRIVATE mrtklib)
 # cmake --install build  →  copies binaries to bin/ (matches make install)
 install(TARGETS rnx2rtkp rtkrcv recvbias RUNTIME DESTINATION bin)
 
+# ── Utility tools (optional) ─────────────────────────────────────────────────
+# Build with: cmake --preset default -DBUILD_UTILS=ON
+option(BUILD_UTILS "Build utility tools" OFF)
+if(BUILD_UTILS)
+    # Tools that depend on mrtklib
+    add_executable(mrtk_rnx2rtcm  util/rnx2rtcm/rnx2rtcm.c)
+    # Excluded (depend on removed/changed internal types):
+    #   diffeph, dumplex, convlex, dumpssr, outlexion — lex_t removed
+    #   geniono, genstec, estiono, gengrid, rcvdcb    — sstat_t/lam changed
+    #   simobs — lam/nav_t.ion/satpos signature changed
+    #   margelog — unfinished draft code with many bugs
+
+    set(_UTIL_TARGETS
+        mrtk_rnx2rtcm
+    )
+    foreach(tgt IN LISTS _UTIL_TARGETS)
+        target_link_libraries(${tgt} PRIVATE mrtklib)
+    endforeach()
+
+    # Standalone tools excluded: gencrc, genmsk, genxor
+    #   — need stdint.h but global -ansi flag prevents it
+endif()
+
 # ── Doxygen documentation ────────────────────────────────────────────────────
 # Build with: cmake --build build --target doc
 find_package(Doxygen)
@@ -150,6 +173,23 @@ endif()
 # Skip slow rtkrcv test: ctest --test-dir build -LE realtime
 enable_testing()
 
+# ── Unit tests ───────────────────────────────────────────────────────────────
+set(_UTEST_DIR ${CMAKE_SOURCE_DIR}/tests/utest)
+set(_UTEST_SOURCES
+    t_atmos t_coord t_geoid t_gloeph t_ionex
+    t_lambda t_matrix t_misc t_ppp t_preceph
+    t_rinex t_time
+    # t_tle excluded: tle_pos() implementation not yet in library
+)
+foreach(test IN LISTS _UTEST_SOURCES)
+    add_executable(${test} ${_UTEST_DIR}/${test}.c)
+    target_link_libraries(${test} PRIVATE mrtklib)
+    add_test(NAME utest_${test} COMMAND ${test}
+             WORKING_DIRECTORY ${_UTEST_DIR})
+    set_tests_properties(utest_${test} PROPERTIES LABELS "utest")
+endforeach()
+
+# ── Regression test data ─────────────────────────────────────────────────────
 set(_TESTDATA  ${CMAKE_SOURCE_DIR}/tests/data/malib)
 set(_REFDATA   ${CMAKE_SOURCE_DIR}/tests/data/regression)
 set(_TESTCMAKE ${CMAKE_SOURCE_DIR}/tests/cmake)
