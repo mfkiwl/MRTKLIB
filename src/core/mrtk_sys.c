@@ -31,13 +31,11 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*============================================================================
  * Forward Declarations (resolved at link time from rtkcmn.c)
  *===========================================================================*/
-
-extern void trace(int level, const char *format, ...);
-extern void tracet(int level, const char *format, ...);
 
 /*============================================================================
  * Platform Constants
@@ -77,7 +75,7 @@ extern double str2num(const char *s, int i, int n)
 *-----------------------------------------------------------------------------*/
 extern int execcmd(const char *cmd)
 {
-    trace(3,"execcmd: cmd=%s\n",cmd);
+    trace(NULL,3,"execcmd: cmd=%s\n",cmd);
 
     return system(cmd);
 }
@@ -98,7 +96,7 @@ extern int expath(const char *path, char *paths[], int nmax)
     const char *file=path;
     char dir[1024]="",s1[1024],s2[1024],*p,*q,*r;
 
-    trace(3,"expath  : path=%s nmax=%d\n",path,nmax);
+    trace(NULL,3,"expath  : path=%s nmax=%d\n",path,nmax);
 
     if ((p=strrchr(path,'/'))||(p=strrchr(path,'\\'))) {
         file=p+1; strncpy(dir,path,p-path+1); dir[p-path+1]='\0';
@@ -127,7 +125,7 @@ extern int expath(const char *path, char *paths[], int nmax)
             }
         }
     }
-    for (i=0;i<n;i++) trace(3,"expath  : file=%s\n",paths[i]);
+    for (i=0;i<n;i++) trace(NULL,3,"expath  : file=%s\n",paths[i]);
 
     return n;
 }
@@ -148,7 +146,7 @@ static int mkdir_r(const char *dir)
         else fclose(fp);
     }
     if (!mkdir(dir,0777)||errno==EEXIST) return 1;
-    trace(2,"directory generation error: dir=%s\n",dir);
+    trace(NULL,2,"directory generation error: dir=%s\n",dir);
     return 0;
 }
 /* create directory ------------------------------------------------------------
@@ -161,7 +159,7 @@ extern void createdir(const char *path)
 {
     char buff[1024],*p;
 
-    tracet(3,"createdir: path=%s\n",path);
+    tracet(NULL,3,"createdir: path=%s\n",path);
 
     strcpy(buff,path);
     if (!(p=strrchr(buff,FILEPATHSEP))) return;
@@ -277,7 +275,7 @@ extern int reppaths(const char *path, char *rpath[], int nmax, gtime_t ts,
     double tow,tint=86400.0;
     int i,n=0,week;
 
-    trace(3,"reppaths: path =%s nmax=%d rov=%s base=%s\n",path,nmax,rov,base);
+    trace(NULL,3,"reppaths: path =%s nmax=%d rov=%s base=%s\n",path,nmax,rov,base);
 
     if (ts.time==0||te.time==0||timediff(ts,te)>0.0) return 0;
 
@@ -292,7 +290,7 @@ extern int reppaths(const char *path, char *rpath[], int nmax, gtime_t ts,
         if (n==0||strcmp(rpath[n],rpath[n-1])) n++;
         time=timeadd(time,tint);
     }
-    for (i=0;i<n;i++) trace(3,"reppaths: rpath=%s\n",rpath[i]);
+    for (i=0;i<n;i++) trace(NULL,3,"reppaths: rpath=%s\n",rpath[i]);
     return n;
 }
 
@@ -313,7 +311,7 @@ extern int rtk_uncompress(const char *file, char *uncfile)
     int stat=0;
     char *p,cmd[64+2048]="",tmpfile[1024]="",buff[1024],*fname,*dir="";
 
-    trace(3,"rtk_uncompress: file=%s\n",file);
+    trace(NULL,3,"rtk_uncompress: file=%s\n",file);
 
     strcpy(tmpfile,file);
     if (!(p=strrchr(tmpfile,'.'))) return 0;
@@ -367,6 +365,6 @@ extern int rtk_uncompress(const char *file, char *uncfile)
         if (stat) remove(tmpfile);
         stat=1;
     }
-    trace(3,"rtk_uncompress: stat=%d\n",stat);
+    trace(NULL,3,"rtk_uncompress: stat=%d\n",stat);
     return stat;
 }

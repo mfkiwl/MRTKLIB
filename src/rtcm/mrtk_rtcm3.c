@@ -20,6 +20,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*--- local constants (duplicated to avoid rtklib.h dependency) -------------*/
 #define SYS_NONE    0x00
@@ -72,7 +73,6 @@ static const double RE_WGS84 = 6378137.0;
 #define SSR_VENDOR_RTCM 1               /* vendor type RTCM3(JAXA-MADOCA) */
 
 /*--- forward declarations for legacy functions resolved at link time -------*/
-extern void trace(int level, const char *format, ...);
 extern int decode_qzss_l6emsg(rtcm_t *rtcm);
 
 /* constants -----------------------------------------------------------------*/
@@ -293,7 +293,7 @@ static int test_staid(rtcm_t *rtcm, int staid)
     }
     else if (staid!=rtcm->staid) {
         type=getbitu(rtcm->buff,24,12);
-        trace(2,"rtcm3 %d staid invalid id=%d %d\n",type,staid,rtcm->staid);
+        trace(NULL,2,"rtcm3 %d staid invalid id=%d %d\n",type,staid,rtcm->staid);
         
         /* reset station id if station id error */
         rtcm->staid=0;
@@ -317,7 +317,7 @@ static int decode_head1001(rtcm_t *rtcm, int *sync)
         nsat =getbitu(rtcm->buff,i, 5);
     }
     else {
-        trace(2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
+        trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
     }
     /* test station ID */
@@ -326,7 +326,7 @@ static int decode_head1001(rtcm_t *rtcm, int *sync)
     adjweek(rtcm,tow);
     
     time2str(rtcm->time,tstr,2);
-    trace(4,"decode_head1001: time=%s nsat=%d sync=%d\n",tstr,nsat,*sync);
+    trace(NULL,4,"decode_head1001: time=%s nsat=%d sync=%d\n",tstr,nsat,*sync);
     
     if (rtcm->outtype) {
         msg=rtcm->msgtype+strlen(rtcm->msgtype);
@@ -365,7 +365,7 @@ static int decode_type1002(rtcm_t *rtcm)
             sys=SYS_SBS; prn+=80;
         }
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 1002 satellite number error: prn=%d\n",prn);
+            trace(NULL,2,"rtcm3 1002 satellite number error: prn=%d\n",prn);
             continue;
         }
         tt=timediff(rtcm->obs.data[0].time,rtcm->time);
@@ -424,7 +424,7 @@ static int decode_type1004(rtcm_t *rtcm)
             sys=SYS_SBS; prn+=80;
         }
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 1004 satellite number error: sys=%d prn=%d\n",sys,prn);
+            trace(NULL,2,"rtcm3 1004 satellite number error: sys=%d prn=%d\n",sys,prn);
             continue;
         }
         tt=timediff(rtcm->obs.data[0].time,rtcm->time);
@@ -477,7 +477,7 @@ static int decode_type1005(rtcm_t *rtcm)
         rr[2]=getbits_38(rtcm->buff,i);
     }
     else {
-        trace(2,"rtcm3 1005 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1005 length error: len=%d\n",rtcm->len);
         return -1;
     }
     if (rtcm->outtype) {
@@ -516,7 +516,7 @@ static int decode_type1006(rtcm_t *rtcm)
         anth =getbitu(rtcm->buff,i,16);
     }
     else {
-        trace(2,"rtcm3 1006 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1006 length error: len=%d\n",rtcm->len);
         return -1;
     }
     if (rtcm->outtype) {
@@ -556,7 +556,7 @@ static int decode_type1007(rtcm_t *rtcm)
         setup=getbitu(rtcm->buff,i, 8);
     }
     else {
-        trace(2,"rtcm3 1007 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1007 length error: len=%d\n",rtcm->len);
         return -1;
     }
     if (rtcm->outtype) {
@@ -593,7 +593,7 @@ static int decode_type1008(rtcm_t *rtcm)
         }
     }
     else {
-        trace(2,"rtcm3 1008 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1008 length error: len=%d\n",rtcm->len);
         return -1;
     }
     if (rtcm->outtype) {
@@ -625,7 +625,7 @@ static int decode_head1009(rtcm_t *rtcm, int *sync)
         nsat =getbitu(rtcm->buff,i, 5);
     }
     else {
-        trace(2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
+        trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
     }
     /* test station ID */
@@ -634,7 +634,7 @@ static int decode_head1009(rtcm_t *rtcm, int *sync)
     adjday_glot(rtcm,tod);
     
     time2str(rtcm->time,tstr,2);
-    trace(4,"decode_head1009: time=%s nsat=%d sync=%d\n",tstr,nsat,*sync);
+    trace(NULL,4,"decode_head1009: time=%s nsat=%d sync=%d\n",tstr,nsat,*sync);
     
     if (rtcm->outtype) {
         msg=rtcm->msgtype+strlen(rtcm->msgtype);
@@ -668,7 +668,7 @@ static int decode_type1010(rtcm_t *rtcm)
         amb  =getbitu(rtcm->buff,i, 7); i+= 7;
         cnr1 =getbitu(rtcm->buff,i, 8); i+= 8;
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 1010 satellite number error: prn=%d\n",prn);
+            trace(NULL,2,"rtcm3 1010 satellite number error: prn=%d\n",prn);
             continue;
         }
         if (!rtcm->nav.glo_fcn[prn-1]) {
@@ -725,7 +725,7 @@ static int decode_type1012(rtcm_t *rtcm)
         lock2=getbitu(rtcm->buff,i, 7); i+= 7;
         cnr2 =getbitu(rtcm->buff,i, 8); i+= 8;
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 1012 satellite number error: sys=%d prn=%d\n",sys,prn);
+            trace(NULL,2,"rtcm3 1012 satellite number error: sys=%d prn=%d\n",sys,prn);
             continue;
         }
         if (!rtcm->nav.glo_fcn[prn-1]) {
@@ -809,13 +809,13 @@ static int decode_type1019(rtcm_t *rtcm)
         eph.fit   =getbitu(rtcm->buff,i, 1)?0.0:4.0; /* 0:4hr,1:>4hr */
     }
     else {
-        trace(2,"rtcm3 1019 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1019 length error: len=%d\n",rtcm->len);
         return -1;
     }
     if (prn>=40) {
         sys=SYS_SBS; prn+=80;
     }
-    trace(4,"decode_type1019: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
+    trace(NULL,4,"decode_type1019: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
     
     if (rtcm->outtype) {
         msg=rtcm->msgtype+strlen(rtcm->msgtype);
@@ -823,7 +823,7 @@ static int decode_type1019(rtcm_t *rtcm)
                 prn,eph.iode,eph.iodc,week,eph.toes,toc,eph.svh);
     }
     if (!(sat=satno(sys,prn))) {
-        trace(2,"rtcm3 1019 satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"rtcm3 1019 satellite number error: prn=%d\n",prn);
         return -1;
     }
     eph.sat=sat;
@@ -886,14 +886,14 @@ static int decode_type1020(rtcm_t *rtcm)
         M          =getbitu(rtcm->buff,i, 2);
     }
     else {
-        trace(2,"rtcm3 1020 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1020 length error: len=%d\n",rtcm->len);
         return -1;
     }
     if (!(sat=satno(sys,prn))) {
-        trace(2,"rtcm3 1020 satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"rtcm3 1020 satellite number error: prn=%d\n",prn);
         return -1;
     }
-    trace(4,"decode_type1020: prn=%d tk=%02.0f:%02.0f:%02.0f\n",prn,tk_h,tk_m,tk_s);
+    trace(NULL,4,"decode_type1020: prn=%d tk=%02.0f:%02.0f:%02.0f\n",prn,tk_h,tk_m,tk_s);
     
     if (rtcm->outtype) {
         msg=rtcm->msgtype+strlen(rtcm->msgtype);
@@ -928,43 +928,43 @@ static int decode_type1020(rtcm_t *rtcm)
 /* decode type 1021: helmert/abridged molodenski -----------------------------*/
 static int decode_type1021(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1021: not supported message\n");
+    trace(NULL,2,"rtcm3 1021: not supported message\n");
     return 0;
 }
 /* decode type 1022: Moledenski-Badekas transfromation -----------------------*/
 static int decode_type1022(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1022: not supported message\n");
+    trace(NULL,2,"rtcm3 1022: not supported message\n");
     return 0;
 }
 /* decode type 1023: residual, ellipsoidal grid representation ---------------*/
 static int decode_type1023(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1023: not supported message\n");
+    trace(NULL,2,"rtcm3 1023: not supported message\n");
     return 0;
 }
 /* decode type 1024: residual, plane grid representation ---------------------*/
 static int decode_type1024(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1024: not supported message\n");
+    trace(NULL,2,"rtcm3 1024: not supported message\n");
     return 0;
 }
 /* decode type 1025: projection (types except LCC2SP,OM) ---------------------*/
 static int decode_type1025(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1025: not supported message\n");
+    trace(NULL,2,"rtcm3 1025: not supported message\n");
     return 0;
 }
 /* decode type 1026: projection (LCC2SP - lambert conic conformal (2sp)) -----*/
 static int decode_type1026(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1026: not supported message\n");
+    trace(NULL,2,"rtcm3 1026: not supported message\n");
     return 0;
 }
 /* decode type 1027: projection (type OM - oblique mercator) -----------------*/
 static int decode_type1027(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1027: not supported message\n");
+    trace(NULL,2,"rtcm3 1027: not supported message\n");
     return 0;
 }
 /* decode type 1029: UNICODE text string -------------------------------------*/
@@ -981,11 +981,11 @@ static int decode_type1029(rtcm_t *rtcm)
         cunit=getbitu(rtcm->buff,i, 8); i+= 8;
     }
     else {
-        trace(2,"rtcm3 1029 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1029 length error: len=%d\n",rtcm->len);
         return -1;
     }
     if (i+nchar*8>rtcm->len*8) {
-        trace(2,"rtcm3 1029 length error: len=%d nchar=%d\n",rtcm->len,nchar);
+        trace(NULL,2,"rtcm3 1029 length error: len=%d nchar=%d\n",rtcm->len,nchar);
         return -1;
     } 
     for (j=0;j<nchar&&j<126;j++) {
@@ -1002,19 +1002,19 @@ static int decode_type1029(rtcm_t *rtcm)
 /* decode type 1030: network RTK residual ------------------------------------*/
 static int decode_type1030(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1030: not supported message\n");
+    trace(NULL,2,"rtcm3 1030: not supported message\n");
     return 0;
 }
 /* decode type 1031: GLONASS network RTK residual ----------------------------*/
 static int decode_type1031(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1031: not supported message\n");
+    trace(NULL,2,"rtcm3 1031: not supported message\n");
     return 0;
 }
 /* decode type 1032: physical reference station position information ---------*/
 static int decode_type1032(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1032: not supported message\n");
+    trace(NULL,2,"rtcm3 1032: not supported message\n");
     return 0;
 }
 /* decode type 1033: receiver and antenna descriptor -------------------------*/
@@ -1053,7 +1053,7 @@ static int decode_type1033(rtcm_t *rtcm)
         }
     }
     else {
-        trace(2,"rtcm3 1033 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1033 length error: len=%d\n",rtcm->len);
         return -1;
     }
     if (rtcm->outtype) {
@@ -1071,37 +1071,37 @@ static int decode_type1033(rtcm_t *rtcm)
     strncpy(rtcm->sta.recver, ver,n2); rtcm->sta.recver [n2]='\0';
     strncpy(rtcm->sta.recsno, rsn,n3); rtcm->sta.recsno [n3]='\0';
     
-    trace(3,"rtcm3 1033: ant=%s:%s rec=%s:%s:%s\n",des,sno,rec,ver,rsn);
+    trace(NULL,3,"rtcm3 1033: ant=%s:%s rec=%s:%s:%s\n",des,sno,rec,ver,rsn);
     return 5;
 }
 /* decode type 1034: GPS network FKP gradient --------------------------------*/
 static int decode_type1034(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1034: not supported message\n");
+    trace(NULL,2,"rtcm3 1034: not supported message\n");
     return 0;
 }
 /* decode type 1035: GLONASS network FKP gradient ----------------------------*/
 static int decode_type1035(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1035: not supported message\n");
+    trace(NULL,2,"rtcm3 1035: not supported message\n");
     return 0;
 }
 /* decode type 1037: GLONASS network RTK ionospheric correction difference ---*/
 static int decode_type1037(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1037: not supported message\n");
+    trace(NULL,2,"rtcm3 1037: not supported message\n");
     return 0;
 }
 /* decode type 1038: GLONASS network RTK geometic correction difference ------*/
 static int decode_type1038(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1038: not supported message\n");
+    trace(NULL,2,"rtcm3 1038: not supported message\n");
     return 0;
 }
 /* decode type 1039: GLONASS network RTK combined correction difference ------*/
 static int decode_type1039(rtcm_t *rtcm)
 {
-    trace(2,"rtcm3 1039: not supported message\n");
+    trace(NULL,2,"rtcm3 1039: not supported message\n");
     return 0;
 }
 /* decode type 1041: NavIC/IRNSS ephemerides ---------------------------------*/
@@ -1141,10 +1141,10 @@ static int decode_type1041(rtcm_t *rtcm)
         eph.i0    =getbits(rtcm->buff,i,32)*P2_31*SC2RAD;
     }
     else {
-        trace(2,"rtcm3 1041 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1041 length error: len=%d\n",rtcm->len);
         return -1;
     }
-    trace(4,"decode_type1041: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
+    trace(NULL,4,"decode_type1041: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
     
     if (rtcm->outtype) {
         msg=rtcm->msgtype+strlen(rtcm->msgtype);
@@ -1152,7 +1152,7 @@ static int decode_type1041(rtcm_t *rtcm)
                 prn,eph.iode,week,eph.toes,toc,eph.svh);
     }
     if (!(sat=satno(sys,prn))) {
-        trace(2,"rtcm3 1041 satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"rtcm3 1041 satellite number error: prn=%d\n",prn);
         return -1;
     }
     eph.sat=sat;
@@ -1215,10 +1215,10 @@ static int decode_type1044(rtcm_t *rtcm)
         eph.fit   =getbitu(rtcm->buff,i, 1)?0.0:2.0; /* 0:2hr,1:>2hr */
     }
     else {
-        trace(2,"rtcm3 1044 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1044 length error: len=%d\n",rtcm->len);
         return -1;
     }
-    trace(4,"decode_type1044: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
+    trace(NULL,4,"decode_type1044: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
     
     if (rtcm->outtype) {
         msg=rtcm->msgtype+strlen(rtcm->msgtype);
@@ -1226,7 +1226,7 @@ static int decode_type1044(rtcm_t *rtcm)
                 prn,eph.iode,eph.iodc,week,eph.toes,toc,eph.svh);
     }
     if (!(sat=satno(sys,prn))) {
-        trace(2,"rtcm3 1044 satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"rtcm3 1044 satellite number error: prn=%d\n",prn);
         return -1;
     }
     eph.sat=sat;
@@ -1291,10 +1291,10 @@ static int decode_type1045(rtcm_t *rtcm)
         rsv       =getbitu(rtcm->buff,i, 7);
     }
     else {
-        trace(2,"rtcm3 1045 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1045 length error: len=%d\n",rtcm->len);
         return -1;
     }
-    trace(4,"decode_type1045: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
+    trace(NULL,4,"decode_type1045: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
     
     if (rtcm->outtype) {
         msg=rtcm->msgtype+strlen(rtcm->msgtype);
@@ -1302,7 +1302,7 @@ static int decode_type1045(rtcm_t *rtcm)
                 prn,eph.iode,week,eph.toes,toc,e5a_hs,e5a_dvs);
     }
     if (!(sat=satno(sys,prn))) {
-        trace(2,"rtcm3 1045 satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"rtcm3 1045 satellite number error: prn=%d\n",prn);
         return -1;
     }
     if (strstr(rtcm->opt,"-GALINAV")) {
@@ -1373,10 +1373,10 @@ static int decode_type1046(rtcm_t *rtcm)
         e1_dvs    =getbitu(rtcm->buff,i, 1);              i+= 1; /* E1 OSDVS */
     }
     else {
-        trace(2,"rtcm3 1046 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1046 length error: len=%d\n",rtcm->len);
         return -1;
     }
-    trace(4,"decode_type1046: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
+    trace(NULL,4,"decode_type1046: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
     
     if (rtcm->outtype) {
         msg=rtcm->msgtype+strlen(rtcm->msgtype);
@@ -1384,7 +1384,7 @@ static int decode_type1046(rtcm_t *rtcm)
                 prn,eph.iode,week,eph.toes,toc,e5b_hs,e1_hs,e5b_dvs,e1_dvs);
     }
     if (!(sat=satno(sys,prn))) {
-        trace(2,"rtcm3 1046 satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"rtcm3 1046 satellite number error: prn=%d\n",prn);
         return -1;
     }
     if (strstr(rtcm->opt,"-GALFNAV")) {
@@ -1451,10 +1451,10 @@ static int decode_type1042(rtcm_t *rtcm)
         eph.svh   =getbitu(rtcm->buff,i, 1);              i+= 1;
     }
     else {
-        trace(2,"rtcm3 1042 length error: len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1042 length error: len=%d\n",rtcm->len);
         return -1;
     }
-    trace(4,"decode_type1042: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
+    trace(NULL,4,"decode_type1042: prn=%d iode=%d toe=%.0f\n",prn,eph.iode,eph.toes);
     
     if (rtcm->outtype) {
         msg=rtcm->msgtype+strlen(rtcm->msgtype);
@@ -1462,7 +1462,7 @@ static int decode_type1042(rtcm_t *rtcm)
                 prn,eph.iode,eph.iodc,week,eph.toes,toc,eph.svh);
     }
     if (!(sat=satno(sys,prn))) {
-        trace(2,"rtcm3 1042 satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"rtcm3 1042 satellite number error: prn=%d\n",prn);
         return -1;
     }
     eph.sat=sat;
@@ -1541,7 +1541,7 @@ static int decode_ssr1_head(rtcm_t *rtcm, int sys, int subtype, int *sync,
     *udint=ssrudint[udi];
     
     time2str(rtcm->time,tstr,2);
-    trace(4,"decode_ssr1_head: time=%s sys=%d subtype=%d nsat=%d sync=%d iod=%d"
+    trace(NULL,4,"decode_ssr1_head: time=%s sys=%d subtype=%d nsat=%d sync=%d iod=%d"
          " provid=%d solid=%d\n",tstr,sys,subtype,nsat,*sync,*iod,provid,solid);
     
     if (rtcm->outtype) {
@@ -1577,7 +1577,7 @@ static int decode_ssr2_head(rtcm_t *rtcm, int sys, int subtype, int *sync,
     *udint=ssrudint[udi];
     
     time2str(rtcm->time,tstr,2);
-    trace(4,"decode_ssr2_head: time=%s sys=%d subtype=%d nsat=%d sync=%d iod=%d"
+    trace(NULL,4,"decode_ssr2_head: time=%s sys=%d subtype=%d nsat=%d sync=%d iod=%d"
          " provid=%d solid=%d\n",tstr,sys,subtype,nsat,*sync,*iod,provid,solid);
     
     if (rtcm->outtype) {
@@ -1597,7 +1597,7 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
     type=getbitu(rtcm->buff,24,12);
     
     if ((nsat=decode_ssr1_head(rtcm,sys,subtype,&sync,&iod,&udint,&refd,&i))<0) {
-        trace(2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
+        trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
     }
     switch (sys) {
@@ -1627,7 +1627,7 @@ static int decode_ssr1(rtcm_t *rtcm, int sys, int subtype)
         ddeph[2]=getbits(rtcm->buff,i,19)*4E-6; i+=19;
         
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
+            trace(NULL,2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
         rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
@@ -1655,7 +1655,7 @@ static int decode_ssr2(rtcm_t *rtcm, int sys, int subtype)
     type=getbitu(rtcm->buff,24,12);
     
     if ((nsat=decode_ssr2_head(rtcm,sys,subtype,&sync,&iod,&udint,&i))<0) {
-        trace(2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
+        trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
     }
     switch (sys) {
@@ -1679,7 +1679,7 @@ static int decode_ssr2(rtcm_t *rtcm, int sys, int subtype)
         dclk[2]=getbits(rtcm->buff,i,27)*2E-8; i+=27;
         
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
+            trace(NULL,2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
         rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
@@ -1704,7 +1704,7 @@ static int decode_ssr3(rtcm_t *rtcm, int sys, int subtype)
     type=getbitu(rtcm->buff,24,12);
     
     if ((nsat=decode_ssr2_head(rtcm,sys,subtype,&sync,&iod,&udint,&i))<0) {
-        trace(2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
+        trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
     }
     switch (sys) {
@@ -1733,11 +1733,11 @@ static int decode_ssr3(rtcm_t *rtcm, int sys, int subtype)
                 cbias[sigs[mode]-1]=(float)bias;
             }
             else {
-                trace(2,"rtcm3 %d not supported mode: mode=%d\n",type,mode);
+                trace(NULL,2,"rtcm3 %d not supported mode: mode=%d\n",type,mode);
             }
         }
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
+            trace(NULL,2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
         rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
@@ -1761,7 +1761,7 @@ static int decode_ssr4(rtcm_t *rtcm, int sys, int subtype)
     type=getbitu(rtcm->buff,24,12);
     
     if ((nsat=decode_ssr1_head(rtcm,sys,subtype,&sync,&iod,&udint,&refd,&i))<0) {
-        trace(2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
+        trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
     }
     switch (sys) {
@@ -1794,7 +1794,7 @@ static int decode_ssr4(rtcm_t *rtcm, int sys, int subtype)
         dclk [2]=getbits(rtcm->buff,i,27)*2E-8; i+=27;
         
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
+            trace(NULL,2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
         rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
@@ -1823,7 +1823,7 @@ static int decode_ssr5(rtcm_t *rtcm, int sys, int subtype)
     type=getbitu(rtcm->buff,24,12);
     
     if ((nsat=decode_ssr2_head(rtcm,sys,subtype,&sync,&iod,&udint,&i))<0) {
-        trace(2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
+        trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
     }
     switch (sys) {
@@ -1845,7 +1845,7 @@ static int decode_ssr5(rtcm_t *rtcm, int sys, int subtype)
         ura=getbitu(rtcm->buff,i, 6);      i+= 6;
         
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
+            trace(NULL,2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
         rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
@@ -1866,7 +1866,7 @@ static int decode_ssr6(rtcm_t *rtcm, int sys, int subtype)
     type=getbitu(rtcm->buff,24,12);
     
     if ((nsat=decode_ssr2_head(rtcm,sys,subtype,&sync,&iod,&udint,&i))<0) {
-        trace(2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
+        trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
     }
     switch (sys) {
@@ -1888,7 +1888,7 @@ static int decode_ssr6(rtcm_t *rtcm, int sys, int subtype)
         hrclk=getbits(rtcm->buff,i,22)*1E-4; i+=22;
         
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
+            trace(NULL,2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
         rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
@@ -1928,7 +1928,7 @@ static int decode_ssr7_head(rtcm_t *rtcm, int sys, int subtype, int *sync,
     *udint=ssrudint[udi];
     
     time2str(rtcm->time,tstr,2);
-    trace(4,"decode_ssr7_head: time=%s sys=%d subtype=%d nsat=%d sync=%d iod=%d"
+    trace(NULL,4,"decode_ssr7_head: time=%s sys=%d subtype=%d nsat=%d sync=%d iod=%d"
           " provid=%d solid=%d\n",tstr,sys,subtype,nsat,*sync,*iod,provid,solid);
     
     if (rtcm->outtype) {
@@ -1951,7 +1951,7 @@ static int decode_ssr7(rtcm_t *rtcm, int sys, int subtype)
     
     if ((nsat=decode_ssr7_head(rtcm,sys,subtype,&sync,&iod,&udint,&dispe,&mw,
                                &i))<0) {
-        trace(2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
+        trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
     }
     switch (sys) {
@@ -1988,11 +1988,11 @@ static int decode_ssr7(rtcm_t *rtcm, int sys, int subtype)
                 stdpb[sigs[mode]-1]=std *0.0001; /* (m) */
             }
             else {
-                trace(2,"rtcm3 %d not supported mode: mode=%d\n",type,mode);
+                trace(NULL,2,"rtcm3 %d not supported mode: mode=%d\n",type,mode);
             }
         }
         if (!(sat=satno(sys,prn))) {
-            trace(2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
+            trace(NULL,2,"rtcm3 %d satellite number error: prn=%d\n",type,prn);
             continue;
         }
         rtcm->ssr[sat-1].vendor=SSR_VENDOR_RTCM;
@@ -2039,11 +2039,11 @@ static void sigindex(int sys, const uint8_t *code, int n, const char *opt,
         if (ex[i]==0) ;
         else if (nex<NEXOBS) idx[i]=NFREQ+nex++;
         else { /* no space in obs data */
-            trace(2,"rtcm msm: no space in obs data sys=%d code=%d\n",sys,code[i]);
+            trace(NULL,2,"rtcm msm: no space in obs data sys=%d code=%d\n",sys,code[i]);
             idx[i]=-1;
         }
 #if 0 /* for debug */
-        trace(2,"sig pos: sys=%d code=%d ex=%d idx=%d\n",sys,code[i],ex[i],idx[i]);
+        trace(NULL,2,"sig pos: sys=%d code=%d ex=%d idx=%d\n",sys,code[i],ex[i],idx[i]);
 #endif
     }
 }
@@ -2092,10 +2092,10 @@ static void save_msm_obs(rtcm_t *rtcm, int sys, msm_h_t *h, const double *r,
         else {
             if (q) q+=sprintf(q,"(%d)%s",h->sigs[i],i<h->nsig-1?",":"");
             
-            trace(2,"rtcm3 %d: unknown signal id=%2d\n",type,h->sigs[i]);
+            trace(NULL,2,"rtcm3 %d: unknown signal id=%2d\n",type,h->sigs[i]);
         }
     }
-    trace(3,"rtcm3 %d: signals=%s\n",type,msm_type);
+    trace(NULL,3,"rtcm3 %d: signals=%s\n",type,msm_type);
     
     /* get signal index */
     sigindex(sys,code,h->nsig,rtcm->opt,idx);
@@ -2114,7 +2114,7 @@ static void save_msm_obs(rtcm_t *rtcm, int sys, msm_h_t *h, const double *r,
             index=obsindex(&rtcm->obs,rtcm->time,sat);
         }
         else {
-            trace(2,"rtcm3 %d satellite error: prn=%d\n",type,prn);
+            trace(NULL,2,"rtcm3 %d satellite error: prn=%d\n",type,prn);
         }
         fcn=0;
         if (sys==SYS_GLO) {
@@ -2206,19 +2206,19 @@ static int decode_msm_head(rtcm_t *rtcm, int sys, int *sync, int *iod,
         }
     }
     else {
-        trace(2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
+        trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
     }
     /* test station id */
     if (!test_staid(rtcm,staid)) return -1;
     
     if (h->nsat*h->nsig>64) {
-        trace(2,"rtcm3 %d number of sats and sigs error: nsat=%d nsig=%d\n",
+        trace(NULL,2,"rtcm3 %d number of sats and sigs error: nsat=%d nsig=%d\n",
               type,h->nsat,h->nsig);
         return -1;
     }
     if (i+h->nsat*h->nsig>rtcm->len*8) {
-        trace(2,"rtcm3 %d length error: len=%d nsat=%d nsig=%d\n",type,
+        trace(NULL,2,"rtcm3 %d length error: len=%d nsat=%d nsig=%d\n",type,
               rtcm->len,h->nsat,h->nsig);
         return -1;
     }
@@ -2229,7 +2229,7 @@ static int decode_msm_head(rtcm_t *rtcm, int sys, int *sync, int *iod,
     *hsize=i;
     
     time2str(rtcm->time,tstr,2);
-    trace(4,"decode_head_msm: time=%s sys=%d staid=%d nsat=%d nsig=%d sync=%d iod=%d ncell=%d\n",
+    trace(NULL,4,"decode_head_msm: time=%s sys=%d staid=%d nsat=%d nsig=%d sync=%d iod=%d ncell=%d\n",
           tstr,sys,staid,h->nsat,h->nsig,*sync,*iod,ncell);
     
     if (rtcm->outtype) {
@@ -2261,7 +2261,7 @@ static int decode_msm4(rtcm_t *rtcm, int sys)
     if ((ncell=decode_msm_head(rtcm,sys,&sync,&iod,&h,&i))<0) return -1;
     
     if (i+h.nsat*18+ncell*48>rtcm->len*8) {
-        trace(2,"rtcm3 %d length error: nsat=%d ncell=%d len=%d\n",type,h.nsat,
+        trace(NULL,2,"rtcm3 %d length error: nsat=%d ncell=%d len=%d\n",type,h.nsat,
               ncell,rtcm->len);
         return -1;
     }
@@ -2315,7 +2315,7 @@ static int decode_msm5(rtcm_t *rtcm, int sys)
     if ((ncell=decode_msm_head(rtcm,sys,&sync,&iod,&h,&i))<0) return -1;
     
     if (i+h.nsat*36+ncell*63>rtcm->len*8) {
-        trace(2,"rtcm3 %d length error: nsat=%d ncell=%d len=%d\n",type,h.nsat,
+        trace(NULL,2,"rtcm3 %d length error: nsat=%d ncell=%d len=%d\n",type,h.nsat,
               ncell,rtcm->len);
         return -1;
     }
@@ -2381,7 +2381,7 @@ static int decode_msm6(rtcm_t *rtcm, int sys)
     if ((ncell=decode_msm_head(rtcm,sys,&sync,&iod,&h,&i))<0) return -1;
     
     if (i+h.nsat*18+ncell*65>rtcm->len*8) {
-        trace(2,"rtcm3 %d length error: nsat=%d ncell=%d len=%d\n",type,h.nsat,
+        trace(NULL,2,"rtcm3 %d length error: nsat=%d ncell=%d len=%d\n",type,h.nsat,
               ncell,rtcm->len);
         return -1;
     }
@@ -2435,7 +2435,7 @@ static int decode_msm7(rtcm_t *rtcm, int sys)
     if ((ncell=decode_msm_head(rtcm,sys,&sync,&iod,&h,&i))<0) return -1;
     
     if (i+h.nsat*36+ncell*80>rtcm->len*8) {
-        trace(2,"rtcm3 %d length error: nsat=%d ncell=%d len=%d\n",type,h.nsat,
+        trace(NULL,2,"rtcm3 %d length error: nsat=%d ncell=%d len=%d\n",type,h.nsat,
               ncell,rtcm->len);
         return -1;
     }
@@ -2494,7 +2494,7 @@ static int decode_type1230(rtcm_t *rtcm)
     int i=24+12,j,staid,align,mask,bias;
     
     if (i+20>=rtcm->len*8) {
-        trace(2,"rtcm3 1230: length error len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 1230: length error len=%d\n",rtcm->len);
         return -1;
     }
     staid=getbitu(rtcm->buff,i,12); i+=12;
@@ -2531,7 +2531,7 @@ static int decode_type4073(rtcm_t *rtcm)
     if (rtcm->outtype) {
         sprintf(rtcm->msgtype+strlen(rtcm->msgtype)," subtype=%d",subtype);
     }
-    trace(2,"rtcm3 4073: unsupported message subtype=%d\n",subtype);
+    trace(NULL,2,"rtcm3 4073: unsupported message subtype=%d\n",subtype);
     return 0;
 }
 /* decode type 4076: proprietary message IGS ---------------------------------*/
@@ -2540,7 +2540,7 @@ static int decode_type4076(rtcm_t *rtcm)
     int i=24+12,ver,subtype;
     
     if (i+3+8>=rtcm->len*8) {
-        trace(2,"rtcm3 4076: length error len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 4076: length error len=%d\n",rtcm->len);
         return -1;
     }
     ver    =getbitu(rtcm->buff,i,3); i+=3;
@@ -2594,7 +2594,7 @@ static int decode_type4076(rtcm_t *rtcm)
         case 126: return decode_ssr7(rtcm,SYS_SBS,subtype);
         case 127: return decode_ssr5(rtcm,SYS_SBS,subtype);
     }
-    trace(2,"rtcm3 4076: unsupported message subtype=%d\n",subtype);
+    trace(NULL,2,"rtcm3 4076: unsupported message subtype=%d\n",subtype);
     return 0;
 }
 
@@ -2606,7 +2606,7 @@ static int decode_type4050(rtcm_t *rtcm)
     uint8_t tmpbuff[1200]; /* message buffer */
     
     if (1776!=rtcm->len*8) {
-        trace(2,"rtcm3 4050: length error len=%d\n",rtcm->len);
+        trace(NULL,2,"rtcm3 4050: length error len=%d\n",rtcm->len);
         return -1;
     }
     
@@ -2617,7 +2617,7 @@ static int decode_type4050(rtcm_t *rtcm)
     type     = getbits(rtcm->buff,i,8);  i+=8;   /* L6 Message Type ID */
     alert    = getbits(rtcm->buff,i,1);  i+=1;   /* Alert Flag */
 
-    trace(3,"rtcm3 4050: tow=%d errbits=%d prn=%d type=%d alert=%d\n",tow, errbits,prn,type,alert);
+    trace(NULL,3,"rtcm3 4050: tow=%d errbits=%d prn=%d type=%d alert=%d\n",tow, errbits,prn,type,alert);
     
     memcpy(tmpbuff, rtcm->buff,sizeof(tmpbuff));
     
@@ -2637,7 +2637,7 @@ int decode_rtcm3(rtcm_t *rtcm)
     double tow;
     int ret=0,type=getbitu(rtcm->buff,24,12),week;
     
-    trace(3,"decode_rtcm3: len=%3d type=%d\n",rtcm->len,type);
+    trace(NULL,3,"decode_rtcm3: len=%3d type=%d\n",rtcm->len,type);
     
     if (rtcm->outtype) {
         sprintf(rtcm->msgtype,"RTCM %4d (%4d):",type,rtcm->len);

@@ -25,6 +25,7 @@
 
 #include <string.h>
 #include <math.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*--- local constants (duplicated to avoid rtklib.h dependency) -------------*/
 #define SYS_GPS     0x01
@@ -47,7 +48,6 @@ static const double RE_WGS84 = 6378137.0;
 #define TRP_BLKSIZE     4.0             /* troposphere block size */
 
 /*--- forward declarations for legacy functions resolved at link time -------*/
-extern void trace(int level, const char *format, ...);
 
 #define GN(gp)      (gp==1?64:16)
 
@@ -179,7 +179,7 @@ int decode_lcltrop(rtcm_t *rtcm, int type)
     sitetrp_t *strp;
 
     p=decode_lclhead(rtcm,type,&tmpblkinf);
-    trace(3,"decode_lcltrop : %s,bn=%4d,btype=%d,gp=%d,gnum=%d\n",
+    trace(NULL,3,"decode_lcltrop : %s,bn=%4d,btype=%d,gp=%d,gnum=%d\n",
         time_str(rtcm->time,0), tmpblkinf.bn, tmpblkinf.btype, tmpblkinf.gpitch,
         tmpblkinf.n);
     for(i=0;i<rtcm->lclblk.tnum;i++){
@@ -222,7 +222,7 @@ int decode_lcltrop(rtcm_t *rtcm, int type)
         strp->trpd.std[0]=TRP_STD_LSB*pow(2,ind);
         pos2ecef(blkinf->grid[i],ecef);
         memcpy(strp->site.ecef,ecef,sizeof(strp->site.ecef));
-        trace(4,"decode_lcltrop : %s,bn=%4d,lat=%.3f,lon=%.3f,base=%lf,detail=%lf,std=%lf\n",
+        trace(NULL,4,"decode_lcltrop : %s,bn=%4d,lat=%.3f,lon=%.3f,base=%lf,detail=%lf,std=%lf\n",
             time_str(rtcm->time,0), blkinf->bn, 
             blkinf->grid[i][0]*R2D, blkinf->grid[i][1]*R2D,
             base,trp,strp->trpd.std[0]);
@@ -261,7 +261,7 @@ int decode_lcliono(rtcm_t *rtcm, int type)
     }
 
     p=decode_lclhead(rtcm,type,&tmpblkinf);
-    trace(3,"decode_lcliono : %s,bn=%4d,btype=%d,gp=%d\n",
+    trace(NULL,3,"decode_lcliono : %s,bn=%4d,btype=%d,gp=%d\n",
         time_str(rtcm->time,0), tmpblkinf.bn, tmpblkinf.btype, tmpblkinf.gpitch);
     for(i=0;i<rtcm->lclblk.inum;i++){
         if(rtcm->lclblk.iblkinf[i].bn==tmpblkinf.bn) break;
@@ -333,7 +333,7 @@ int decode_lcliono(rtcm_t *rtcm, int type)
             ionp->time=rtcm->time;
             ionp->ion=ion+base;
             ionp->std=ION_STD_LSB*pow(2,ind);
-            trace(4,"decode_lcliono : %s,sys=%d,prn=%d,bn=%5d,gn=%d,lat=%.3f,lon=%.3f,base=%lf,detail=%lf,std=%lf\n",
+            trace(NULL,4,"decode_lcliono : %s,sys=%d,prn=%d,bn=%5d,gn=%d,lat=%.3f,lon=%.3f,base=%lf,detail=%lf,std=%lf\n",
                 time_str(rtcm->time,0),msys,prn[j],blkinf->bn,tp,
                 blkinf->grid[j][0]*R2D, blkinf->grid[j][1]*R2D,
                 base, ion, ionp->std);
@@ -424,7 +424,7 @@ int encode_lcltrop(rtcm_t *rtcm, int type)
 
     /* encode trop message */
     p=encode_lclhead(rtcm,type,blkinf);
-    trace(3,"encode_lcltrop : %s,bn=%4d,btype=%d,gp=%d,gnum=%d\n",
+    trace(NULL,3,"encode_lcltrop : %s,bn=%4d,btype=%d,gp=%d,gnum=%d\n",
         time_str(rtcm->time,0), blkinf->bn, blkinf->btype, blkinf->gpitch, 
         blkinf->n);
     setbitu(rtcm->buff,p, 6,base); p+=6;       /* Base Value LSB:0.1m */
@@ -452,14 +452,14 @@ int encode_lcltrop(rtcm_t *rtcm, int type)
         if(zwd[i]<base*TRP_BAS_LSB){
             detail=0;
             stdev=7;
-            trace(4,"encode_lcltrop zwd<base: %s,bn=%4d,gn=%d,lat=%.3f,lon=%.3f,base=%lf,zwd=%lf\n",
+            trace(NULL,4,"encode_lcltrop zwd<base: %s,bn=%4d,gn=%d,lat=%.3f,lon=%.3f,base=%lf,zwd=%lf\n",
                 time_str(rtcm->time,0),blkinf->bn,tp,
                 blkinf->grid[tp][0]*R2D, blkinf->grid[tp][1]*R2D,
                 base*ION_BAS_LSB,zwd[i]);
         }
         else if (TRP_STD_MAX <= trpp->std[0]) {
             stdev=7;
-            trace(4,"encode_lcltrop TRP_STD_MAX<std: %s,bn=%4d,gn=%d,lat=%.3f,lon=%.3f,base=%lf,zwd=%lf\n",
+            trace(NULL,4,"encode_lcltrop TRP_STD_MAX<std: %s,bn=%4d,gn=%d,lat=%.3f,lon=%.3f,base=%lf,zwd=%lf\n",
                 time_str(rtcm->time,0),blkinf->bn,tp,
                 blkinf->grid[tp][0]*R2D, blkinf->grid[tp][1]*R2D,
                 base*ION_BAS_LSB,zwd[i]);
@@ -468,7 +468,7 @@ int encode_lcltrop(rtcm_t *rtcm, int type)
         setbitu(rtcm->buff,p, 9,detail); p+=9; /* Detail Value */
         setbitu(rtcm->buff,p, 3,stdev);  p+=3; /* STD Index */
 
-        trace(4,"encode_lcltrop : %s,bn=%4d,gn=%d,lat=%.3f,lon=%.3f,base=%.3f,detail=%.3f,std=%.3f\n",
+        trace(NULL,4,"encode_lcltrop : %s,bn=%4d,gn=%d,lat=%.3f,lon=%.3f,base=%.3f,detail=%.3f,std=%.3f\n",
             time_str(rtcm->time,0), blkinf->bn,tp,
             blkinf->grid[tp][0]*R2D, blkinf->grid[tp][1]*R2D,
             base*TRP_BAS_LSB,detail*TRP_DET_LSB, pow(2.0,stdev)*TRP_STD_LSB);
@@ -539,7 +539,7 @@ int encode_lcliono(rtcm_t *rtcm, int type)
 
     /* encode iono message */
     p=encode_lclhead(rtcm,type,blkinf);
-    trace(3,"encode_lcliono : %s,bn=%4d,btype=%d,gp=%d,gnum=%d\n",
+    trace(NULL,3,"encode_lcliono : %s,bn=%4d,btype=%d,gp=%d,gnum=%d\n",
         time_str(rtcm->time,0), blkinf->bn, blkinf->btype, blkinf->gpitch,
         blkinf->n);
     if (nsat>32) {
@@ -570,20 +570,20 @@ int encode_lcliono(rtcm_t *rtcm, int type)
             if(ion[j][i]<base[i]*ION_BAS_LSB) {
                 detail=0;
                 stdev=7;
-                trace(4,"encode_lcliono ion<base: %s,sys=%d,prn=%d,bn=%4d,gn=%d,base=%lf,ion=%lf\n",
+                trace(NULL,4,"encode_lcliono ion<base: %s,sys=%d,prn=%d,bn=%4d,gn=%d,base=%lf,ion=%lf\n",
                     time_str(rtcm->time,0),msys,i+1,blkinf->bn,blkinf->gp[j],
                     base[i]*ION_BAS_LSB,ion[j][i]);
             }
             else if (ION_STD_MAX <= std[j][i]) {
                 stdev=7;
-                trace(4,"encode_lcliono ION_STD_MAX<std: %s,sys=%d,prn=%d,bn=%4d,gn=%d,base=%lf,ion=%lf\n",
+                trace(NULL,4,"encode_lcliono ION_STD_MAX<std: %s,sys=%d,prn=%d,bn=%4d,gn=%d,base=%lf,ion=%lf\n",
                     time_str(rtcm->time,0),msys,i+1,blkinf->bn,blkinf->gp[j],
                     base[i]*ION_BAS_LSB,ion[j][i]);
             }
 
             setbitu(rtcm->buff,p, 9,detail); p+=9; /* detail value */
             setbitu(rtcm->buff,p, 3,stdev);  p+=3; /* std index */
-            trace(4,"encode_lcliono : %s,sys=%d,prn=%d,bn=%4d,gn=%d,base=%lf,detail=%lf,std=%lf\n",
+            trace(NULL,4,"encode_lcliono : %s,sys=%d,prn=%d,bn=%4d,gn=%d,base=%lf,detail=%lf,std=%lf\n",
                 time_str(rtcm->time,0),msys,i+1,blkinf->bn,blkinf->gp[j],
                 base[i]*ION_BAS_LSB,detail*ION_DET_LSB, pow(2.0,stdev)*ION_STD_LSB);
         }

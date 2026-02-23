@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
+#include "mrtklib/mrtk_trace.h"
 
 /* local constants (duplicated from rtklib.h to avoid circular dependency) */
 #define CLIGHT      299792458.0
@@ -34,7 +35,6 @@
 #define SYS_IRN     0x40
 
 /* forward declarations (implemented in rtkcmn.c, resolved at link time) */
-extern void trace(int level, const char *format, ...);
 extern char *time_str(gtime_t t, int n);
 
 #define MIN_AMB_RES 4         /* min number of ambiguities for ILS-AR */
@@ -288,7 +288,7 @@ static int ppp_amb_IFLC(rtk_t *rtk, const obsd_t *obs, int n, int *exc,
             Be=(amb1->LC[1]-amb2->LC[1])/lamE;
             Ne=ROUND(Be);
 #if 0
-            trace(2,"%s sat=%2d-%2d:Be=%13.4f Fe=%7.4f\n",time_str(obs[0].time,0),
+            trace(NULL,2,"%s sat=%2d-%2d:Be=%13.4f Fe=%7.4f\n",time_str(obs[0].time,0),
                   sat1[i],sat2[i],Be,Be-Ne);
 #endif
         }
@@ -324,7 +324,7 @@ static int ppp_amb_IFLC(rtk_t *rtk, const obsd_t *obs, int n, int *exc,
 
     /* update states with fixed LC-ambiguity constraints */
     if ((info=filter(x,P,H,v,R,rtk->nx,na))) {
-        trace(1,"filter error (info=%d)\n",info);
+        trace(NULL,1,"filter error (info=%d)\n",info);
         free(H);
         return 0;
     }
@@ -341,28 +341,28 @@ static void write_trace1(rtk_t *rtk, const double *Z, const double *a,
     char buff[1024],s[32],*p=buff;
     int i,j;
 
-    trace(2,"EPOCH=%s NFIX=%d\n",time_str(rtk->sol.time,0),rtk->nfix);
+    trace(NULL,2,"EPOCH=%s NFIX=%d\n",time_str(rtk->sol.time,0),rtk->nfix);
 
     for (i=0,p=buff;i<na;i++) {
         satno2id(sat1[i],s); p+=sprintf(p,"%s ",s);
     }
-    trace(2,"     %s          Z*a     STD\n",buff);
+    trace(NULL,2,"     %s          Z*a     STD\n",buff);
     for (i=0,p=buff;i<na;i++) {
         satno2id(sat2[i],s); p+=sprintf(p,"%s ",s);
     }
-    trace(2,"     %s         (cyc)   (cyc)\n",buff);
+    trace(NULL,2,"     %s         (cyc)   (cyc)\n",buff);
     for (i=0,p=buff;i<na;i++) {
         p+=sprintf(p,"L%c  ",freq[frq[i]]);
     }
-    trace(2,"      %s\n",buff);
+    trace(NULL,2,"      %s\n",buff);
     for (i=na-1;i>=0;i--) {
         p=buff;
         p+=sprintf(p,"%3d: ",na-i);
         for (j=0;j<na;j++) p+=sprintf(p,"%3.0f ",Z[j+i*na]);
         p+=sprintf(p,"%14.3f %7.3f",a[i],sqrt(Q[i+i*na]));
-        trace(2,"%s\n",buff);
+        trace(NULL,2,"%s\n",buff);
     }
-    trace(2,"%3s: %7s %9s (%9s/%9s) [ N1 N2 ... NN ]\n","FIX","STD-POS","RATIO",
+    trace(NULL,2,"%3s: %7s %9s (%9s/%9s) [ N1 N2 ... NN ]\n","FIX","STD-POS","RATIO",
           "S1","S2");
 }
 static void write_trace2(rtk_t *rtk, const double *x, const double *P,
@@ -385,7 +385,7 @@ static void write_trace2(rtk_t *rtk, const double *x, const double *P,
     }
     if (!filter(xp,Pp,D,b,R,rtk->nx,na)) {
         for (i=0;i<3;i++) std[i]=sqrt(Pp[i+i*rtk->nx]);
-        trace(2,"%3d: %7.3f %9.3f (%9.3f/%9.3f) [%s]\n",na,norm(std,3),
+        trace(NULL,2,"%3d: %7.3f %9.3f (%9.3f/%9.3f) [%s]\n",na,norm(std,3),
               MIN(99999.999,s[1]/s[0]),s[0],s[1],buff);
     }
     free(xp); free(Pp);
@@ -539,13 +539,13 @@ static int ppp_amb_ILS(rtk_t *rtk, const obsd_t *obs, int n, int *exc,
         R[i+i*na]=SQR(CONST_AMB);
     }
     if ((info=filter(x,P,D,a,R,rtk->nx,na))) {
-        trace(1,"filter error (info=%d)\n",info);
+        trace(NULL,1,"filter error (info=%d)\n",info);
     }
     free(D); free(R);
     return info?0:1;
 }
 /* ambiguity resolution in ppp -----------------------------------------------*/
-extern int ppp_ar(rtk_t *rtk, const obsd_t *obs, int n, int *exc,
+extern int ppp_ar(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, int *exc,
                   const nav_t *nav, const double *azel, double *x, double *P)
 {
     if (n<=0||rtk->opt.modear<ARMODE_CONT) return 0;

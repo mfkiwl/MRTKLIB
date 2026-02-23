@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "mrtklib/mrtk_trace.h"
 
 /* local constants -----------------------------------------------------------*/
 static const double CLIGHT  = 299792458.0;
@@ -25,7 +26,6 @@ static const double CLIGHT  = 299792458.0;
 #define SYS_CMP 0x20
 
 /*--- forward declarations for legacy functions resolved at link time -------*/
-extern void trace(int level, const char *format, ...);
 extern int satid2no(const char *id);
 extern int satsys(int sat, int *prn);
 extern double code2freq(int sys, uint8_t code, int fcn);
@@ -85,10 +85,10 @@ static int readfcbf(const char *file)
 
     fcbsp = getfcbs();
 
-    trace(3, "readfcbf: file=%s\n", file);
+    trace(NULL,3, "readfcbf: file=%s\n", file);
 
     if(!(fp = fopen(file, "r"))) {
-        trace(2, "fcb parameters file open error: %s\n", file);
+        trace(NULL,2, "fcb parameters file open error: %s\n", file);
         return 0;
     }
     while(fgets(buff, sizeof(buff), fp)) {
@@ -140,7 +140,7 @@ int readfcb(const char *file)
     char *efiles[MAXEXFILE] = {0};
     int i, n;
 
-    trace(3, "readfcb : file=%s\n", file);
+    trace(NULL,3, "readfcb : file=%s\n", file);
 
     for(i = 0; i < MAXEXFILE; i++) {
         if(!(efiles[i] = (char *)malloc(1024))) {

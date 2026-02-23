@@ -24,12 +24,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*============================================================================
  * Forward Declarations (resolved at link time)
  *===========================================================================*/
-
-extern void trace(int level, const char *format, ...);
 
 /*============================================================================
  * Private Constants
@@ -198,7 +197,7 @@ static void uniqeph(nav_t *nav)
     eph_t *nav_eph;
     int i,j;
 
-    trace(3,"uniqeph: n=%d\n",nav->n);
+    trace(NULL,3,"uniqeph: n=%d\n",nav->n);
 
     if (nav->n<=0) return;
 
@@ -214,14 +213,14 @@ static void uniqeph(nav_t *nav)
     nav->n=j+1;
 
     if (!(nav_eph=(eph_t *)realloc(nav->eph,sizeof(eph_t)*nav->n))) {
-        trace(1,"uniqeph malloc error n=%d\n",nav->n);
+        trace(NULL,1,"uniqeph malloc error n=%d\n",nav->n);
         free(nav->eph); nav->eph=NULL; nav->n=nav->nmax=0;
         return;
     }
     nav->eph=nav_eph;
     nav->nmax=nav->n;
 
-    trace(4,"uniqeph: n=%d\n",nav->n);
+    trace(NULL,4,"uniqeph: n=%d\n",nav->n);
 }
 /* compare glonass ephemeris -------------------------------------------------*/
 static int cmpgeph(const void *p1, const void *p2)
@@ -237,7 +236,7 @@ static void uniqgeph(nav_t *nav)
     geph_t *nav_geph;
     int i,j;
 
-    trace(3,"uniqgeph: ng=%d\n",nav->ng);
+    trace(NULL,3,"uniqgeph: ng=%d\n",nav->ng);
 
     if (nav->ng<=0) return;
 
@@ -253,14 +252,14 @@ static void uniqgeph(nav_t *nav)
     nav->ng=j+1;
 
     if (!(nav_geph=(geph_t *)realloc(nav->geph,sizeof(geph_t)*nav->ng))) {
-        trace(1,"uniqgeph malloc error ng=%d\n",nav->ng);
+        trace(NULL,1,"uniqgeph malloc error ng=%d\n",nav->ng);
         free(nav->geph); nav->geph=NULL; nav->ng=nav->ngmax=0;
         return;
     }
     nav->geph=nav_geph;
     nav->ngmax=nav->ng;
 
-    trace(4,"uniqgeph: ng=%d\n",nav->ng);
+    trace(NULL,4,"uniqgeph: ng=%d\n",nav->ng);
 }
 /* compare sbas ephemeris ----------------------------------------------------*/
 static int cmpseph(const void *p1, const void *p2)
@@ -276,7 +275,7 @@ static void uniqseph(nav_t *nav)
     seph_t *nav_seph;
     int i,j;
 
-    trace(3,"uniqseph: ns=%d\n",nav->ns);
+    trace(NULL,3,"uniqseph: ns=%d\n",nav->ns);
 
     if (nav->ns<=0) return;
 
@@ -291,14 +290,14 @@ static void uniqseph(nav_t *nav)
     nav->ns=j+1;
 
     if (!(nav_seph=(seph_t *)realloc(nav->seph,sizeof(seph_t)*nav->ns))) {
-        trace(1,"uniqseph malloc error ns=%d\n",nav->ns);
+        trace(NULL,1,"uniqseph malloc error ns=%d\n",nav->ns);
         free(nav->seph); nav->seph=NULL; nav->ns=nav->nsmax=0;
         return;
     }
     nav->seph=nav_seph;
     nav->nsmax=nav->ns;
 
-    trace(4,"uniqseph: ns=%d\n",nav->ns);
+    trace(NULL,4,"uniqseph: ns=%d\n",nav->ns);
 }
 /* unique ephemerides ----------------------------------------------------------
 * unique ephemerides in navigation data
@@ -307,7 +306,7 @@ static void uniqseph(nav_t *nav)
 *-----------------------------------------------------------------------------*/
 extern void uniqnav(nav_t *nav)
 {
-    trace(3,"uniqnav: neph=%d ngeph=%d nseph=%d\n",nav->n,nav->ng,nav->ns);
+    trace(NULL,3,"uniqnav: neph=%d ngeph=%d nseph=%d\n",nav->n,nav->ng,nav->ns);
 
     /* unique ephemeris */
     uniqeph (nav);
@@ -329,7 +328,7 @@ extern int readnav(const char *file, nav_t *nav)
     long toe_time,tof_time,toc_time,ttr_time;
     int i,sat,prn;
 
-    trace(3,"loadnav: file=%s\n",file);
+    trace(NULL,3,"loadnav: file=%s\n",file);
 
     if (!(fp=fopen(file,"r"))) return 0;
 
@@ -393,7 +392,7 @@ extern int savenav(const char *file, const nav_t *nav)
     int i;
     char id[32];
 
-    trace(3,"savenav: file=%s\n",file);
+    trace(NULL,3,"savenav: file=%s\n",file);
 
     if (!(fp=fopen(file,"w"))) return 0;
 
@@ -479,16 +478,16 @@ int satexclude(int sat, double var, int svh, const struct prcopt_t *opt)
 
     if (sys==SYS_GLO) {
         if ((svh&9)||((svh>>1)&3)==2) { /* test Bn and extended SVH */
-            trace(3,"unhealthy GLO satellite: sat=%3d svh=%02X\n",sat,svh);
+            trace(NULL,3,"unhealthy GLO satellite: sat=%3d svh=%02X\n",sat,svh);
             return 1;
         }
     }
     else if (svh) {
-        trace(3,"unhealthy satellite: sat=%3d svh=%02X\n",sat,svh);
+        trace(NULL,3,"unhealthy satellite: sat=%3d svh=%02X\n",sat,svh);
         return 1;
     }
     if (var>MAX_VAR_EPH) {
-        trace(3,"invalid ura satellite: sat=%3d ura=%.2f\n",sat,sqrt(var));
+        trace(NULL,3,"invalid ura satellite: sat=%3d ura=%.2f\n",sat,sqrt(var));
         return 1;
     }
     return 0;

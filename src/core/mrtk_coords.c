@@ -21,6 +21,7 @@
 
 #include <math.h>
 #include <string.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*============================================================================
  * Constants (duplicated from rtklib.h to avoid header dependency)
@@ -42,9 +43,6 @@
 /*============================================================================
  * Forward declarations for legacy trace functions (resolved at link time)
  *===========================================================================*/
-
-extern void trace(int level, const char *format, ...);
-extern void tracemat(int level, const double *A, int n, int m, int p, int q);
 
 /*============================================================================
  * Degree / DMS Conversions
@@ -391,7 +389,7 @@ extern void eci2ecef(gtime_t tutc, const double *erpv, double *U, double *gmst)
     double R1[9],R2[9],R3[9],R[9],W[9],N[9],P[9],NP[9];
     int i;
 
-    trace(4,"eci2ecef: tutc=%s\n",time_str(tutc,3));
+    trace(NULL,4,"eci2ecef: tutc=%s\n",time_str(tutc,3));
 
     if (fabs(timediff(tutc,tutc_))<0.01) { /* read cache */
         for (i=0;i<9;i++) U[i]=U_[i];
@@ -438,11 +436,11 @@ extern void eci2ecef(gtime_t tutc, const double *erpv, double *U, double *gmst)
     for (i=0;i<9;i++) U[i]=U_[i];
     if (gmst) *gmst=gmst_;
 
-    trace(5,"gmst=%.12f gast=%.12f\n",gmst_,gast);
-    trace(5,"P=\n"); tracemat(5,P,3,3,15,12);
-    trace(5,"N=\n"); tracemat(5,N,3,3,15,12);
-    trace(5,"W=\n"); tracemat(5,W,3,3,15,12);
-    trace(5,"U=\n"); tracemat(5,U,3,3,15,12);
+    trace(NULL,5,"gmst=%.12f gast=%.12f\n",gmst_,gast);
+    trace(NULL,5,"P=\n"); tracemat(NULL,5,P,3,3,15,12);
+    trace(NULL,5,"N=\n"); tracemat(NULL,5,N,3,3,15,12);
+    trace(NULL,5,"W=\n"); tracemat(NULL,5,W,3,3,15,12);
+    trace(NULL,5,"U=\n"); tracemat(NULL,5,U,3,3,15,12);
 }
 
 /*============================================================================

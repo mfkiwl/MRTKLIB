@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "mrtklib/mrtk_trace.h"
 
 /* local constants -----------------------------------------------------------*/
 #define D2R         (3.1415926535897932/180.0)
@@ -27,7 +28,6 @@
 #define GN(gp)      (gp==1?64:16)
 
 /* forward declarations (implemented in rtkcmn.c/stream.c, resolved at link) -*/
-extern void trace(int level, const char *format, ...);
 extern int strwrite(struct stream_tag *stream, uint8_t *buff, int n);
 
 /* substruct vector ----------------------------------------------------------*/
@@ -95,7 +95,7 @@ static int selpersta(const stat_t *stat, const double *llh, int flag,
         d = posdist(spos->ecef,ecef);
         ecef2pos(spos->ecef,tllh[0]);
         ecef2pos(ecef,tllh[1]);
-        trace(4,"get_site:targetpos llh=%f,%f,%f site pos llh=%f,%f,%f dist=%f\n",
+        trace(NULL,4,"get_site:targetpos llh=%f,%f,%f site pos llh=%f,%f,%f dist=%f\n",
             tllh[0][0]*R2D,tllh[0][1]*R2D,tllh[0][2],
             tllh[1][0]*R2D,tllh[1][1]*R2D,tllh[1][2],d);
         if(d > maxdist*1E3) continue;
@@ -171,7 +171,7 @@ static int gettriangledd(const stat_t *stat, const double *llh, int flag,
                 staid[2]=id[k];
                 ret = coldet(sllh[0], sllh[1], sllh[2], llh);
                 if(ret) {
-                    trace(3,"interpolation: %.1f %.1f site=%s %s %s\n",
+                    trace(NULL,3,"interpolation: %.1f %.1f site=%s %s %s\n",
                         llh[0]*R2D, llh[1]*R2D, site[0].name, site[1].name,
                         site[2].name);
                     return 3;
@@ -190,7 +190,7 @@ static int gettriangledd(const stat_t *stat, const double *llh, int flag,
             }
             staid[i]=id[i];
         }
-        trace(3,"extrapolation: %.1f %.1f site=%s %s %s\n",
+        trace(NULL,3,"extrapolation: %.1f %.1f site=%s %s %s\n",
             llh[0]*R2D, llh[1]*R2D, site[0].name, site[1].name, site[2].name);
         return 3;
     }
@@ -305,7 +305,7 @@ extern int initgridsta(const char *setfile, lclblock_t *lclblk, int btype)
     char type[8];
 
     if ((sfp=fopen(setfile,"r")) == NULL) {
-        trace(2,"initgridsta : setting file open error :%s\n", setfile);
+        trace(NULL,2,"initgridsta : setting file open error :%s\n", setfile);
         return 0;
     }
     while (fgets(buff,sizeof(buff),sfp)!=NULL) {
@@ -322,7 +322,7 @@ extern int initgridsta(const char *setfile, lclblock_t *lclblk, int btype)
             bnum=&lclblk->tnum;
             bi->bs=TRP_BLKSIZE;
         }else{
-            trace(2,"initgrid : grid setting file type error :%s\n", type);
+            trace(NULL,2,"initgrid : grid setting file type error :%s\n", type);
             continue;
         }
 
@@ -330,14 +330,14 @@ extern int initgridsta(const char *setfile, lclblock_t *lclblk, int btype)
         bi->btype=btype;
         token=strtok(NULL,",");
         if(token == NULL){
-            trace(2,"initgrid : grid setting file format error : bn\n");
+            trace(NULL,2,"initgrid : grid setting file format error : bn\n");
             continue;
         }
         bi->bn=atoi(token);
         if(btype==BTYPE_GRID) {
             token=strtok(NULL,",");
             if(token == NULL){
-                trace(2,"initgrid : grid setting file format error : gp\n");
+                trace(NULL,2,"initgrid : grid setting file format error : gp\n");
                 continue;
             }
             gp=atoi(token);
@@ -348,18 +348,18 @@ extern int initgridsta(const char *setfile, lclblock_t *lclblk, int btype)
                 bi->gpitch=1;
             }
             else{
-                trace(2,"initgrid : grid setting file grid pitch error :%d\n", gp);
+                trace(NULL,2,"initgrid : grid setting file grid pitch error :%d\n", gp);
                 continue;
             }
             token=strtok(NULL,",");
             if(token == NULL){
-                trace(2,"initgrid : grid setting file format error : mask[0]\n");
+                trace(NULL,2,"initgrid : grid setting file format error : mask[0]\n");
                 continue;
             }
             bi->mask[0]=strtol(token, NULL, 0);
             token=strtok(NULL,",");
             if(token == NULL){
-                trace(2,"initgrid : grid setting file format error : mask[1]\n");
+                trace(NULL,2,"initgrid : grid setting file format error : mask[1]\n");
                 continue;
             }
             bi->mask[1]=strtol(token, NULL, 0);
@@ -367,7 +367,7 @@ extern int initgridsta(const char *setfile, lclblock_t *lclblk, int btype)
 
         initblkinf(bi);
         *bnum+=1;
-        trace(3,"initgrid : read grid setting file [%s]\n",buff);
+        trace(NULL,3,"initgrid : read grid setting file [%s]\n",buff);
     }
     fclose(sfp);
 

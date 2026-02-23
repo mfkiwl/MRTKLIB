@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "mrtklib/mrtk_trace.h"
 
 /* local constants -----------------------------------------------------------*/
 static const double CLIGHT  = 299792458.0;
@@ -22,7 +23,6 @@ static const double CLIGHT  = 299792458.0;
 #define M2NS    (1E9/CLIGHT)
 
 /*--- forward declarations for legacy functions resolved at link time -------*/
-extern void trace(int level, const char *format, ...);
 extern void satno2id(int sat, char *id);
 extern int satid2no(const char *id);
 extern uint8_t obs2code(const char *obs);
@@ -115,7 +115,7 @@ void addbia(const bia_t *bia, bia_t **ary, int *n, int *nmax)
     if(*nmax <= *n) {
         *nmax += 256;
         if(!(b = (bia_t *)realloc(*ary, sizeof(bia_t)*(*nmax)))) {
-            trace(1, "addbia: memory allocation error\n");
+            trace(NULL,1, "addbia: memory allocation error\n");
             free(*ary); *ary = NULL; *n = *nmax = 0;
             return;
         }
@@ -139,10 +139,10 @@ int readbsnx(const char *file)
     FILE *fp;
     bia_t bia;
 
-    trace(3, "readbsnx : file=%s\n", file);
+    trace(NULL,3, "readbsnx : file=%s\n", file);
 
     if(!(fp = fopen(file, "r"))) {
-        trace(2, "bias sinex file open error: %s\n", file);
+        trace(NULL,2, "bias sinex file open error: %s\n", file);
         return 0;
     }
     freebiass();
@@ -161,7 +161,7 @@ int readbsnx(const char *file)
                     if((p = strtok(NULL, " \n"))) dscrpt[n] = p;
                     else                          dscrpt[n] = "";
                 }
-                trace(4, "readbsnx KEYWORD, %-39s, %s, %s, %s\n",
+                trace(NULL,4, "readbsnx KEYWORD, %-39s, %s, %s, %s\n",
                     dscrpt[0], dscrpt[1], dscrpt[2], dscrpt[3]);
                 break;
 
@@ -234,7 +234,7 @@ int readbsnx(const char *file)
                         if(strcmp(sta, biass.sta[i].name) == 0) break;
                     }
                     if(i >= MAXSTA) {
-                        trace(2, "readbsnx %s has exceeded the station limit of %d.\n",
+                        trace(NULL,2, "readbsnx %s has exceeded the station limit of %d.\n",
                             sta, MAXSTA);
                         continue;
                     }
@@ -257,7 +257,7 @@ int readbsnx(const char *file)
                             &biass.sta[i].nsatcbmax[sat - 1]);
                     }
                 }
-                trace(4, "readbsnx %8d,%4s,%-9s, %3s, %3s, %3d, %3s, %3d, %s, %8d,%10.4f,%10.4f,%10.4f,%10.4f\n",
+                trace(NULL,4, "readbsnx %8d,%4s,%-9s, %3s, %3s, %3d, %3s, %3d, %s, %8d,%10.4f,%10.4f,%10.4f,%10.4f\n",
                     ret, typeid[bia.type], sta, satid, sig1, bia.code[0],
                     sig2, bia.code[1], time_str(bia.t0, 0),
                     (int)timediff(bia.t1, bia.t0),
@@ -318,7 +318,7 @@ void outbsnxh(FILE *fp, gtime_t ts, gtime_t te, const char *agency)
     gtime_t nt = timeget();
 
     if(fp == NULL) return;
-    trace(3, "outbsnxh: \n");
+    trace(NULL,3, "outbsnxh: \n");
 
     time2epoch(nt, ep);
     time2biast(nt, &year, &doy, &tod);
@@ -339,7 +339,7 @@ void outbsnxh(FILE *fp, gtime_t ts, gtime_t te, const char *agency)
 void outbsnxrefh(FILE *fp)
 {
     if(fp == NULL) return;
-    trace(3, "outbsnxrefh: \n");
+    trace(NULL,3, "outbsnxrefh: \n");
 
     fprintf(fp, "*-------------------------------------------------------------------------------\n");
     fprintf(fp, "+FILE/REFERENCE\n");
@@ -358,15 +358,15 @@ void outbsnxrefb(FILE *fp, int type, char *reftext)
     char *inft[6] = {"DESCRIPTION","OUTPUT","CONTACT","SOFTWARE","HARDWARE","INPUT"};
     if(fp == NULL) return;
     if(type < 0 || type >= 6) {
-        trace(2, "outbsnxrefb error: type=%d is out of range.[0-5]\n", type);
+        trace(NULL,2, "outbsnxrefb error: type=%d is out of range.[0-5]\n", type);
         return;
     }
     if(strlen(reftext) > 60) {
-        trace(2, "outbsnxrefb error: comment length over %d[60]\n",
+        trace(NULL,2, "outbsnxrefb error: comment length over %d[60]\n",
             strlen(reftext));
         return;
     }
-    trace(3, "outbsnxrefb: \n");
+    trace(NULL,3, "outbsnxrefb: \n");
     fprintf(fp, " %-18s %-60s\n", inft[type], reftext);
 }
 
@@ -378,7 +378,7 @@ void outbsnxrefb(FILE *fp, int type, char *reftext)
 void outbsnxreff(FILE *fp)
 {
     if(fp == NULL) return;
-    trace(3, "outbsnxreff: \n");
+    trace(NULL,3, "outbsnxreff: \n");
     fprintf(fp, "-FILE/REFERENCE\n");
 }
 
@@ -390,7 +390,7 @@ void outbsnxreff(FILE *fp)
 void outbsnxcomh(FILE *fp)
 {
     if(fp == NULL) return;
-    trace(3, "outbsnxcomh: \n");
+    trace(NULL,3, "outbsnxcomh: \n");
     fprintf(fp, "*-------------------------------------------------------------------------------\n");
     fprintf(fp, "+FILE/COMMENT\n");
 }
@@ -405,11 +405,11 @@ void outbsnxcomb(FILE *fp, char *comtext)
 {
     if(fp == NULL) return;
     if(strlen(comtext) > 79) {
-        trace(2, "outbsnxcomb error: comment length over %d[79]\n",
+        trace(NULL,2, "outbsnxcomb error: comment length over %d[79]\n",
             strlen(comtext));
         return;
     }
-    trace(3, "outbsnxcomb: %s\n", comtext);
+    trace(NULL,3, "outbsnxcomb: %s\n", comtext);
     fprintf(fp, " %-79s\n", comtext);
 }
 
@@ -421,7 +421,7 @@ void outbsnxcomb(FILE *fp, char *comtext)
 void outbsnxcomf(FILE *fp)
 {
     if(fp == NULL) return;
-    trace(3, "outbsnxcomf: \n");
+    trace(NULL,3, "outbsnxcomf: \n");
     fprintf(fp, "-FILE/COMMENT\n");
 }
 
@@ -463,7 +463,7 @@ void outbsnxsol(FILE *fp)
     char satid[8];
 
     if(fp == NULL) return;
-    trace(3, "outbsnxsol: \n");
+    trace(NULL,3, "outbsnxsol: \n");
 
     biass = getbiass();
 

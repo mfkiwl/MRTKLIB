@@ -20,12 +20,11 @@
 #include "mrtklib/mrtk_bits.h"
 
 #include <stdint.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*============================================================================
  * Forward Declarations (resolved at link time from rtkcmn.c)
  *===========================================================================*/
-
-extern void trace(int level, const char *format, ...);
 
 /*============================================================================
  * Private Constants
@@ -167,7 +166,7 @@ extern uint32_t rtk_crc32(const uint8_t *buff, int len)
     uint32_t crc=0;
     int i,j;
 
-    trace(4,"rtk_crc32: len=%d\n",len);
+    trace(NULL,4,"rtk_crc32: len=%d\n",len);
 
     for (i=0;i<len;i++) {
         crc^=buff[i];
@@ -189,7 +188,7 @@ extern uint32_t rtk_crc24q(const uint8_t *buff, int len)
     uint32_t crc=0;
     int i;
 
-    trace(4,"rtk_crc24q: len=%d\n",len);
+    trace(NULL,4,"rtk_crc24q: len=%d\n",len);
 
     for (i=0;i<len;i++) crc=((crc<<8)&0xFFFFFF)^tbl_CRC24Q[(crc>>16)^buff[i]];
     return crc;
@@ -206,7 +205,7 @@ extern uint16_t rtk_crc16(const uint8_t *buff, int len)
     uint16_t crc=0;
     int i;
 
-    trace(4,"rtk_crc16: len=%d\n",len);
+    trace(NULL,4,"rtk_crc16: len=%d\n",len);
 
     for (i=0;i<len;i++) {
         crc=(crc<<8)^tbl_CRC16[((crc>>8)^buff[i])&0xFF];
@@ -235,7 +234,7 @@ extern int decode_word(uint32_t word, uint8_t *data)
     uint32_t parity=0,w;
     int i;
 
-    trace(5,"decodeword: word=%08x\n",word);
+    trace(NULL,5,"decodeword: word=%08x\n",word);
 
     if (word&0x40000000) word^=0x3FFFFFC0;
 

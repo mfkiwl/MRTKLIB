@@ -25,6 +25,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include "mrtklib/mrtk_trace.h"
 
 /* Local constants (duplicated from rtklib.h to avoid dependency) */
 #define PI          3.1415926535897932  /* pi */
@@ -99,8 +100,6 @@
 #define P2_59       1.734723475976810E-18
 
 /* Forward declarations for functions in rtklib (resolved at link time) */
-extern void trace   (int level, const char *format, ...);
-extern void traceb  (int level, const uint8_t *p, int n);
 
 #define BNXSYNC1    0xC2    /* BINEX sync (little-endian,regular-crc) */
 #define BNXSYNC2    0xE2    /* BINEX sync (big-endian   ,regular-crc) */
@@ -288,7 +287,7 @@ static int decode_bnx_00(raw_t *raw, uint8_t *buff, int len)
             ret=5;
         }
         else {
-            trace(2,"BINEX 0x00: unsupported field fid=0x%02x\n",fid);
+            trace(NULL,2,"BINEX 0x00: unsupported field fid=0x%02x\n",fid);
             break;
         }
     }
@@ -297,7 +296,7 @@ static int decode_bnx_00(raw_t *raw, uint8_t *buff, int len)
 /* decode BINEX mesaage 0x01-00: coded (raw bytes) GNSS ephemeris ------------*/
 static int decode_bnx_01_00(raw_t *raw, uint8_t *buff, int len)
 {
-    trace(2,"BINEX 0x01-00: unsupported message\n");
+    trace(NULL,2,"BINEX 0x01-00: unsupported message\n");
     return 0;
 }
 /* decode BINEX mesaage 0x01-01: decoded GPS ephmemeris ----------------------*/
@@ -308,7 +307,7 @@ static int decode_bnx_01_01(raw_t *raw, uint8_t *buff, int len)
     double tow,ura,sqrtA;
     int prn,sat,flag;
     
-    trace(4,"BINEX 0x01-01: len=%d\n",len);
+    trace(NULL,4,"BINEX 0x01-01: len=%d\n",len);
     
     if (len>=127) {
         prn       =U1(p)+1;      p+=1;
@@ -341,11 +340,11 @@ static int decode_bnx_01_01(raw_t *raw, uint8_t *buff, int len)
         flag      =U2(p);
     }
     else {
-        trace(2,"BINEX 0x01-01: length error len=%d\n",len);
+        trace(NULL,2,"BINEX 0x01-01: length error len=%d\n",len);
         return -1;
     }
     if (!(sat=satno(SYS_GPS,prn))) {
-        trace(2,"BINEX 0x01-01: satellite error prn=%d\n",prn);
+        trace(NULL,2,"BINEX 0x01-01: satellite error prn=%d\n",prn);
         return -1;
     }
     eph.sat=sat;
@@ -376,7 +375,7 @@ static int decode_bnx_01_02(raw_t *raw, uint8_t *buff, int len)
     double tod,tof,tau_gps;
     int prn,sat,day,leap;
     
-    trace(4,"BINEX 0x01-02: len=%d\n",len);
+    trace(NULL,4,"BINEX 0x01-02: len=%d\n",len);
     
     if (len>=119) {
         prn        =U1(p)+1;   p+=1;
@@ -402,11 +401,11 @@ static int decode_bnx_01_02(raw_t *raw, uint8_t *buff, int len)
         geph.dtaun =R8(p);
     }
     else {
-        trace(2,"BINEX 0x01-02: length error len=%d\n",len);
+        trace(NULL,2,"BINEX 0x01-02: length error len=%d\n",len);
         return -1;
     }
     if (!(sat=satno(SYS_GLO,prn))) {
-        trace(2,"BINEX 0x01-02: satellite error prn=%d\n",prn);
+        trace(NULL,2,"BINEX 0x01-02: satellite error prn=%d\n",prn);
         return -1;
     }
     if (raw->time.time==0) return 0;
@@ -432,7 +431,7 @@ static int decode_bnx_01_03(raw_t *raw, uint8_t *buff, int len)
     double tow,tod,tof;
     int prn,sat,week,iodn;
     
-    trace(4,"BINEX 0x01-03: len=%d\n",len);
+    trace(NULL,4,"BINEX 0x01-03: len=%d\n",len);
     
     if (len>=98) {
         prn        =U1(p);     p+=1;
@@ -455,11 +454,11 @@ static int decode_bnx_01_03(raw_t *raw, uint8_t *buff, int len)
         iodn       =U1(p);
     }
     else {
-        trace(2,"BINEX 0x01-03 length error: len=%d\n",len);
+        trace(NULL,2,"BINEX 0x01-03 length error: len=%d\n",len);
         return -1;
     }
     if (!(sat=satno(SYS_SBS,prn))) {
-        trace(2,"BINEX 0x01-03 satellite error: prn=%d\n",prn);
+        trace(NULL,2,"BINEX 0x01-03 satellite error: prn=%d\n",prn);
         return -1;
     }
     seph.sat=sat;
@@ -483,7 +482,7 @@ static int decode_bnx_01_04(raw_t *raw, uint8_t *buff, int len)
     double tow,ura,sqrtA;
     int prn,sat,set,eph_sel=3; /* ephemeris selection (1:I/NAV+2:F/NAV) */
     
-    trace(4,"BINEX 0x01-04: len=%d\n",len);
+    trace(NULL,4,"BINEX 0x01-04: len=%d\n",len);
     
     if (strstr(raw->opt,"-GALFNAV")) eph_sel=1;
     if (strstr(raw->opt,"-GALINAV")) eph_sel=2;
@@ -519,11 +518,11 @@ static int decode_bnx_01_04(raw_t *raw, uint8_t *buff, int len)
         eph.code  =U2(p); /* data source defined as RINEX 3.03 */
     }
     else {
-        trace(2,"BINEX 0x01-04: length error len=%d\n",len);
+        trace(NULL,2,"BINEX 0x01-04: length error len=%d\n",len);
         return -1;
     }
     if (!(sat=satno(SYS_GAL,prn))) {
-        trace(2,"BINEX 0x01-04: satellite error prn=%d\n",prn);
+        trace(NULL,2,"BINEX 0x01-04: satellite error prn=%d\n",prn);
         return -1;
     }
     set=(eph.code&(1<<8))?1:0; /* 0:I/NAV,1:F/NAV */
@@ -564,7 +563,7 @@ static int decode_bnx_01_05(raw_t *raw, uint8_t *buff, int len)
     double tow,toc,sqrtA;
     int prn,sat,flag1,flag2;
     
-    trace(4,"BINEX 0x01-05: len=%d\n",len);
+    trace(NULL,4,"BINEX 0x01-05: len=%d\n",len);
     
     if (len>=117) {
         prn       =U1(p);        p+=1;
@@ -594,11 +593,11 @@ static int decode_bnx_01_05(raw_t *raw, uint8_t *buff, int len)
         flag2     =U4(p);
     }
     else {
-        trace(2,"BINEX 0x01-05: length error len=%d\n",len);
+        trace(NULL,2,"BINEX 0x01-05: length error len=%d\n",len);
         return -1;
     }
     if (!(sat=satno(SYS_CMP,prn))) {
-        trace(2,"BINEX 0x01-05: satellite error prn=%d\n",prn);
+        trace(NULL,2,"BINEX 0x01-05: satellite error prn=%d\n",prn);
         return 0;
     }
     eph.sat=sat;
@@ -633,7 +632,7 @@ static int decode_bnx_01_06(raw_t *raw, uint8_t *buff, int len)
     double tow,ura,sqrtA;
     int prn,sat,flag;
     
-    trace(4,"BINEX 0x01-06: len=%d\n",len);
+    trace(NULL,4,"BINEX 0x01-06: len=%d\n",len);
     
     if (len>=127) {
         prn       =U1(p);        p+=1;
@@ -666,11 +665,11 @@ static int decode_bnx_01_06(raw_t *raw, uint8_t *buff, int len)
         flag      =U2(p);
     }
     else {
-        trace(2,"BINEX 0x01-06: length error len=%d\n",len);
+        trace(NULL,2,"BINEX 0x01-06: length error len=%d\n",len);
         return -1;
     }
     if (!(sat=satno(SYS_QZS,prn))) {
-        trace(2,"BINEX 0x01-06: satellite error prn=%d\n",prn);
+        trace(NULL,2,"BINEX 0x01-06: satellite error prn=%d\n",prn);
         return 0;
     }
     eph.sat=sat;
@@ -700,7 +699,7 @@ static int decode_bnx_01_07(raw_t *raw, uint8_t *buff, int len)
     double tow,toc,sqrtA;
     int prn,sat,flag,iodec;
     
-    trace(4,"BINEX 0x01-07: len=%d\n",len);
+    trace(NULL,4,"BINEX 0x01-07: len=%d\n",len);
     
     if (len>=114) {
         prn       =U1(p);        p+=1;
@@ -730,11 +729,11 @@ static int decode_bnx_01_07(raw_t *raw, uint8_t *buff, int len)
         iodec     =U2(p);
     }
     else {
-        trace(2,"BINEX 0x01-07: length error len=%d\n",len);
+        trace(NULL,2,"BINEX 0x01-07: length error len=%d\n",len);
         return -1;
     }
     if (!(sat=satno(SYS_IRN,prn))) {
-        trace(2,"BINEX 0x01-07: satellite error prn=%d\n",prn);
+        trace(NULL,2,"BINEX 0x01-07: satellite error prn=%d\n",prn);
         return 0;
     }
     eph.sat=sat;
@@ -766,7 +765,7 @@ static int decode_bnx_01_14(raw_t *raw, uint8_t *buff, int len)
     double tow,ura,sqrtA;
     int prn,sat,tocs,set,eph_sel=3;
     
-    trace(4,"BINEX 0x01-14: len=%d\n",len);
+    trace(NULL,4,"BINEX 0x01-14: len=%d\n",len);
     
     if (strstr(raw->opt,"-GALFNAV")) eph_sel=1;
     if (strstr(raw->opt,"-GALINAV")) eph_sel=2;
@@ -803,11 +802,11 @@ static int decode_bnx_01_14(raw_t *raw, uint8_t *buff, int len)
         eph.code  =U2(p); /* data source defined as RINEX 3.03 */
     }
     else {
-        trace(2,"BINEX 0x01-14: length error len=%d\n",len);
+        trace(NULL,2,"BINEX 0x01-14: length error len=%d\n",len);
         return -1;
     }
     if (!(sat=satno(SYS_GAL,prn))) {
-        trace(2,"BINEX 0x01-14: satellite error prn=%d\n",prn);
+        trace(NULL,2,"BINEX 0x01-14: satellite error prn=%d\n",prn);
         return -1;
     }
     set=(eph.code&(1<<8))?1:0; /* 0:I/NAV,1:F/NAV */
@@ -860,55 +859,55 @@ static int decode_bnx_01(raw_t *raw, uint8_t *buff, int len)
 /* decode BINEX mesaage 0x02: generalized GNSS data --------------------------*/
 static int decode_bnx_02(raw_t *raw, uint8_t *buff, int len)
 {
-    trace(2,"BINEX 0x02: unsupported message\n");
+    trace(NULL,2,"BINEX 0x02: unsupported message\n");
     return 0;
 }
 /* decode BINEX mesaage 0x03: generalized ancillary site data ----------------*/
 static int decode_bnx_03(raw_t *raw, uint8_t *buff, int len)
 {
-    trace(2,"BINEX 0x03: unsupported message\n");
+    trace(NULL,2,"BINEX 0x03: unsupported message\n");
     return 0;
 }
 /* decode BINEX mesaage 0x7d: receiver internal state prototyping ------------*/
 static int decode_bnx_7d(raw_t *raw, uint8_t *buff, int len)
 {
-    trace(2,"BINEX 0x7d: unsupported message\n");
+    trace(NULL,2,"BINEX 0x7d: unsupported message\n");
     return 0;
 }
 /* decode BINEX mesaage 0x7e: ancillary site data prototyping ----------------*/
 static int decode_bnx_7e(raw_t *raw, uint8_t *buff, int len)
 {
-    trace(2,"BINEX 0x7e: unsupported message\n");
+    trace(NULL,2,"BINEX 0x7e: unsupported message\n");
     return 0;
 }
 /* decode BINEX mesaage 0x7f-00: JPL fiducial site ---------------------------*/
 static int decode_bnx_7f_00(raw_t *raw, uint8_t *buff, int len)
 {
-    trace(2,"BINEX 0x7f-00: unsupported message\n");
+    trace(NULL,2,"BINEX 0x7f-00: unsupported message\n");
     return 0;
 }
 /* decode BINEX mesaage 0x7f-01: UCAR COSMIC ---------------------------------*/
 static int decode_bnx_7f_01(raw_t *raw, uint8_t *buff, int len)
 {
-    trace(2,"BINEX 0x7f-01: unsupported message\n");
+    trace(NULL,2,"BINEX 0x7f-01: unsupported message\n");
     return 0;
 }
 /* decode BINEX mesaage 0x7f-02: Trimble 4700 --------------------------------*/
 static int decode_bnx_7f_02(raw_t *raw, uint8_t *buff, int len)
 {
-    trace(2,"BINEX 0x7f-02: unsupported message\n");
+    trace(NULL,2,"BINEX 0x7f-02: unsupported message\n");
     return 0;
 }
 /* decode BINEX mesaage 0x7f-03: Trimble NetRS -------------------------------*/
 static int decode_bnx_7f_03(raw_t *raw, uint8_t *buff, int len)
 {
-    trace(2,"BINEX 0x7f-03: unsupported message\n");
+    trace(NULL,2,"BINEX 0x7f-03: unsupported message\n");
     return 0;
 }
 /* decode BINEX mesaage 0x7f-04: Trimble NetRS -------------------------------*/
 static int decode_bnx_7f_04(raw_t *raw, uint8_t *buff, int len)
 {
-    trace(2,"BINEX 0x7f-04: unsupported message\n");
+    trace(NULL,2,"BINEX 0x7f-04: unsupported message\n");
     return 0;
 }
 /* decode BINEX mesaage 0x7f-05: Trimble NetR8 obs data ----------------------*/
@@ -970,7 +969,7 @@ static uint8_t *decode_bnx_7f_05_obs(raw_t *raw, uint8_t *buff, int sat,
     int i,j,k,sys,prn,fcn=-10,code[8],slip[8],pri[8],idx[8];
     int slipcnt[8]={0},mask[8]={0};
     
-    trace(5,"decode_bnx_7f_05_obs: sat=%2d nobs=%2d\n",sat,nobs);
+    trace(NULL,5,"decode_bnx_7f_05_obs: sat=%2d nobs=%2d\n",sat,nobs);
     
     sys=satsys(sat,&prn);
     
@@ -1035,9 +1034,9 @@ static uint8_t *decode_bnx_7f_05_obs(raw_t *raw, uint8_t *buff, int sat,
                 slipcnt[i]=U1(p); p+=1;
             }
         }
-        trace(5,"(%d) CODE=%2d S=%d F=%02X %02X %02X %02X\n",i+1,
+        trace(NULL,5,"(%d) CODE=%2d S=%d F=%02X %02X %02X %02X\n",i+1,
               code[i],slip[i],flags[0],flags[1],flags[2],flags[3]);
-        trace(5,"(%d) P=%13.3f L=%13.3f D=%7.1f SNR=%4.1f SCNT=%2d\n",
+        trace(NULL,5,"(%d) P=%13.3f L=%13.3f D=%7.1f SNR=%4.1f SCNT=%2d\n",
               i+1,range[i],phase[i],dopp[i],cnr[i],slipcnt[i]);
     }
     if (!codes) {
@@ -1106,7 +1105,7 @@ static int decode_bnx_7f_05(raw_t *raw, uint8_t *buff, int len)
     uint32_t flag;
     int i,nsat,nobs,prn,sys,sat,clkrst=0,rsys=0,nsys=0,tsys[16]={0};
     
-    trace(4,"decode_bnx_7f_05\n");
+    trace(NULL,4,"decode_bnx_7f_05\n");
     
     raw->obs.n=0;
     flag=U1(p++);
@@ -1129,7 +1128,7 @@ static int decode_bnx_7f_05(raw_t *raw, uint8_t *buff, int len)
         nobs=getbitu(p,1,3);
         sys =getbitu(p,4,4); p++;
         
-        trace(5,"BINEX 0x7F-05 PRN=%3d SYS=%d NOBS=%d\n",prn,sys,nobs);
+        trace(NULL,5,"BINEX 0x7F-05 PRN=%3d SYS=%d NOBS=%d\n",prn,sys,nobs);
         
         switch (sys) {
             case 0: sat=satno(SYS_GPS,prn); break;
@@ -1145,7 +1144,7 @@ static int decode_bnx_7f_05(raw_t *raw, uint8_t *buff, int len)
         if (!(p=decode_bnx_7f_05_obs(raw,p,sat,nobs,&data))) return -1;
         
         if ((int)(p-buff)>len) {
-            trace(2,"BINEX 0x7F-05 length error: nsat=%2d len=%d\n",nsat,len);
+            trace(NULL,2,"BINEX 0x7F-05 length error: nsat=%2d len=%d\n",nsat,len);
             return -1;
         }
         /* save obs data to obs buffer */
@@ -1198,7 +1197,7 @@ static int decode_bnx(raw_t *raw)
     /* record and header length */
     len_h=getbnxi(raw->buff+2,&len);
     
-    trace(5,"decode_bnx: rec=%02x len=%d\n",rec,len);
+    trace(NULL,5,"decode_bnx: rec=%02x len=%d\n",rec,len);
     
     /* check parity */
     if (raw->len-1<128) {
@@ -1210,7 +1209,7 @@ static int decode_bnx(raw_t *raw)
         cs2=rtk_crc16(raw->buff+1,raw->len-1);
     }
     if (cs1!=cs2) {
-        trace(2,"BINEX 0x%02X parity error CS=%X %X\n",rec,cs1,cs2);
+        trace(NULL,2,"BINEX 0x%02X parity error CS=%X %X\n",rec,cs1,cs2);
         return -1;
     }
     if (raw->outtype) {
@@ -1275,7 +1274,7 @@ extern int input_bnx(raw_t *raw, uint8_t data)
     uint32_t len;
     int len_h,len_c;
     
-    trace(5,"input_bnx: data=%02x\n",data);
+    trace(NULL,5,"input_bnx: data=%02x\n",data);
     
     /* synchronize BINEX message */
     if (raw->nbyte==0) {
@@ -1291,7 +1290,7 @@ extern int input_bnx(raw_t *raw, uint8_t data)
     raw->len=len+len_h+2; /* length without CRC */
     
     if (raw->len-1>4096) {
-        trace(2,"BINEX length error: len=%d\n",raw->len-1);
+        trace(NULL,2,"BINEX length error: len=%d\n",raw->len-1);
         raw->nbyte=0;
         return -1;
     }
@@ -1314,7 +1313,7 @@ extern int input_bnxf(raw_t *raw, FILE *fp)
     uint32_t len;
     int i,data,len_h,len_c;
     
-    trace(4,"input_bnxf\n");
+    trace(NULL,4,"input_bnxf\n");
     
     if (raw->nbyte==0) {
         for (i=0;;i++) {
@@ -1330,7 +1329,7 @@ extern int input_bnxf(raw_t *raw, FILE *fp)
     raw->len=len+len_h+2;
     
     if (raw->len-1>4096) {
-        trace(2,"BINEX length error: len=%d\n",raw->len-1);
+        trace(NULL,2,"BINEX length error: len=%d\n",raw->len-1);
         raw->nbyte=0;
         return -1;
     }

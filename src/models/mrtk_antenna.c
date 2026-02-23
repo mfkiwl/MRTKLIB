@@ -24,12 +24,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*============================================================================
  * Forward Declarations (resolved at link time)
  *===========================================================================*/
-
-extern void trace(int level, const char *format, ...);
 
 /* satid2no remains in rtkcmn.c */
 extern int satid2no(const char *id);
@@ -65,7 +64,7 @@ static void addpcv(const pcv_t *pcv, pcvs_t *pcvs)
     if (pcvs->nmax<=pcvs->n) {
         pcvs->nmax+=256;
         if (!(pcvs_pcv=(pcv_t *)realloc(pcvs->pcv,sizeof(pcv_t)*pcvs->nmax))) {
-            trace(1,"addpcv: memory allocation error\n");
+            trace(NULL,1,"addpcv: memory allocation error\n");
             free(pcvs->pcv); pcvs->pcv=NULL; pcvs->n=pcvs->nmax=0;
             return;
         }
@@ -84,7 +83,7 @@ static int readngspcv(const char *file, pcvs_t *pcvs)
     char buff[256];
 
     if (!(fp=fopen(file,"r"))) {
-        trace(2,"ngs pcv file open error: %s\n",file);
+        trace(NULL,2,"ngs pcv file open error: %s\n",file);
         return 0;
     }
     while (fgets(buff,sizeof(buff),fp)) {
@@ -130,10 +129,10 @@ static int readantex(const char *file, pcvs_t *pcvs)
     int i,f,freq=0,state=0,freqs[]={1,2,5,0};
     char buff[256];
 
-    trace(3,"readantex: file=%s\n",file);
+    trace(NULL,3,"readantex: file=%s\n",file);
 
     if (!(fp=fopen(file,"r"))) {
-        trace(2,"antex pcv file open error: %s\n",file);
+        trace(NULL,2,"antex pcv file open error: %s\n",file);
         return 0;
     }
     while (fgets(buff,sizeof(buff),fp)) {
@@ -218,7 +217,7 @@ extern int readpcv(const char *file, pcvs_t *pcvs)
     char *ext;
     int i,j,stat;
 
-    trace(3,"readpcv: file=%s\n",file);
+    trace(NULL,3,"readpcv: file=%s\n",file);
 
     if (!(ext=strrchr(file,'.'))) ext="";
 
@@ -230,7 +229,7 @@ extern int readpcv(const char *file, pcvs_t *pcvs)
     }
     for (i=0;i<pcvs->n;i++) {
         pcv=pcvs->pcv+i;
-        trace(4,"sat=%2d type=%20s code=%s off=%8.4f %8.4f %8.4f  %8.4f %8.4f %8.4f\n",
+        trace(NULL,4,"sat=%2d type=%20s code=%s off=%8.4f %8.4f %8.4f  %8.4f %8.4f %8.4f\n",
               pcv->sat,pcv->type,pcv->code,pcv->off[0][0],pcv->off[0][1],
               pcv->off[0][2],pcv->off[1][0],pcv->off[1][1],pcv->off[1][2]);
 
@@ -258,7 +257,7 @@ extern pcv_t *searchpcv(int sat, const char *type, gtime_t time,
     char buff[MAXANT],*types[2],*p;
     int i,j,n=0;
 
-    trace(3,"searchpcv: sat=%2d type=%s\n",sat,type);
+    trace(NULL,3,"searchpcv: sat=%2d type=%s\n",sat,type);
 
     if (sat) { /* search satellite antenna */
         for (i=0;i<pcvs->n;i++) {
@@ -285,7 +284,7 @@ extern pcv_t *searchpcv(int sat, const char *type, gtime_t time,
             pcv=pcvs->pcv+i;
             if (strstr(pcv->type,types[0])!=pcv->type) continue;
 
-            trace(2,"pcv without radome is used type=%s\n",type);
+            trace(NULL,2,"pcv without radome is used type=%s\n",type);
             return pcv;
         }
     }
@@ -307,7 +306,7 @@ extern void antmodel(const pcv_t *pcv, const double *del, const double *azel,
     double e[3],off[3],cosel=cos(azel[1]);
     int i,j;
 
-    trace(4,"antmodel: azel=%6.1f %4.1f opt=%d\n",azel[0]*R2D,azel[1]*R2D,opt);
+    trace(NULL,4,"antmodel: azel=%6.1f %4.1f opt=%d\n",azel[0]*R2D,azel[1]*R2D,opt);
 
     e[0]=sin(azel[0])*cosel;
     e[1]=cos(azel[0])*cosel;
@@ -318,7 +317,7 @@ extern void antmodel(const pcv_t *pcv, const double *del, const double *azel,
 
         dant[i]=-dot(off,e,3)+(opt?interpvar(90.0-azel[1]*R2D,pcv->var[i]):0.0);
     }
-    trace(5,"antmodel: dant=%6.3f %6.3f\n",dant[0],dant[1]);
+    trace(NULL,5,"antmodel: dant=%6.3f %6.3f\n",dant[0],dant[1]);
 }
 /* satellite antenna model ------------------------------------------------------
 * compute satellite antenna phase center parameters
@@ -331,10 +330,10 @@ extern void antmodel_s(const pcv_t *pcv, double nadir, double *dant)
 {
     int i;
 
-    trace(4,"antmodel_s: nadir=%6.1f\n",nadir*R2D);
+    trace(NULL,4,"antmodel_s: nadir=%6.1f\n",nadir*R2D);
 
     for (i=0;i<NFREQ;i++) {
         dant[i]=interpvar(nadir*R2D*5.0,pcv->var[i]);
     }
-    trace(5,"antmodel_s: dant=%6.3f %6.3f\n",dant[0],dant[1]);
+    trace(NULL,5,"antmodel_s: dant=%6.3f %6.3f\n",dant[0],dant[1]);
 }

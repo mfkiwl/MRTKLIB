@@ -24,12 +24,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*============================================================================
  * Forward Declarations (resolved at link time)
  *===========================================================================*/
-
-extern void trace(int level, const char *format, ...);
 
 /* satsys remains in mrtk_nav.c */
 extern int satsys(int sat, int *prn);
@@ -370,7 +369,7 @@ extern double sat2freq(int sat, uint8_t code, const nav_t *nav)
 *-----------------------------------------------------------------------------*/
 extern void setcodepri(int sys, int idx, const char *pri)
 {
-    trace(3,"setcodepri:sys=%d idx=%d pri=%s\n",sys,idx,pri);
+    trace(NULL,3,"setcodepri:sys=%d idx=%d pri=%s\n",sys,idx,pri);
 
     if (idx<0||idx>=MAXFREQ) return;
     if (sys&SYS_GPS) strcpy(codepris[0][idx],pri);
@@ -424,7 +423,7 @@ extern int sortobs(obs_t *obs)
 {
     int i,j,n;
 
-    trace(3,"sortobs: nobs=%d\n",obs->n);
+    trace(NULL,3,"sortobs: nobs=%d\n",obs->n);
 
     if (obs->n<=0) return 0;
 

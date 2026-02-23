@@ -23,12 +23,11 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*============================================================================
  * Forward Declarations (resolved at link time)
  *===========================================================================*/
-
-extern void trace(int level, const char *format, ...);
 
 /*============================================================================
  * Private Constants
@@ -83,7 +82,7 @@ extern int readelmask(const char *file, int16_t *elmask)
     char buff[256],*p;
     int i,j=0,n=0;
 
-    trace(3,"readelmask: file=%s\n",file);
+    trace(NULL,3,"readelmask: file=%s\n",file);
 
     for (i=0;i<360;i++) {
         elmask[i]=0;
@@ -124,7 +123,7 @@ extern void readpos(const char *file, const char *rcv, double *pos)
     int i,j,len,np=0;
     char buff[256],str[256];
 
-    trace(3,"readpos: file=%s\n",file);
+    trace(NULL,3,"readpos: file=%s\n",file);
 
     if (!(fp=fopen(file,"r"))) {
         fprintf(stderr,"reference position file open error : %s\n",file);
@@ -163,7 +162,7 @@ extern int readblq(const char *file, const char *sta, double *odisp)
     for (p=staname;(*p=(char)toupper((int)(*p)));p++) ;
 
     if (!(fp=fopen(file,"r"))) {
-        trace(2,"blq file open error: file=%s\n",file);
+        trace(NULL,2,"blq file open error: file=%s\n",file);
         return 0;
     }
     while (fgets(buff,sizeof(buff),fp)) {
@@ -180,6 +179,6 @@ extern int readblq(const char *file, const char *sta, double *odisp)
         }
     }
     fclose(fp);
-    trace(2,"no otl parameters: sta=%s file=%s\n",sta,file);
+    trace(NULL,2,"no otl parameters: sta=%s file=%s\n",sta,file);
     return 0;
 }

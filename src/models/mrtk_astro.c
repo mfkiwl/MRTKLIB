@@ -22,12 +22,11 @@
 #include "mrtklib/mrtk_coords.h"
 
 #include <math.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*============================================================================
  * Forward Declarations (resolved at link time)
  *===========================================================================*/
-
-extern void trace(int level, const char *format, ...);
 
 /*============================================================================
  * Private Constants
@@ -74,7 +73,7 @@ extern void sunmoonpos_eci(gtime_t tut, double *rsun, double *rmoon)
     const double ep2000[]={2000,1,1,12,0,0};
     double t,f[5],eps,Ms,ls,rs,lm,pm,rm,sine,cose,sinp,cosp,sinl,cosl;
 
-    trace(4,"sunmoonpos_eci: tut=%s\n",time_str(tut,3));
+    trace(NULL,4,"sunmoonpos_eci: tut=%s\n",time_str(tut,3));
 
     t=timediff(tut,epoch2time(ep2000))/86400.0/36525.0;
 
@@ -95,7 +94,7 @@ extern void sunmoonpos_eci(gtime_t tut, double *rsun, double *rmoon)
         rsun[1]=rs*cose*sinl;
         rsun[2]=rs*sine*sinl;
 
-        trace(5,"rsun =%.3f %.3f %.3f\n",rsun[0],rsun[1],rsun[2]);
+        trace(NULL,5,"rsun =%.3f %.3f %.3f\n",rsun[0],rsun[1],rsun[2]);
     }
     /* moon position in eci */
     if (rmoon) {
@@ -111,7 +110,7 @@ extern void sunmoonpos_eci(gtime_t tut, double *rsun, double *rmoon)
         rmoon[1]=rm*(cose*cosp*sinl-sine*sinp);
         rmoon[2]=rm*(sine*cosp*sinl+cose*sinp);
 
-        trace(5,"rmoon=%.3f %.3f %.3f\n",rmoon[0],rmoon[1],rmoon[2]);
+        trace(NULL,5,"rmoon=%.3f %.3f %.3f\n",rmoon[0],rmoon[1],rmoon[2]);
     }
 }
 /* sun and moon position -------------------------------------------------------
@@ -129,7 +128,7 @@ extern void sunmoonpos(gtime_t tutc, const double *erpv, double *rsun,
     gtime_t tut;
     double rs[3],rm[3],U[9],gmst_;
 
-    trace(4,"sunmoonpos: tutc=%s\n",time_str(tutc,3));
+    trace(NULL,4,"sunmoonpos: tutc=%s\n",time_str(tutc,3));
 
     tut=timeadd(tutc,erpv[2]); /* utc -> ut1 */
 

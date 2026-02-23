@@ -24,6 +24,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include "mrtklib/mrtk_trace.h"
 
 /* Local constants (duplicated from rtklib.h to avoid dependency) */
 #define PI          3.1415926535897932  /* pi */
@@ -104,8 +105,6 @@
 #define P2_59       1.734723475976810E-18
 
 /* Forward declarations for functions in rtklib (resolved at link time) */
-extern void trace   (int level, const char *format, ...);
-extern void traceb  (int level, const uint8_t *p, int n);
 
 #define OEM4SYNC1       0xAA    /* oem7/6/4 message start sync code 1 */
 #define OEM4SYNC2       0x44    /* oem7/6/4 message start sync code 2 */
@@ -347,11 +346,11 @@ static int decode_track_stat(uint32_t stat, int *sys, int *code, int *track,
         case 5: *sys=SYS_QZS; break; /* OEM6 */
         case 6: *sys=SYS_IRN; break; /* OEM7 */
         default:
-            trace(2,"oem4 unknown system: sys=%d\n",satsys);
+            trace(NULL,2,"oem4 unknown system: sys=%d\n",satsys);
             return -1;
     }
     if (!(*code=sig2code(*sys,sigtype))||(idx=code2idx(*sys,*code))<0) {
-        trace(2,"oem4 signal type error: sys=%d sigtype=%d\n",*sys,sigtype);
+        trace(NULL,2,"oem4 signal type error: sys=%d sigtype=%d\n",*sys,sigtype);
         return -1;
     }
     return idx;
@@ -403,7 +402,7 @@ static int decode_rangecmpb(raw_t *raw)
     
     nobs=U4(p);
     if (raw->len<OEM4HLEN+4+nobs*24) {
-        trace(2,"oem4 rangecmpb length error: len=%d nobs=%d\n",raw->len,nobs);
+        trace(NULL,2,"oem4 rangecmpb length error: len=%d nobs=%d\n",raw->len,nobs);
         return -1;
     }
     if (raw->outtype) {
@@ -427,7 +426,7 @@ static int decode_rangecmpb(raw_t *raw)
             prn-=160; /* Tersus BX */
         }
         if (!(sat=satno(sys,prn))) {
-            trace(3,"oem4 rangecmpb satellite number error: sys=%d,prn=%d\n",sys,prn);
+            trace(NULL,3,"oem4 rangecmpb satellite number error: sys=%d,prn=%d\n",sys,prn);
             continue;
         }
         if (sys==SYS_GLO&&!parity) continue; /* invalid if GLO parity unknown */
@@ -492,7 +491,7 @@ static int decode_rangeb(raw_t *raw)
     
     nobs=U4(p);
     if (raw->len<OEM4HLEN+4+nobs*44) {
-        trace(2,"oem4 rangeb length error: len=%d nobs=%d\n",raw->len,nobs);
+        trace(NULL,2,"oem4 rangeb length error: len=%d nobs=%d\n",raw->len,nobs);
         return -1;
     }
     if (raw->outtype) {
@@ -516,7 +515,7 @@ static int decode_rangeb(raw_t *raw)
             prn-=160; /* Tersus BX */
         }
         if (!(sat=satno(sys,prn))) {
-            trace(3,"oem4 rangeb satellite number error: sys=%d,prn=%d\n",sys,prn);
+            trace(NULL,3,"oem4 rangeb satellite number error: sys=%d,prn=%d\n",sys,prn);
             continue;
         }
         if (sys==SYS_GLO&&!parity) continue;
@@ -575,12 +574,12 @@ static int decode_rawephemb(raw_t *raw)
     int prn,sat;
 
     if (raw->len<OEM4HLEN+102) {
-        trace(2,"oem4 rawephemb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 rawephemb length error: len=%d\n",raw->len);
         return -1;
     }
     prn=U4(p);
     if (!(sat=satno(SYS_GPS,prn))) {
-        trace(2,"oem4 rawephemb satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"oem4 rawephemb satellite number error: prn=%d\n",prn);
         return -1;
     }
     if (raw->outtype) {
@@ -589,7 +588,7 @@ static int decode_rawephemb(raw_t *raw)
     memcpy(subframe,p+12,30*3); /* subframe 1-3 */
     
     if (!decode_frame(subframe,&eph,NULL,NULL,NULL)) {
-        trace(2,"oem4 rawephemb subframe error: prn=%d\n",prn);
+        trace(NULL,2,"oem4 rawephemb subframe error: prn=%d\n",prn);
         return -1;
     }
     if (!strstr(raw->opt,"-EPHALL")) {
@@ -609,7 +608,7 @@ static int decode_ionutcb(raw_t *raw)
     int i;
     
     if (raw->len<OEM4HLEN+108) {
-        trace(2,"oem4 ionutcb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 ionutcb length error: len=%d\n",raw->len);
         return -1;
     }
     for (i=0;i<8;i++) raw->nav.ion_gps[i]=R8(p+i*8);
@@ -630,7 +629,7 @@ static int decode_rawwaasframeb(raw_t *raw)
     int prn;
     
     if (raw->len<OEM4HLEN+48) {
-        trace(2,"oem4 rawwaasframeb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 rawwaasframeb length error: len=%d\n",raw->len);
         return -1;
     }
     prn=U4(p+4);
@@ -660,7 +659,7 @@ static int decode_gpsephemb(raw_t *raw)
     int prn,sat,week,iode2,N;
     
     if (raw->len<OEM4HLEN+224) {
-        trace(2,"oem4 gpsephemb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 gpsephemb length error: len=%d\n",raw->len);
         return -1;
     }
     prn       =U4(p);   p+=4;
@@ -697,16 +696,16 @@ static int decode_gpsephemb(raw_t *raw)
     ura       =R8(p);
     
     if (toc!=eph.toes) { /* toe and toc should be matched */
-        trace(2,"oem4 gpsephemb toe and toc unmatch prn=%d\n",prn);
+        trace(NULL,2,"oem4 gpsephemb toe and toc unmatch prn=%d\n",prn);
         return -1;
     }
     if (iode2!=eph.iode) { /* iodes should be matched */
-        trace(2,"oem4 gpsephemb iode unmatch prn=%d iode=%d %d\n",prn,eph.iode,
+        trace(NULL,2,"oem4 gpsephemb iode unmatch prn=%d iode=%d %d\n",prn,eph.iode,
               iode2);
         return -1;
     }
     if (!(sat=satno(SYS_GPS,prn))) {
-        trace(2,"oemv gpsephemb satellite error: prn=%d\n",prn);
+        trace(NULL,2,"oemv gpsephemb satellite error: prn=%d\n",prn);
         return 0;
     }
     if (raw->outtype) {
@@ -737,13 +736,13 @@ static int decode_gloephemerisb(raw_t *raw)
     int prn,sat,week,type,P,flags;
     
     if (raw->len<OEM4HLEN+144) {
-        trace(2,"oem4 gloephemerisb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 gloephemerisb length error: len=%d\n",raw->len);
         return -1;
     }
     prn=U2(p)-37;
     
     if (!(sat=satno(SYS_GLO,prn))) {
-        trace(2,"oem4 gloephemerisb prn error: prn=%d\n",prn);
+        trace(NULL,2,"oem4 gloephemerisb prn error: prn=%d\n",prn);
         return -1;
     }
     if (raw->outtype) {
@@ -798,12 +797,12 @@ static int decode_qzssrawephemb(raw_t *raw)
     int prn,sat;
     
     if (raw->len<OEM4HLEN+102) {
-        trace(2,"oem4 qzssrawephemb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 qzssrawephemb length error: len=%d\n",raw->len);
         return -1;
     }
     prn=U4(p);
     if (!(sat=satno(SYS_QZS,prn))) {
-        trace(2,"oem4 qzssrawephemb satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"oem4 qzssrawephemb satellite number error: prn=%d\n",prn);
         return -1;
     }
     if (raw->outtype) {
@@ -812,7 +811,7 @@ static int decode_qzssrawephemb(raw_t *raw)
     memcpy(subfrm,p+12,90);
     
     if (!decode_frame(subfrm,&eph,NULL,NULL,NULL)) {
-        trace(3,"oem4 qzssrawephemb ephemeris error: prn=%d\n",prn);
+        trace(NULL,3,"oem4 qzssrawephemb ephemeris error: prn=%d\n",prn);
         return 0;
     }
     if (!strstr(raw->opt,"-EPHALL")) {
@@ -834,20 +833,20 @@ static int decode_qzssrawsubframeb(raw_t *raw)
     int prn,sat,id;
     
     if (raw->len<OEM4HLEN+44) {
-        trace(2,"oem4 qzssrawsubframeb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 qzssrawsubframeb length error: len=%d\n",raw->len);
         return -1;
     }
     prn=U4(p);
     id =U4(p+4);
     if (!(sat=satno(SYS_QZS,prn))) {
-        trace(2,"oem4 qzssrawsubframeb satellite error: prn=%d\n",prn);
+        trace(NULL,2,"oem4 qzssrawsubframeb satellite error: prn=%d\n",prn);
         return -1;
     }
     if (raw->outtype) {
         sprintf(raw->msgtype+strlen(raw->msgtype)," prn=%d id=%d",prn,id);
     }
     if (id<1||id>5) {
-        trace(2,"oem4 qzssrawsubframeb subfrm id error: prn=%d id=%d\n",prn,id);
+        trace(NULL,2,"oem4 qzssrawsubframeb subfrm id error: prn=%d id=%d\n",prn,id);
         return -1;
     }
     memcpy(raw->subfrm[sat-1]+30*(id-1),p+8,30);
@@ -882,7 +881,7 @@ static int decode_qzssephemerisb(raw_t *raw)
     int prn,sat,week,iode2,as,N,fit;
     
     if (raw->len<OEM4HLEN+228) {
-        trace(2,"oem4 qzssephemerisb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 qzssephemerisb length error: len=%d\n",raw->len);
         return -1;
     }
     prn       =U4(p);   p+=4;
@@ -920,12 +919,12 @@ static int decode_qzssephemerisb(raw_t *raw)
     fit       =U1(p);
     
     if (iode2!=eph.iode) { /* iodes should be matched */
-        trace(2,"oem4 qzssephemerisb iode unmatch prn=%d iode=%d %d\n",prn,eph.iode,
+        trace(NULL,2,"oem4 qzssephemerisb iode unmatch prn=%d iode=%d %d\n",prn,eph.iode,
               iode2);
         return -1;
     }
     if (!(sat=satno(SYS_QZS,prn))) {
-        trace(2,"oemv qzssephemerisb satellite error: prn=%d\n",prn);
+        trace(NULL,2,"oemv qzssephemerisb satellite error: prn=%d\n",prn);
         return 0;
     }
     if (raw->outtype) {
@@ -957,7 +956,7 @@ static int decode_qzssionutcb(raw_t *raw)
     int i;
     
     if (raw->len<OEM4HLEN+108) {
-        trace(2,"oem4 qzssionutcb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 qzssionutcb length error: len=%d\n",raw->len);
         return -1;
     }
     for (i=0;i<8;i++) raw->nav.ion_qzs[i]=R8(p+i*8);
@@ -981,7 +980,7 @@ static int decode_galephemerisb(raw_t *raw)
     if (strstr(raw->opt,"-GALFNAV")) sel_eph=2;
     
     if (raw->len<OEM4HLEN+220) {
-        trace(2,"oem4 galephemrisb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 galephemrisb length error: len=%d\n",raw->len);
         return -1;
     }
     prn       =U4(p);   p+=4;
@@ -1023,7 +1022,7 @@ static int decode_galephemerisb(raw_t *raw)
     eph.tgd[1]=R8(p);         /* BGD: E5B-E1 (s) */
     
     if (!(sat=satno(SYS_GAL,prn))) {
-        trace(2,"oemv galephemeris satellite error: prn=%d\n",prn);
+        trace(NULL,2,"oemv galephemeris satellite error: prn=%d\n",prn);
         return -1;
     }
     if (raw->outtype) {
@@ -1076,7 +1075,7 @@ static int decode_galinavephemerisb(raw_t *raw)
     int dvs_e5b,toc_inav; 
     
     if (raw->len<OEM4HLEN+184) {
-        trace(2,"oem4 galinavephemrisb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 galinavephemrisb length error: len=%d\n",raw->len);
         return -1;
     }
     prn       =U4(p);   p+=4;
@@ -1111,7 +1110,7 @@ static int decode_galinavephemerisb(raw_t *raw)
     eph.tgd[1]=R8(p);         /* BGD: E5B-E1 (s) */
     
     if (!(sat=satno(SYS_GAL,prn))) {
-        trace(2,"oemv galephemeris satellite error: prn=%d\n",prn);
+        trace(NULL,2,"oemv galephemeris satellite error: prn=%d\n",prn);
         return -1;
     }
     if (raw->outtype) {
@@ -1155,7 +1154,7 @@ static int decode_galclockb(raw_t *raw)
     int dtls,tot,wnt,wnlsf,dn,dtlsf,t0g,wn0g;
     
     if (raw->len<OEM4HLEN+64) {
-        trace(2,"oem4 galclockb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 galclockb length error: len=%d\n",raw->len);
         return -1;
     }
     a0   =R8(p); p+=8;
@@ -1188,7 +1187,7 @@ static int decode_galionob(raw_t *raw)
     int i,sf[5];
     
     if (raw->len<OEM4HLEN+29) {
-        trace(2,"oem4 galionob length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 galionob length error: len=%d\n",raw->len);
         return -1;
     }
     ai[0]=R8(p); p+=8;
@@ -1212,7 +1211,7 @@ static int decode_bdsephemerisb(raw_t *raw)
     int prn,sat,toc;
     
     if (raw->len<OEM4HLEN+196) {
-        trace(2,"oem4 bdsephemrisb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 bdsephemrisb length error: len=%d\n",raw->len);
         return -1;
     }
     prn       =U4(p);   p+=4;
@@ -1245,7 +1244,7 @@ static int decode_bdsephemerisb(raw_t *raw)
     eph.cis   =R8(p);
     
     if (!(sat=satno(SYS_CMP,prn))) {
-        trace(2,"oemv bdsephemeris satellite error: prn=%d\n",prn);
+        trace(NULL,2,"oemv bdsephemeris satellite error: prn=%d\n",prn);
         return -1;
     }
     if (raw->outtype) {
@@ -1277,7 +1276,7 @@ static int decode_navicephemerisb(raw_t *raw)
     int prn,sat,toc,rsv,l5_health,s_health,alert,autonav;
     
     if (raw->len<OEM4HLEN+204) {
-        trace(2,"oem4 navicephemrisb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 navicephemrisb length error: len=%d\n",raw->len);
         return -1;
     }
     prn       =U4(p);   p+=4;
@@ -1314,11 +1313,11 @@ static int decode_navicephemerisb(raw_t *raw)
     autonav   =U4(p);
     
     if (toc!=eph.toes) { /* toe and toc should be matched */
-        trace(2,"oem4 navicephemrisb toe and toc unmatch prn=%d\n",prn);
+        trace(NULL,2,"oem4 navicephemrisb toe and toc unmatch prn=%d\n",prn);
         return -1;
     }
     if (!(sat=satno(SYS_IRN,prn))) {
-        trace(2,"oemv navicephemeris satellite error: prn=%d\n",prn);
+        trace(NULL,2,"oemv navicephemeris satellite error: prn=%d\n",prn);
         return 0;
     }
     if (raw->outtype) {
@@ -1357,7 +1356,7 @@ static int decode_rgeb(raw_t *raw)
     raw->time=gpst2time(week,tow);
     
     if (raw->len!=OEM3HLEN+20+nobs*44) {
-        trace(2,"oem3 regb length error: len=%d nobs=%d\n",raw->len,nobs);
+        trace(NULL,2,"oem3 regb length error: len=%d nobs=%d\n",raw->len,nobs);
         return -1;
     }
     for (i=0,p+=20;i<nobs;i++,p+=44) {
@@ -1372,7 +1371,7 @@ static int decode_rgeb(raw_t *raw)
         sys   =(stat>>15)&7; /* satellite sys (0:GPS,1:GLONASS,2:WAAS) */
         parity=(stat>>10)&1; /* parity known */
         if (!(sat=satno(sys==1?SYS_GLO:(sys==2?SYS_SBS:SYS_GPS),prn))) {
-            trace(2,"oem3 regb satellite number error: sys=%d prn=%d\n",sys,prn);
+            trace(NULL,2,"oem3 regb satellite number error: sys=%d prn=%d\n",sys,prn);
             continue;
         }
         if (raw->tobs[sat-1][freq].time!=0) {
@@ -1416,7 +1415,7 @@ static int decode_rged(raw_t *raw)
     tow =U4(p+4)/100.0;
     raw->time=gpst2time(week,tow);
     if (raw->len!=OEM3HLEN+12+nobs*20) {
-        trace(2,"oem3 regd length error: len=%d nobs=%d\n",raw->len,nobs);
+        trace(NULL,2,"oem3 regd length error: len=%d nobs=%d\n",raw->len,nobs);
         return -1;
     }
     for (i=0,p+=12;i<nobs;i++,p+=20) {
@@ -1434,7 +1433,7 @@ static int decode_rged(raw_t *raw)
         sys   =(stat>>15)&7; /* satellite sys (0:GPS,1:GLONASS,2:WAAS) */
         parity=(stat>>10)&1; /* parity known */
         if (!(sat=satno(sys==1?SYS_GLO:(sys==2?SYS_SBS:SYS_GPS),prn))) {
-            trace(2,"oem3 regd satellite number error: sys=%d prn=%d\n",sys,prn);
+            trace(NULL,2,"oem3 regd satellite number error: sys=%d prn=%d\n",sys,prn);
             continue;
         }
         psr=(psrh*4294967296.0+psrl)/128.0;
@@ -1476,16 +1475,16 @@ static int decode_repb(raw_t *raw)
     int prn,sat;
     
     if (raw->len!=OEM3HLEN+96) {
-        trace(2,"oem3 repb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem3 repb length error: len=%d\n",raw->len);
         return -1;
     }
     prn=U4(p);
     if (!(sat=satno(SYS_GPS,prn))) {
-        trace(2,"oem3 repb satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"oem3 repb satellite number error: prn=%d\n",prn);
         return -1;
     }
     if (!decode_frame(p+4,&eph,NULL,NULL,NULL)) {
-        trace(2,"oem3 repb subframe error: prn=%d\n",prn);
+        trace(NULL,2,"oem3 repb subframe error: prn=%d\n",prn);
         return -1;
     }
     if (!strstr(raw->opt,"-EPHALL")) {
@@ -1504,7 +1503,7 @@ static int decode_frmb(raw_t *raw)
     double tow;
     int i,week,prn,nbit;
     
-    trace(3,"decode_frmb: len=%d\n",raw->len);
+    trace(NULL,3,"decode_frmb: len=%d\n",raw->len);
     
     week=adjgpsweek(U4(p));
     tow =R8(p+ 4);
@@ -1513,7 +1512,7 @@ static int decode_frmb(raw_t *raw)
     raw->time=gpst2time(week,tow);
     if (nbit!=250) return 0;
     if (prn<MINPRNSBS||MAXPRNSBS<prn) {
-        trace(2,"oem3 frmb satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"oem3 frmb satellite number error: prn=%d\n",prn);
         return -1;
     }
     raw->sbsmsg.week=week;
@@ -1529,7 +1528,7 @@ static int decode_ionb(raw_t *raw)
     int i;
     
     if (raw->len!=64+OEM3HLEN) {
-        trace(2,"oem3 ionb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem3 ionb length error: len=%d\n",raw->len);
         return -1;
     }
     for (i=0;i<8;i++) raw->nav.ion_gps[i]=R8(p+i*8);
@@ -1541,7 +1540,7 @@ static int decode_utcb(raw_t *raw)
     uint8_t *p=raw->buff+OEM3HLEN;
     
     if (raw->len!=40+OEM3HLEN) {
-        trace(2,"oem3 utcb length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem3 utcb length error: len=%d\n",raw->len);
         return -1;
     }
     raw->nav.utc_gps[0]=R8(p   );
@@ -1558,11 +1557,11 @@ static int decode_oem4(raw_t *raw)
     char tstr[32];
     int msg,stat,week,type=U2(raw->buff+4);
     
-    trace(3,"decode_oem4: type=%3d len=%d\n",type,raw->len);
+    trace(NULL,3,"decode_oem4: type=%3d len=%d\n",type,raw->len);
     
     /* check crc32 */
     if (rtk_crc32(raw->buff,raw->len)!=U4(raw->buff+raw->len)) {
-        trace(2,"oem4 crc error: type=%3d len=%d\n",type,raw->len);
+        trace(NULL,2,"oem4 crc error: type=%3d len=%d\n",type,raw->len);
         return -1;
     }
     msg =(U1(raw->buff+6)>>4)&0x3; /* message type: 0=binary,1=ascii */
@@ -1570,7 +1569,7 @@ static int decode_oem4(raw_t *raw)
     week=U2(raw->buff+14);
     
     if (stat==20||week==0) {
-        trace(3,"oem4 time error: type=%3d msg=%d stat=%d week=%d\n",type,msg,
+        trace(NULL,3,"oem4 time error: type=%3d msg=%d stat=%d week=%d\n",type,msg,
               stat,week);
         return 0;
     }
@@ -1610,11 +1609,11 @@ static int decode_oem3(raw_t *raw)
 {
     int type=U4(raw->buff+4);
     
-    trace(3,"decode_oem3: type=%3d len=%d\n",type,raw->len);
+    trace(NULL,3,"decode_oem3: type=%3d len=%d\n",type,raw->len);
     
     /* checksum */
     if (chksum(raw->buff,raw->len)) {
-        trace(2,"oem3 checksum error: type=%3d len=%d\n",type,raw->len);
+        trace(NULL,2,"oem3 checksum error: type=%3d len=%d\n",type,raw->len);
         return -1;
     }
     if (raw->outtype) {
@@ -1668,7 +1667,7 @@ static int sync_oem3(uint8_t *buff, uint8_t data)
 *-----------------------------------------------------------------------------*/
 extern int input_oem4(raw_t *raw, uint8_t data)
 {
-    trace(5,"input_oem4: data=%02x\n",data);
+    trace(NULL,5,"input_oem4: data=%02x\n",data);
     
     /* synchronize frame */
     if (raw->nbyte==0) {
@@ -1678,7 +1677,7 @@ extern int input_oem4(raw_t *raw, uint8_t data)
     raw->buff[raw->nbyte++]=data;
     
     if (raw->nbyte==10&&(raw->len=U2(raw->buff+8)+OEM4HLEN)>MAXRAWLEN-4) {
-        trace(2,"oem4 length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 length error: len=%d\n",raw->len);
         raw->nbyte=0;
         return -1;
     }
@@ -1696,7 +1695,7 @@ extern int input_oem4(raw_t *raw, uint8_t data)
 *-----------------------------------------------------------------------------*/
 extern int input_oem3(raw_t *raw, uint8_t data)
 {
-    trace(5,"input_oem3: data=%02x\n",data);
+    trace(NULL,5,"input_oem3: data=%02x\n",data);
     
     /* synchronize frame */
     if (raw->nbyte==0) {
@@ -1706,7 +1705,7 @@ extern int input_oem3(raw_t *raw, uint8_t data)
     raw->buff[raw->nbyte++]=data;
     
     if (raw->nbyte==12&&(raw->len=U4(raw->buff+8))>MAXRAWLEN) {
-        trace(2,"oem3 length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem3 length error: len=%d\n",raw->len);
         raw->nbyte=0;
         return -1;
     }
@@ -1726,7 +1725,7 @@ extern int input_oem4f(raw_t *raw, FILE *fp)
 {
     int i,data;
     
-    trace(4,"input_oem4f:\n");
+    trace(NULL,4,"input_oem4f:\n");
     
     /* synchronize frame */
     if (raw->nbyte==0) {
@@ -1740,7 +1739,7 @@ extern int input_oem4f(raw_t *raw, FILE *fp)
     raw->nbyte=10;
     
     if ((raw->len=U2(raw->buff+8)+OEM4HLEN)>MAXRAWLEN-4) {
-        trace(2,"oem4 length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem4 length error: len=%d\n",raw->len);
         raw->nbyte=0;
         return -1;
     }
@@ -1760,7 +1759,7 @@ extern int input_oem3f(raw_t *raw, FILE *fp)
 {
     int i,data;
     
-    trace(4,"input_oem3f:\n");
+    trace(NULL,4,"input_oem3f:\n");
     
     /* synchronize frame */
     if (raw->nbyte==0) {
@@ -1774,7 +1773,7 @@ extern int input_oem3f(raw_t *raw, FILE *fp)
     raw->nbyte=12;
     
     if ((raw->len=U4(raw->buff+8))>MAXRAWLEN) {
-        trace(2,"oem3 length error: len=%d\n",raw->len);
+        trace(NULL,2,"oem3 length error: len=%d\n",raw->len);
         raw->nbyte=0;
         return -1;
     }

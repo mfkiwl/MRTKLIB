@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "mrtklib/mrtk_trace.h"
 
 /* local constants -----------------------------------------------------------*/
 static const double CLIGHT    = 299792458.0;
@@ -49,7 +50,6 @@ static const double EFACT_SBS = 3.0;
 #define SYS_IRN     0x40
 
 /*--- forward declarations for legacy functions resolved at link time -------*/
-extern void trace(int level, const char *format, ...);
 
 /* chi-sqr(n) table (alpha=0.001) — moved from rtkcmn.c */
 const double chisqr[100]={
@@ -209,7 +209,7 @@ static int rescode(int iter, const obsd_t *obs, int n, const double *rs,
     double e[3],P,fact_ion;
     int i,j,nv=0,sat,sys,mask[NX-3]={0};
 
-    trace(3,"resprng : n=%d\n",n);
+    trace(NULL,3,"resprng : n=%d\n",n);
 
     for (i=0;i<3;i++) rr[i]=x[i];
     dtr=x[3];
@@ -224,7 +224,7 @@ static int rescode(int iter, const obsd_t *obs, int n, const double *rs,
 
         /* reject duplicated observation data */
         if (i<n-1&&i<MAXOBS-1&&sat==obs[i+1].sat) {
-            trace(2,"duplicated obs data %s sat=%d\n",time_str(time,3),sat);
+            trace(NULL,2,"duplicated obs data %s sat=%d\n",time_str(time,3),sat);
             i++;
             continue;
         }
@@ -281,7 +281,7 @@ static int rescode(int iter, const obsd_t *obs, int n, const double *rs,
         /* variance of pseudorange error */
         var[nv++]=varerr(opt,azel[1+i*2],sys)+vare[i]+vmeas+vion+vtrp;
 
-        trace(4,"sat=%2d azel=%5.1f %4.1f res=%7.3f sig=%5.3f\n",obs[i].sat,
+        trace(NULL,4,"sat=%2d azel=%5.1f %4.1f res=%7.3f sig=%5.3f\n",obs[i].sat,
               azel[i*2]*R2D,azel[1+i*2]*R2D,resp[i],sqrt(var[nv-1]));
     }
     /* constraint to avoid rank-deficient */
@@ -301,14 +301,14 @@ static int valsol(const double *azel, const int *vsat, int n,
     double azels[MAXOBS*2],dop[4],vv;
     int i,ns;
 
-    trace(3,"valsol  : n=%d nv=%d\n",n,nv);
+    trace(NULL,3,"valsol  : n=%d nv=%d\n",n,nv);
 
     /* Chi-square validation of residuals */
     vv=dot(v,v,nv);
     if (nv>nx&&vv>chisqr[nv-nx-1]) {
         sprintf(msg,"chi-square error nv=%d vv=%.1f cs=%.1f",nv,vv,chisqr[nv-nx-1]);
         if(!opt->ign_chierr)return 0;
-        trace(2,"ignore %s\n",msg);
+        trace(NULL,2,"ignore %s\n",msg);
     }
     /* large GDOP check */
     for (i=ns=0;i<n;i++) {
@@ -318,7 +318,7 @@ static int valsol(const double *azel, const int *vsat, int n,
         ns++;
     }
     dops(ns,azels,opt->elmin,dop);
-    trace(4,"valsol  : n=%d nv=%d vv=%.1f cs=%.1f maxgdop=%.1f gdop=%.1f pdop=%.1f hdop=%.1f vdop=%.1f\n",
+    trace(NULL,4,"valsol  : n=%d nv=%d vv=%.1f cs=%.1f maxgdop=%.1f gdop=%.1f pdop=%.1f hdop=%.1f vdop=%.1f\n",
         n,nv,vv,chisqr[nv-nx-1],opt->maxgdop,dop[0],dop[1],dop[2],dop[3]);
     if (dop[0]<=0.0||dop[0]>opt->maxgdop) {
         sprintf(msg,"gdop error nv=%d gdop=%.1f",nv,dop[0]);
@@ -335,7 +335,7 @@ static int estpos(const obsd_t *obs, int n, const double *rs, const double *dts,
     double x[NX]={0},dx[NX],Q[NX*NX],*v,*H,*var,sig;
     int i,j,k,info,stat,nv,ns;
 
-    trace(3,"estpos  : n=%d\n",n);
+    trace(NULL,3,"estpos  : n=%d\n",n);
 
     v=mat(n+NTO,1); H=mat(NX,n+NTO); var=mat(n+NTO,1);
 
@@ -407,7 +407,7 @@ static int raim_fde(const obsd_t *obs, int n, const double *rs,
     double *rs_e,*dts_e,*vare_e,*azel_e,*resp_e,rms_e,rms=100.0;
     int i,j,k,nvsat,stat=0,*svh_e,*vsat_e,sat=0;
 
-    trace(3,"raim_fde: %s n=%2d\n",time_str(obs[0].time,0),n);
+    trace(NULL,3,"raim_fde: %s n=%2d\n",time_str(obs[0].time,0),n);
 
     if (!(obs_e=(obsd_t *)malloc(sizeof(obsd_t)*n))) return 0;
     rs_e = mat(6,n); dts_e = mat(2,n); vare_e=mat(1,n); azel_e=zeros(2,n);
@@ -427,7 +427,7 @@ static int raim_fde(const obsd_t *obs, int n, const double *rs,
         /* estimate receiver position without a satellite */
         if (!estpos(obs_e,n-1,rs_e,dts_e,vare_e,svh_e,nav,opt,&sol_e,azel_e,
                     vsat_e,resp_e,msg_e)) {
-            trace(3,"raim_fde: exsat=%2d (%s)\n",obs[i].sat,msg);
+            trace(NULL,3,"raim_fde: exsat=%2d (%s)\n",obs[i].sat,msg);
             continue;
         }
         for (j=nvsat=0,rms_e=0.0;j<n-1;j++) {
@@ -436,13 +436,13 @@ static int raim_fde(const obsd_t *obs, int n, const double *rs,
             nvsat++;
         }
         if (nvsat<5) {
-            trace(3,"raim_fde: exsat=%2d lack of satellites nvsat=%2d\n",
+            trace(NULL,3,"raim_fde: exsat=%2d lack of satellites nvsat=%2d\n",
                   obs[i].sat,nvsat);
             continue;
         }
         rms_e=sqrt(rms_e/nvsat);
 
-        trace(3,"raim_fde: exsat=%2d rms=%8.3f\n",obs[i].sat,rms_e);
+        trace(NULL,3,"raim_fde: exsat=%2d rms=%8.3f\n",obs[i].sat,rms_e);
 
         if (rms_e>rms) continue;
 
@@ -462,7 +462,7 @@ static int raim_fde(const obsd_t *obs, int n, const double *rs,
     }
     if (stat) {
         time2str(obs[0].time,tstr,2); satno2id(sat,name);
-        trace(2,"%s: %s excluded by raim\n",tstr+11,name);
+        trace(NULL,2,"%s: %s excluded by raim\n",tstr+11,name);
     }
     free(obs_e);
     free(rs_e ); free(dts_e ); free(vare_e); free(azel_e);
@@ -478,7 +478,7 @@ static int resdop(const obsd_t *obs, int n, const double *rs, const double *dts,
     double freq,rate,pos[3],E[9],a[3],e[3],vs[3],cosel,sig;
     int i,j,nv=0;
 
-    trace(3,"resdop  : n=%d\n",n);
+    trace(NULL,3,"resdop  : n=%d\n",n);
 
     ecef2pos(rr,pos); xyz2enu(pos,E);
 
@@ -527,7 +527,7 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
     double err=opt->err[4]; /* Doppler error (Hz) */
     int i,j,nv;
 
-    trace(3,"estvel  : n=%d\n",n);
+    trace(NULL,3,"estvel  : n=%d\n",n);
 
     v=mat(n,1); H=mat(4,n);
 
@@ -558,7 +558,8 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
 /* single-point positioning ----------------------------------------------------
 * compute receiver position, velocity, clock bias by single-point positioning
 * with pseudorange and doppler observables
-* args   : obsd_t *obs      I   observation data
+* args   : mrtk_ctx_t *ctx  I   MRTKLIB context (for trace logging)
+*          obsd_t *obs      I   observation data
 *          int    n         I   number of observation data
 *          nav_t  *nav      I   navigation data
 *          prcopt_t *opt    I   processing options
@@ -568,7 +569,7 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
 *          char   *msg      O   error message for error exit
 * return : status(1:ok,0:error)
 *-----------------------------------------------------------------------------*/
-int pntpos(const obsd_t *obs, int n, const nav_t *nav,
+int pntpos(mrtk_ctx_t *ctx, const obsd_t *obs, int n, const nav_t *nav,
                   const prcopt_t *opt, sol_t *sol, double *azel, ssat_t *ssat,
                   char *msg)
 {
@@ -576,7 +577,7 @@ int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     double *rs,*dts,*var,*azel_,*resp;
     int i,stat,vsat[MAXOBS]={0},svh[MAXOBS];
 
-    trace(3,"pntpos  : tobs=%s n=%d\n",time_str(obs[0].time,3),n);
+    trace(ctx,3,"pntpos  : tobs=%s n=%d\n",time_str(obs[0].time,3),n);
 
     sol->stat=SOLQ_NONE;
 

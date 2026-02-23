@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "mrtklib/mrtk_trace.h"
 
 /* local constants -----------------------------------------------------------*/
 #define PI          3.1415926535897932
@@ -36,7 +37,6 @@
 #define GN(gp)      (gp==1?64:16)
 
 /* forward declarations (implemented in rtkcmn.c, resolved at link time) -----*/
-extern void trace(int level, const char *format, ...);
 extern int satid2no(const char *id);
 extern char *time_str(gtime_t t, int n);
 
@@ -133,7 +133,7 @@ static int decode_stat(sstat_t *sstat, char *buff, int *nbyte)
 *-----------------------------------------------------------------------------*/
 extern int input_stat(sstat_t *sstat, const char data, char* buff, int *nbyte)
 {
-    trace(4,"input_stat: data=%c,%d\n",data,*nbyte);
+    trace(NULL,4,"input_stat: data=%c,%d\n",data,*nbyte);
 
     /* synchronize frame */
     if (*nbyte==0) {
@@ -161,7 +161,7 @@ extern int input_statf(sstat_t *sstat, FILE *fp, char *buff, int *nbyte)
 {
     int i,data,ret;
 
-    trace(4,"input_statf:\n");
+    trace(NULL,4,"input_statf:\n");
 
     for (i=0;i<4096;i++) {
         if ((data=fgetc(fp))==EOF) return -2;
@@ -213,7 +213,7 @@ static int get_site(const stat_t *stat, const double *llh, int iontrp,
         }
         d=posdist(site->ecef,ecef);
         ecef2pos(site->ecef,gllh[n]);
-        trace(4,"get_site:targetpos llh=%f,%f,%f site pos llh=%f,%f,%f dist=%f\n",
+        trace(NULL,4,"get_site:targetpos llh=%f,%f,%f site pos llh=%f,%f,%f dist=%f\n",
             llh[0]*R2D,llh[1]*R2D,llh[2],
             gllh[n][0]*R2D,gllh[n][1]*R2D,gllh[n][2],d);
         if ((dist[n]=MAX(d/1E3,0.1))>maxdist) continue;
@@ -234,7 +234,7 @@ extern int get_trop_sta(gtime_t time, const trp_t *trpd, double *trp,
     for (i=0;i<3;i++) {
         trp[i]=trpd->trp[i];
         std[i]=sqrt(SQR(trpd->std[i])+SQR(tt*(i==0?PRN_ZTD:PRN_GRAD)));
-        trace(4,"trpd %s %d ion=%f std=%f\n",
+        trace(NULL,4,"trpd %s %d ion=%f std=%f\n",
             time_str(time,0), i+1, trp[i], std[i]);
     }
     return 1;
@@ -253,7 +253,7 @@ extern int get_iono_sta(gtime_t time, const ion_t *iond, double *ion,
         ion[i]=iond[i].ion;
         std[i]=iond[i].std;
         el[i]=iond[i].azel[1];
-        trace(4,"iond %s sat=%d ion=%f std=%f\n",
+        trace(NULL,4,"iond %s sat=%d ion=%f std=%f\n",
             time_str(time,0), i+1, ion[i], std[i]);
         cnt++;
     }
@@ -303,7 +303,7 @@ extern int corr_trop_distwgt(const stat_t *stat, gtime_t time,
      for (i=0;i<3;i++) {
         trp[i]/=wgt[i];
         std[i]=sqrt(1.0/cof[i]);
-        trace(3,"interpolation trp  %s %d trp=%f std=%f lat=%.2f lat=%.2f n=%d\n",
+        trace(NULL,3,"interpolation trp  %s %d trp=%f std=%f lat=%.2f lat=%.2f n=%d\n",
             time_str(time,0), i+1, trp[i], std[i], llh[0]*R2D, llh[1]*R2D, n);
      }
      /* convert zwd to ztd */
@@ -365,7 +365,7 @@ extern int corr_iono_distwgt(const stat_t *stat, gtime_t time,
         if (wgt[i]==0.0||(cof[i]<=0.0)) continue;
         ion[i]/=wgt[i];
         std[i]=sqrt(1.0/cof[i]);
-        trace(3,"interpolation ion  %s sat=%d ion=%f std=%f lat=%.2f lat=%.2f n=%d\n",
+        trace(NULL,3,"interpolation ion  %s sat=%d ion=%f std=%f lat=%.2f lat=%.2f n=%d\n",
             time_str(time,0), i+1, ion[i], std[i], llh[0]*R2D, llh[1]*R2D, n);
     }
     if(maxres > 0.0){

@@ -19,6 +19,7 @@ endif()
 # Uses C11 (ISO/IEC 9899:2011) and the include/mrtklib/ public headers.
 add_library(mrtklib STATIC
     # ── core/ (基盤・数学・ユーティリティ) ─────────────────────────────────────
+    src/core/mrtk_context.c
     src/core/mrtk_core.c
     src/core/mrtk_time.c
     src/core/mrtk_mat.c

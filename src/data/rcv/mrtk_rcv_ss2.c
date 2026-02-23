@@ -24,6 +24,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include "mrtklib/mrtk_trace.h"
 
 /* Local constants (duplicated from rtklib.h to avoid dependency) */
 #define PI          3.1415926535897932  /* pi */
@@ -98,8 +99,6 @@
 #define P2_59       1.734723475976810E-18
 
 /* Forward declarations for functions in rtklib (resolved at link time) */
-extern void trace   (int level, const char *format, ...);
-extern void traceb  (int level, const uint8_t *p, int n);
 
 #define SS2SOH      0x01        /* ss2 start of header */
 
@@ -143,10 +142,10 @@ static int decode_ss2llh(raw_t *raw)
 	double ep[6];
     uint8_t *p=raw->buff+4;
     
-    trace(4,"decode_ss2llh: len=%d\n",raw->len);
+    trace(NULL,4,"decode_ss2llh: len=%d\n",raw->len);
     
     if (raw->len!=77) {
-        trace(2,"ss2 id#20 length error: len=%d\n",raw->len);
+        trace(NULL,2,"ss2 id#20 length error: len=%d\n",raw->len);
         return -1;
     }
     ep[3]=U1(p   ); ep[4]=U1(p+ 1); ep[5]=R8(p+ 2);
@@ -159,10 +158,10 @@ static int decode_ss2ecef(raw_t *raw)
 {
     uint8_t *p=raw->buff+4;
     
-    trace(4,"decode_ss2ecef: len=%d\n",raw->len);
+    trace(NULL,4,"decode_ss2ecef: len=%d\n",raw->len);
     
     if (raw->len!=85) {
-        trace(2,"ss2 id#21 length error: len=%d\n",raw->len);
+        trace(NULL,2,"ss2 id#21 length error: len=%d\n",raw->len);
         return -1;
     }
     raw->time=gpst2time(U2(p+8),R8(p));
@@ -177,16 +176,16 @@ static int decode_ss2meas(raw_t *raw)
     uint8_t *p=raw->buff+4;
     uint32_t sc;
     
-    trace(4,"decode_ss2meas: len=%d\n",raw->len);
+    trace(NULL,4,"decode_ss2meas: len=%d\n",raw->len);
     
     nobs=U1(p+2);
     if (17+nobs*11!=raw->len) {
-        trace(2,"ss2 id#23 message length error: len=%d\n",raw->len);
+        trace(NULL,2,"ss2 id#23 message length error: len=%d\n",raw->len);
         return -1;
     }
     tow=floor(R8(p+3)*1000.0+0.5)/1000.0; /* rounded by 1ms */
     if (!adjweek(raw,tow)) {
-        trace(2,"ss2 id#23 message time adjustment error\n");
+        trace(NULL,2,"ss2 id#23 message time adjustment error\n");
         return -1;
     }
     /* time slew defined as uchar (ref [1]) but minus value appears in some f/w */
@@ -197,7 +196,7 @@ static int decode_ss2meas(raw_t *raw)
     for (i=n=0,p+=11;i<nobs&&n<MAXOBS;i++,p+=11) {
         prn=(p[0]&0x1F)+1;
         if (!(sat=satno(p[0]&0x20?SYS_SBS:SYS_GPS,prn))) {
-            trace(2,"ss2 id#23 satellite number error: prn=%d\n",prn);
+            trace(NULL,2,"ss2 id#23 satellite number error: prn=%d\n",prn);
             continue;
         }
         raw->obs.data[n].time=raw->time;
@@ -238,19 +237,19 @@ static int decode_ss2eph(raw_t *raw)
     uint8_t *p=raw->buff+4,buff[90]={0};
     int i,j,prn,sat;
     
-    trace(4,"decode_ss2eph: len=%d\n",raw->len);
+    trace(NULL,4,"decode_ss2eph: len=%d\n",raw->len);
     
     if (raw->len!=79) {
-        trace(2,"ss2 id#22 length error: len=%d\n",raw->len);
+        trace(NULL,2,"ss2 id#22 length error: len=%d\n",raw->len);
         return -1;
     }
     prn=(U4(p)&0x1F)+1;
     if (!(sat=satno(SYS_GPS,prn))) {
-        trace(2,"ss2 id#22 satellite number error: prn=%d\n",prn);
+        trace(NULL,2,"ss2 id#22 satellite number error: prn=%d\n",prn);
         return -1;
     }
     if (raw->time.time==0) {
-        trace(2,"ss2 id#22 week number unknown error\n");
+        trace(NULL,2,"ss2 id#22 week number unknown error\n");
         return -1;
     }
     tow=(uint32_t)(time2gpst(raw->time,NULL)/6.0);
@@ -261,7 +260,7 @@ static int decode_ss2eph(raw_t *raw)
         for (j=0;j<24;j++) buff[30*i+6+j]=p[1+24*i+j];
     }
     if (!decode_frame(buff,&eph,NULL,NULL,NULL)) {
-        trace(2,"ss2 id#22 subframe error: prn=%d\n",prn);
+        trace(NULL,2,"ss2 id#22 subframe error: prn=%d\n",prn);
         return -1;
     }
     if (!strstr(raw->opt,"-EPHALL")) {
@@ -281,15 +280,15 @@ static int decode_ss2sbas(raw_t *raw)
     int i,prn;
     uint8_t *p=raw->buff+4;
     
-    trace(4,"decode_ss2sbas: len=%d\n",raw->len);
+    trace(NULL,4,"decode_ss2sbas: len=%d\n",raw->len);
     
     if (raw->len!=54) {
-        trace(2,"ss2 id#67 length error: len=%d\n",raw->len);
+        trace(NULL,2,"ss2 id#67 length error: len=%d\n",raw->len);
         return -1;
     }
     prn=U4(p+12);
     if (prn<MINPRNSBS||MAXPRNSBS<prn) {
-        trace(3,"ss2 id#67 prn error: prn=%d\n",prn);
+        trace(NULL,3,"ss2 id#67 prn error: prn=%d\n",prn);
         return 0;
     }
     raw->sbsmsg.week=U4(p);
@@ -305,10 +304,10 @@ static int decode_ss2(raw_t *raw)
     uint8_t *p=raw->buff;
     int type=U1(p+1);
     
-    trace(3,"decode_ss2: type=%2d\n",type);
+    trace(NULL,3,"decode_ss2: type=%2d\n",type);
     
     if (!chksum(raw->buff,raw->len)) {
-        trace(2,"ss2 message checksum error: type=%d len=%d\n",type,raw->len);
+        trace(NULL,2,"ss2 message checksum error: type=%d len=%d\n",type,raw->len);
         return -1;
     }
     if (raw->outtype) {
@@ -341,7 +340,7 @@ static int sync_ss2(uint8_t *buff, uint8_t data)
 *-----------------------------------------------------------------------------*/
 extern int input_ss2(raw_t *raw, uint8_t data)
 {
-    trace(5,"input_ss2: data=%02x\n",data);
+    trace(NULL,5,"input_ss2: data=%02x\n",data);
     
     /* synchronize frame */
     if (raw->nbyte==0) {
@@ -353,7 +352,7 @@ extern int input_ss2(raw_t *raw, uint8_t data)
     
     if (raw->nbyte==4) {
         if ((raw->len=U1(raw->buff+3)+6)>MAXRAWLEN) {
-            trace(2,"ss2 length error: len=%d\n",raw->len);
+            trace(NULL,2,"ss2 length error: len=%d\n",raw->len);
             raw->nbyte=0;
             return -1;
         }
@@ -374,7 +373,7 @@ extern int input_ss2f(raw_t *raw, FILE *fp)
 {
     int i,data;
     
-    trace(4,"input_ss2f:\n");
+    trace(NULL,4,"input_ss2f:\n");
     
     /* synchronize frame */
     if (raw->nbyte==0) {
@@ -388,7 +387,7 @@ extern int input_ss2f(raw_t *raw, FILE *fp)
     raw->nbyte=4;
     
     if ((raw->len=U1(raw->buff+3)+6)>MAXRAWLEN) {
-        trace(2,"ss2 length error: len=%d\n",raw->len);
+        trace(NULL,2,"ss2 length error: len=%d\n",raw->len);
         raw->nbyte=0;
         return -1;
     }

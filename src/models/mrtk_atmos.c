@@ -21,6 +21,7 @@
 #include "mrtklib/mrtk_ionex.h"
 
 #include <math.h>
+#include "mrtklib/mrtk_trace.h"
 
 /*============================================================================
  * Constants (duplicated from rtklib.h to avoid header dependency)
@@ -36,8 +37,6 @@
 /*============================================================================
  * Forward declarations for legacy functions (resolved at link time)
  *===========================================================================*/
-
-extern void trace(int level, const char *format, ...);
 
 #ifdef IERS_MODEL
 extern int gmf_(double *mjd, double *lat, double *lon, double *hgt, double *zd,
@@ -253,7 +252,7 @@ extern double tropmapf(gtime_t time, const double pos[], const double azel[],
     const double ep[]={2000,1,1,12,0,0};
     double mjd,lat,lon,hgt,zd,gmfh,gmfw;
 #endif
-    trace(4,"tropmapf: pos=%10.6f %11.6f %6.1f azel=%5.1f %4.1f\n",
+    trace(NULL,4,"tropmapf: pos=%10.6f %11.6f %6.1f azel=%5.1f %4.1f\n",
           pos[0]*R2D,pos[1]*R2D,pos[2],azel[0]*R2D,azel[1]*R2D);
 
     if (pos[2]<-1000.0||pos[2]>20000.0) {
@@ -303,7 +302,7 @@ extern double tropmapf(gtime_t time, const double pos[], const double azel[],
 int ionocorr(gtime_t time, const nav_t *nav, int sat, const double *pos,
                     const double *azel, int ionoopt, double *ion, double *var)
 {
-    trace(4,"ionocorr: time=%s opt=%d sat=%2d pos=%.3f %.3f azel=%.3f %.3f\n",
+    trace(NULL,4,"ionocorr: time=%s opt=%d sat=%2d pos=%.3f %.3f azel=%.3f %.3f\n",
           time_str(time,3),ionoopt,sat,pos[0]*R2D,pos[1]*R2D,azel[0]*R2D,
           azel[1]*R2D);
 
@@ -345,7 +344,7 @@ int ionocorr(gtime_t time, const nav_t *nav, int sat, const double *pos,
 int tropcorr(gtime_t time, const nav_t *nav, const double *pos,
                     const double *azel, int tropopt, double *trp, double *var)
 {
-    trace(4,"tropcorr: time=%s opt=%d pos=%.3f %.3f azel=%.3f %.3f\n",
+    trace(NULL,4,"tropcorr: time=%s opt=%d pos=%.3f %.3f azel=%.3f %.3f\n",
           time_str(time,3),tropopt,pos[0]*R2D,pos[1]*R2D,azel[0]*R2D,
           azel[1]*R2D);
 

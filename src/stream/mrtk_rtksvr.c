@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "mrtklib/mrtk_trace.h"
 
 /* Local constants (duplicated from rtklib.h to avoid dependency) */
 #define SYS_GPS     0x01
@@ -48,8 +49,6 @@
 #define COMMENTH    "%"
 
 /* Forward declarations for functions in rtklib (resolved at link time) */
-extern void tracet  (int level, const char *format, ...);
-extern void trace   (int level, const char *format, ...);
 extern void timeset (gtime_t t);
 
 #define MIN_INT_RESET   30000   /* mininum interval of reset command (ms) */
@@ -81,7 +80,7 @@ static void writesol(rtksvr_t *svr, int index)
     uint8_t buff[MAXSOLMSG+1];
     int i,n;
     
-    tracet(4,"writesol: index=%d\n",index);
+    tracet(NULL,4,"writesol: index=%d\n",index);
     
     for (i=0;i<2;i++) {
         
@@ -340,7 +339,7 @@ static void update_svr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav,
                        int ephsat, int ephset, sbsmsg_t *sbsmsg, int index,
                        int iobs)
 {
-    tracet(4,"updatesvr: ret=%d ephsat=%d ephset=%d index=%d\n",ret,ephsat,
+    tracet(NULL,4,"updatesvr: ret=%d ephsat=%d ephset=%d index=%d\n",ret,ephsat,
            ephset,index);
     
     if (ret==1) { /* observation data */
@@ -385,7 +384,7 @@ static int decoderaw(rtksvr_t *svr, int index)
     static char buff[3][4096];
     static int nbyte[3]={0};
     
-    tracet(4,"decoderaw: index=%d\n",index);
+    tracet(NULL,4,"decoderaw: index=%d\n",index);
     
     rtksvrlock(svr);
     
@@ -428,7 +427,7 @@ static int decoderaw(rtksvr_t *svr, int index)
         }
 #if 0 /* record for receiving tick for debug */
         if (ret==1) {
-            trace(0,"%d %10d T=%s NS=%2d\n",index,tickget(),
+            trace(NULL,0,"%d %10d T=%s NS=%2d\n",index,tickget(),
                   time_str(obs->data[0].time,0),obs->n);
         }
 #endif
@@ -454,7 +453,7 @@ static void decodefile(rtksvr_t *svr, int index)
     char file[1024];
     int nb;
     
-    tracet(4,"decodefile: index=%d\n",index);
+    tracet(NULL,4,"decodefile: index=%d\n",index);
     
     rtksvrlock(svr);
     
@@ -474,7 +473,7 @@ static void decodefile(rtksvr_t *svr, int index)
         /* read sp3 precise ephemeris */
         readsp3(file,&nav,0);
         if (nav.ne<=0) {
-            tracet(1,"sp3 file read error: %s\n",file);
+            tracet(NULL,1,"sp3 file read error: %s\n",file);
             return;
         }
         /* update precise ephemeris */
@@ -492,7 +491,7 @@ static void decodefile(rtksvr_t *svr, int index)
         
         /* read rinex clock */
         if (readrnxc(file,&nav)<=0) {
-            tracet(1,"rinex clock file read error: %s\n",file);
+            tracet(NULL,1,"rinex clock file read error: %s\n",file);
             return;
         }
         /* update precise clock */
@@ -575,7 +574,7 @@ static void send_nmea(rtksvr_t *svr, uint32_t *tickreset)
         if (bl>=svr->bl_reset&&(int)(tick-*tickreset)>MIN_INT_RESET) {
             strsendcmd(svr->stream+1,svr->cmd_reset);
             
-            tracet(2,"send reset: bl=%.3f rr=%.3f %.3f %.3f rb=%.3f %.3f %.3f\n",
+            tracet(NULL,2,"send reset: bl=%.3f rr=%.3f %.3f %.3f rb=%.3f %.3f %.3f\n",
                    bl,svr->rtk.sol.rr[0],svr->rtk.sol.rr[1],svr->rtk.sol.rr[2],
                    svr->rtk.rb[0],svr->rtk.rb[1],svr->rtk.rb[2]);
             *tickreset=tick;
@@ -593,7 +592,7 @@ static void send_nmea(rtksvr_t *svr, uint32_t *tickreset)
         }
         strsendnmea(svr->stream+1,&sol_nmea);
         
-        tracet(3,"send nmea: rr=%.3f %.3f %.3f\n",sol_nmea.rr[0],sol_nmea.rr[1],
+        tracet(NULL,3,"send nmea: rr=%.3f %.3f %.3f\n",sol_nmea.rr[0],sol_nmea.rr[1],
                sol_nmea.rr[2]);
     }
 }
@@ -601,6 +600,7 @@ static void send_nmea(rtksvr_t *svr, uint32_t *tickreset)
 static void *rtksvrthread(void *arg)
 {
     rtksvr_t *svr=(rtksvr_t *)arg;
+    mrtk_ctx_t *ctx=svr->ctx;
     obs_t obs;
     obsd_t *data=(obsd_t *)malloc(MAXOBS*2*sizeof(obsd_t));
     sol_t sol={{0}};
@@ -610,7 +610,7 @@ static void *rtksvrthread(void *arg)
     char msg[128];
     int i,j,n,fobs[3]={0},cycle,cputime;
 
-    tracet(3,"rtksvrthread:\n");
+    tracet(ctx,3,"rtksvrthread:\n");
 
     if (!data) return 0;
     svr->state=1; obs.data=data;
@@ -651,7 +651,7 @@ static void *rtksvrthread(void *arg)
         /* averaging single base pos */
         if (fobs[1]>0&&svr->rtk.opt.refpos==POSOPT_SINGLE) {
             if ((svr->rtk.opt.maxaveep<=0||svr->nave<svr->rtk.opt.maxaveep)&&
-                pntpos(svr->obs[1][0].data,svr->obs[1][0].n,&svr->nav,
+                pntpos(ctx,svr->obs[1][0].data,svr->obs[1][0].n,&svr->nav,
                        &svr->rtk.opt,&sol,NULL,NULL,msg)) {
                 svr->nave++;
                 for (i=0;i<3;i++) {
@@ -670,7 +670,7 @@ static void *rtksvrthread(void *arg)
             }
             /* rtk positioning */
             rtksvrlock(svr);
-            rtkpos(&svr->rtk,obs.data,obs.n,&svr->nav);
+            rtkpos(ctx,&svr->rtk,obs.data,obs.n,&svr->nav);
             rtksvrunlock(svr);
             
             if (svr->rtk.sol.stat!=SOLQ_NONE) {
@@ -735,7 +735,7 @@ extern int rtksvrinit(rtksvr_t *svr)
     seph_t seph0={0};
     int i,j;
     
-    tracet(3,"rtksvrinit:\n");
+    tracet(NULL,3,"rtksvrinit:\n");
     
     svr->state=svr->cycle=svr->nmeacycle=svr->nmeareq=0;
     for (i=0;i<3;i++) svr->nmeapos[i]=0.0;
@@ -764,7 +764,7 @@ extern int rtksvrinit(rtksvr_t *svr)
     if (!(svr->nav.eph =(eph_t  *)malloc(sizeof(eph_t )*MAXSAT*4 ))||
         !(svr->nav.geph=(geph_t *)malloc(sizeof(geph_t)*NSATGLO*2))||
         !(svr->nav.seph=(seph_t *)malloc(sizeof(seph_t)*NSATSBS*2))) {
-        tracet(1,"rtksvrinit: malloc error\n");
+        tracet(NULL,1,"rtksvrinit: malloc error\n");
         return 0;
     }
     for (i=0;i<MAXSAT*4 ;i++) svr->nav.eph [i]=eph0;
@@ -778,7 +778,7 @@ extern int rtksvrinit(rtksvr_t *svr)
 
     for (i=0;i<3;i++) for (j=0;j<MAXOBSBUF;j++) {
         if (!(svr->obs[i][j].data=(obsd_t *)malloc(sizeof(obsd_t)*MAXOBS))) {
-            tracet(1,"rtksvrinit: malloc error\n");
+            tracet(NULL,1,"rtksvrinit: malloc error\n");
             return 0;
         }
     }
@@ -875,7 +875,7 @@ extern int rtksvrstart(rtksvr_t *svr, int cycle, int buffsize, int *strs,
     gtime_t time,time0={0};
     int i,j,rw;
     
-    tracet(3,"rtksvrstart: cycle=%d buffsize=%d navsel=%d nmeacycle=%d nmeareq=%d\n",
+    tracet(NULL,3,"rtksvrstart: cycle=%d buffsize=%d navsel=%d nmeacycle=%d nmeareq=%d\n",
            cycle,buffsize,navsel,nmeacycle,nmeareq);
     
     if (svr->state) {
@@ -904,7 +904,7 @@ extern int rtksvrstart(rtksvr_t *svr, int cycle, int buffsize, int *strs,
         svr->nb[i]=svr->npb[i]=0;
         if (!(svr->buff[i]=(uint8_t *)malloc(buffsize))||
             !(svr->pbuf[i]=(uint8_t *)malloc(buffsize))) {
-            tracet(1,"rtksvrstart: malloc error\n");
+            tracet(NULL,1,"rtksvrstart: malloc error\n");
             sprintf(errmsg,"rtk server malloc error");
             return 0;
         }
@@ -925,7 +925,7 @@ extern int rtksvrstart(rtksvr_t *svr, int cycle, int buffsize, int *strs,
     }
     for (i=0;i<2;i++) { /* output peek buffer */
         if (!(svr->sbuf[i]=(uint8_t *)malloc(buffsize))) {
-            tracet(1,"rtksvrstart: malloc error\n");
+            tracet(NULL,1,"rtksvrstart: malloc error\n");
             sprintf(errmsg,"rtk server malloc error");
             return 0;
         }
@@ -947,7 +947,10 @@ extern int rtksvrstart(rtksvr_t *svr, int cycle, int buffsize, int *strs,
     
     /* set monitor stream */
     svr->moni=moni;
-    
+
+    /* store global context for thread use */
+    svr->ctx=g_mrtk_ctx;
+
     /* open input streams */
     for (i=0;i<8;i++) {
         rw=i<3?STR_MODE_R:STR_MODE_W;
@@ -1013,7 +1016,7 @@ extern void rtksvrstop(rtksvr_t *svr, char **cmds)
 {
     int i;
     
-    tracet(3,"rtksvrstop:\n");
+    tracet(NULL,3,"rtksvrstop:\n");
     
     /* write stop commands to input streams */
     rtksvrlock(svr);
@@ -1042,7 +1045,7 @@ extern void rtksvrstop(rtksvr_t *svr, char **cmds)
 extern int rtksvropenstr(rtksvr_t *svr, int index, int str, const char *path,
                          const solopt_t *solopt)
 {
-    tracet(3,"rtksvropenstr: index=%d str=%d path=%s\n",index,str,path);
+    tracet(NULL,3,"rtksvropenstr: index=%d str=%d path=%s\n",index,str,path);
     
     if (index<3||index>7||!svr->state) return 0;
     
@@ -1053,7 +1056,7 @@ extern int rtksvropenstr(rtksvr_t *svr, int index, int str, const char *path,
         return 0;
     }
     if (!stropen(svr->stream+index,str,STR_MODE_W,path)) {
-        tracet(2,"stream open error: index=%d\n",index);
+        tracet(NULL,2,"stream open error: index=%d\n",index);
         rtksvrunlock(svr);
         return 0;
     }
@@ -1076,7 +1079,7 @@ extern int rtksvropenstr(rtksvr_t *svr, int index, int str, const char *path,
 *-----------------------------------------------------------------------------*/
 extern void rtksvrclosestr(rtksvr_t *svr, int index)
 {
-    tracet(3,"rtksvrclosestr: index=%d\n",index);
+    tracet(NULL,3,"rtksvrclosestr: index=%d\n",index);
     
     if (index<3||index>7||!svr->state) return;
     
@@ -1104,7 +1107,7 @@ extern int rtksvrostat(rtksvr_t *svr, int rcv, gtime_t *time, int *sat,
 {
     int i,j,ns;
     
-    tracet(4,"rtksvrostat: rcv=%d\n",rcv);
+    tracet(NULL,4,"rtksvrostat: rcv=%d\n",rcv);
     
     if (!svr->state) return 0;
     rtksvrlock(svr);
@@ -1141,7 +1144,7 @@ extern void rtksvrsstat(rtksvr_t *svr, int *sstat, char *msg)
     int i;
     char s[MAXSTRMSG],*p=msg;
     
-    tracet(4,"rtksvrsstat:\n");
+    tracet(NULL,4,"rtksvrsstat:\n");
     
     rtksvrlock(svr);
     for (i=0;i<MAXSTRRTK;i++) {
@@ -1163,7 +1166,7 @@ extern int rtksvrmark(rtksvr_t *svr, const char *name, const char *comment)
     double tow,pos[3];
     int i,sum,week;
     
-    tracet(4,"rtksvrmark:name=%s comment=%s\n",name,comment);
+    tracet(NULL,4,"rtksvrmark:name=%s comment=%s\n",name,comment);
     
     if (!svr->state) return 0;
     
