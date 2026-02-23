@@ -102,6 +102,16 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(mrtklib PUBLIC rt)
 endif()
 
+# ── System LAPACK/BLAS integration for fast matrix operations ────────────────
+find_package(LAPACK)
+if(LAPACK_FOUND)
+    target_compile_definitions(mrtklib PRIVATE LAPACK)
+    target_link_libraries(mrtklib PRIVATE LAPACK::LAPACK)
+    message(STATUS "LAPACK found and enabled for fast matrix operations.")
+else()
+    message(WARNING "LAPACK not found. Falling back to internal (slower) matrix math.")
+endif()
+
 # ── rnx2rtkp ─────────────────────────────────────────────────────────────────
 add_executable(rnx2rtkp
     apps/rnx2rtkp/rnx2rtkp.c

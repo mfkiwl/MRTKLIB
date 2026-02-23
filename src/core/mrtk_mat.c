@@ -200,6 +200,20 @@ extern void matcpy(double *A, const double *B, int n, int m)
 
 #ifdef LAPACK /* with LAPACK/BLAS or MKL */
 
+/* LAPACK/BLAS Fortran interface declarations */
+extern void dgemm_(const char *transa, const char *transb, const int *m,
+                   const int *n, const int *k, const double *alpha,
+                   const double *A, const int *lda, const double *B,
+                   const int *ldb, const double *beta, double *C,
+                   const int *ldc);
+extern void dgetrf_(const int *m, const int *n, double *A, const int *lda,
+                    int *ipiv, int *info);
+extern void dgetri_(const int *n, double *A, const int *lda, const int *ipiv,
+                    double *work, const int *lwork, int *info);
+extern void dgetrs_(const char *trans, const int *n, const int *nrhs,
+                    const double *A, const int *lda, const int *ipiv,
+                    double *B, const int *ldb, int *info);
+
 /* multiply matrix (wrapper of blas dgemm) -------------------------------------
 * multiply matrix by matrix (C=alpha*A*B+beta*C)
 * args   : char   *tr       I  transpose flags ("N":normal,"T":transpose)
