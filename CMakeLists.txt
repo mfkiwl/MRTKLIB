@@ -18,53 +18,65 @@ endif()
 # New modular implementation that will gradually replace rtklib.
 # Uses C11 (ISO/IEC 9899:2011) and the include/mrtklib/ public headers.
 add_library(mrtklib STATIC
-    src/mrtk_core.c
-    src/mrtk_time.c
-    src/mrtk_mat.c
-    src/mrtk_coords.c
-    src/mrtk_atmos.c
-    src/mrtk_eph.c
-    src/mrtk_peph.c
-    src/mrtk_bits.c
-    src/mrtk_sys.c
-    src/mrtk_astro.c
-    src/mrtk_antenna.c
-    src/mrtk_station.c
-    src/mrtk_obs.c
-    src/mrtk_nav.c
-    src/mrtk_rinex.c
-    src/mrtk_tides.c
-    src/mrtk_geoid.c
-    src/mrtk_sbas.c
-    src/mrtk_rtcm.c
-    src/mrtk_rtcm2.c
-    src/mrtk_rtcm3.c
-    src/mrtk_rtcm3e.c
-    src/mrtk_rtcm3lcl.c
-    src/mrtk_ionex.c
-    src/mrtk_opt.c
-    src/mrtk_sol.c
-    src/mrtk_bias_sinex.c
-    src/mrtk_fcb.c
-    src/mrtk_spp.c
-    src/mrtk_madoca_local_corr.c
-    src/mrtk_madoca_local_comb.c
-    src/mrtk_madoca.c
-    src/mrtk_lambda.c
-    src/mrtk_ppp_ar.c
-    src/mrtk_rtkpos.c
-    src/mrtk_ppp.c
-    src/mrtk_postpos.c
-    src/mrtk_options.c
-    src/mrtk_rcvraw.c
-    src/rcv/mrtk_rcv_binex.c     src/rcv/mrtk_rcv_crescent.c
-    src/rcv/mrtk_rcv_javad.c     src/rcv/mrtk_rcv_novatel.c
-    src/rcv/mrtk_rcv_nvs.c       src/rcv/mrtk_rcv_rt17.c
-    src/rcv/mrtk_rcv_septentrio.c src/rcv/mrtk_rcv_skytraq.c
-    src/rcv/mrtk_rcv_ss2.c       src/rcv/mrtk_rcv_ublox.c
-    src/mrtk_stream.c
-    src/mrtk_rtksvr.c
-    src/mrtk_trace.c
+    # ── core/ (基盤・数学・ユーティリティ) ─────────────────────────────────────
+    src/core/mrtk_core.c
+    src/core/mrtk_time.c
+    src/core/mrtk_mat.c
+    src/core/mrtk_coords.c
+    src/core/mrtk_bits.c
+    src/core/mrtk_sys.c
+    src/core/mrtk_trace.c
+    # ── models/ (物理・環境モデル) ─────────────────────────────────────────────
+    src/models/mrtk_atmos.c
+    src/models/mrtk_astro.c
+    src/models/mrtk_antenna.c
+    src/models/mrtk_geoid.c
+    src/models/mrtk_tides.c
+    src/models/mrtk_station.c
+    # ── data/ (データ構造・I/Oパース) ──────────────────────────────────────────
+    src/data/mrtk_eph.c
+    src/data/mrtk_peph.c
+    src/data/mrtk_obs.c
+    src/data/mrtk_nav.c
+    src/data/mrtk_rinex.c
+    src/data/mrtk_ionex.c
+    src/data/mrtk_bias_sinex.c
+    src/data/mrtk_fcb.c
+    src/data/mrtk_sbas.c
+    src/data/mrtk_rcvraw.c
+    src/data/rcv/mrtk_rcv_binex.c
+    src/data/rcv/mrtk_rcv_crescent.c
+    src/data/rcv/mrtk_rcv_javad.c
+    src/data/rcv/mrtk_rcv_novatel.c
+    src/data/rcv/mrtk_rcv_nvs.c
+    src/data/rcv/mrtk_rcv_rt17.c
+    src/data/rcv/mrtk_rcv_septentrio.c
+    src/data/rcv/mrtk_rcv_skytraq.c
+    src/data/rcv/mrtk_rcv_ss2.c
+    src/data/rcv/mrtk_rcv_ublox.c
+    # ── rtcm/ (RTCM関連) ──────────────────────────────────────────────────────
+    src/rtcm/mrtk_rtcm.c
+    src/rtcm/mrtk_rtcm2.c
+    src/rtcm/mrtk_rtcm3.c
+    src/rtcm/mrtk_rtcm3e.c
+    src/rtcm/mrtk_rtcm3lcl.c
+    # ── madoca/ (MADOCA-PPP固有処理) ───────────────────────────────────────────
+    src/madoca/mrtk_madoca.c
+    src/madoca/mrtk_madoca_local_corr.c
+    src/madoca/mrtk_madoca_local_comb.c
+    # ── pos/ (測位アルゴリズム・オプション) ────────────────────────────────────
+    src/pos/mrtk_spp.c
+    src/pos/mrtk_rtkpos.c
+    src/pos/mrtk_ppp_ar.c
+    src/pos/mrtk_ppp.c
+    src/pos/mrtk_lambda.c
+    src/pos/mrtk_postpos.c
+    src/pos/mrtk_sol.c
+    src/pos/mrtk_opt.c
+    src/pos/mrtk_options.c
+    # ── stream/ (リアルタイム基盤) ─────────────────────────────────────────────
+    src/stream/mrtk_stream.c
+    src/stream/mrtk_rtksvr.c
 )
 target_include_directories(mrtklib PUBLIC include)
 set_target_properties(mrtklib PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
