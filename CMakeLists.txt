@@ -200,6 +200,10 @@ foreach(test IN LISTS _UTEST_SOURCES)
     set_tests_properties(utest_${test} PROPERTIES LABELS "utest")
 endforeach()
 
+# ── Python-based comparison tool ─────────────────────────────────────────────
+find_package(Python3 COMPONENTS Interpreter)
+set(_COMPARE_POS ${CMAKE_SOURCE_DIR}/scripts/tests/compare_pos.py)
+
 # ── Regression test data ─────────────────────────────────────────────────────
 set(_TESTDATA  ${CMAKE_SOURCE_DIR}/tests/data/malib)
 set(_REFDATA   ${CMAKE_SOURCE_DIR}/tests/data/malib)
@@ -253,11 +257,10 @@ set_tests_properties(rnx2rtkp_ppp PROPERTIES
 )
 
 add_test(NAME rnx2rtkp_ppp_check
-    COMMAND ${CMAKE_COMMAND}
-        -DOUTPUT=${CMAKE_BINARY_DIR}/out_ppp.pos
-        -DREFERENCE=${_REFDATA}/MALIB_OSS_data_obsnav_240822-1100.pp.pos
-        -DTHRESHOLD=90
-        -P ${_TESTCMAKE}/compare_pos.cmake
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_REFDATA}/MALIB_OSS_data_obsnav_240822-1100.pp.pos
+        ${CMAKE_BINARY_DIR}/out_ppp.pos
+        --tolerance 0.005
 )
 set_tests_properties(rnx2rtkp_ppp_check PROPERTIES
     DEPENDS           rnx2rtkp_ppp
@@ -281,11 +284,10 @@ set_tests_properties(rnx2rtkp_spp PROPERTIES
 )
 
 add_test(NAME rnx2rtkp_spp_check
-    COMMAND ${CMAKE_COMMAND}
-        -DOUTPUT=${CMAKE_BINARY_DIR}/out_spp.pos
-        -DREFERENCE=${_REFDATA}/MALIB_OSS_data_obsnav_240822-1100.pp.spp.pos
-        -DTHRESHOLD=90
-        -P ${_TESTCMAKE}/compare_pos.cmake
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_REFDATA}/MALIB_OSS_data_obsnav_240822-1100.pp.spp.pos
+        ${CMAKE_BINARY_DIR}/out_spp.pos
+        --tolerance 0.005
 )
 set_tests_properties(rnx2rtkp_spp_check PROPERTIES
     DEPENDS           rnx2rtkp_spp
@@ -407,11 +409,10 @@ set_tests_properties(madocalib_ppp PROPERTIES
 )
 
 add_test(NAME madocalib_ppp_check
-    COMMAND ${CMAKE_COMMAND}
-        -DOUTPUT=${CMAKE_BINARY_DIR}/out_madocalib_ppp.pos
-        -DREFERENCE=${_MDLDATA}/madocalib_MIZU_20250401-0000.pp.pos
-        -DTHRESHOLD=90
-        -P ${_TESTCMAKE}/compare_pos.cmake
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_MDLDATA}/madocalib_MIZU_20250401-0000.pp.pos
+        ${CMAKE_BINARY_DIR}/out_madocalib_ppp.pos
+        --tolerance 0.005
 )
 set_tests_properties(madocalib_ppp_check PROPERTIES
     DEPENDS           madocalib_ppp
@@ -438,11 +439,10 @@ set_tests_properties(madocalib_pppar PROPERTIES
 )
 
 add_test(NAME madocalib_pppar_check
-    COMMAND ${CMAKE_COMMAND}
-        -DOUTPUT=${CMAKE_BINARY_DIR}/out_madocalib_pppar.pos
-        -DREFERENCE=${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar.pos
-        -DTHRESHOLD=90
-        -P ${_TESTCMAKE}/compare_pos.cmake
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar.pos
+        ${CMAKE_BINARY_DIR}/out_madocalib_pppar.pos
+        --tolerance 0.005
 )
 set_tests_properties(madocalib_pppar_check PROPERTIES
     DEPENDS           madocalib_pppar
@@ -469,11 +469,10 @@ set_tests_properties(madocalib_pppar_003 PROPERTIES
 )
 
 add_test(NAME madocalib_pppar_003_check
-    COMMAND ${CMAKE_COMMAND}
-        -DOUTPUT=${CMAKE_BINARY_DIR}/out_madocalib_pppar_003.pos
-        -DREFERENCE=${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar_003.pos
-        -DTHRESHOLD=90
-        -P ${_TESTCMAKE}/compare_pos.cmake
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar_003.pos
+        ${CMAKE_BINARY_DIR}/out_madocalib_pppar_003.pos
+        --tolerance 0.005
 )
 set_tests_properties(madocalib_pppar_003_check PROPERTIES
     DEPENDS           madocalib_pppar_003
@@ -503,11 +502,10 @@ set_tests_properties(madocalib_pppar_ion PROPERTIES
 )
 
 add_test(NAME madocalib_pppar_ion_check
-    COMMAND ${CMAKE_COMMAND}
-        -DOUTPUT=${CMAKE_BINARY_DIR}/out_madocalib_pppar_ion.pos
-        -DREFERENCE=${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar_ion.pos
-        -DTHRESHOLD=90
-        -P ${_TESTCMAKE}/compare_pos.cmake
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar_ion.pos
+        ${CMAKE_BINARY_DIR}/out_madocalib_pppar_ion.pos
+        --tolerance 0.005
 )
 set_tests_properties(madocalib_pppar_ion_check PROPERTIES
     DEPENDS           madocalib_pppar_ion
