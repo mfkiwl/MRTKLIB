@@ -28,6 +28,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+/* forward declarations for functions in mrtk_nav.c */
+extern int satsys_bd2(int sat, int *prn);
+extern int freq_idx2freq_num(int sys, int freq_idx);
+extern double freq_num2freq(int sys, int freq_num, int fcn);
+extern int freq_idx2ant_idx(int sys, int freq_idx);
 #include <string.h>
 #include <math.h>
 #include "mrtklib/mrtk_trace.h"
@@ -721,37 +727,30 @@ extern void satantoff(gtime_t time, const double *rs, int sat, const nav_t *nav,
     cross3(ey,ez,ex);
 
     /* iono-free LC coefficients */
-    sys=satsys(sat,NULL);
-    if (sys==SYS_GPS||sys==SYS_QZS) { /* L1-L2 */
-        freq[0]=FREQ1;
-        freq[1]=FREQ2;
-    }
-    else if (sys==SYS_GLO) { /* G1-G2 */
+    sys=satsys_bd2(sat,NULL);
+    freq[0]=freq_num2freq(sys,freq_idx2freq_num(sys,0),0);
+    freq[1]=freq_num2freq(sys,freq_idx2freq_num(sys,1),0);
+
+    if (sys==SYS_GLO) { /* GLONASS: use sat-dependent freq */
         freq[0]=sat2freq(sat,CODE_L1C,nav);
         freq[1]=sat2freq(sat,CODE_L2C,nav);
     }
-    else if (sys==SYS_GAL) { /* E1-E5b */
-        freq[0]=FREQ1;
-        freq[1]=FREQ7;
-    }
-    else if (sys==SYS_CMP) { /* B1I-B2I */
-        freq[0]=FREQ1_CMP;
-        freq[1]=FREQ2_CMP;
-    }
-    else if (sys==SYS_IRN) { /* B1I-B2I */
-        freq[0]=FREQ5;
-        freq[1]=FREQ9;
-    }
-    else return;
+    if (freq[0]==0.0||freq[1]==0.0) return;
 
     C1= SQR(freq[0])/(SQR(freq[0])-SQR(freq[1]));
     C2=-SQR(freq[1])/(SQR(freq[0])-SQR(freq[1]));
 
-    /* iono-free LC */
-    for (i=0;i<3;i++) {
-        dant1=pcv->off[0][0]*ex[i]+pcv->off[0][1]*ey[i]+pcv->off[0][2]*ez[i];
-        dant2=pcv->off[1][0]*ex[i]+pcv->off[1][1]*ey[i]+pcv->off[1][2]*ez[i];
-        dant[i]=C1*dant1+C2*dant2;
+    /* antenna indices for each frequency */
+    {
+        int a1=freq_idx2ant_idx(sys,0);
+        int a2=freq_idx2ant_idx(sys,1);
+
+        /* iono-free LC */
+        for (i=0;i<3;i++) {
+            dant1=pcv->off[a1][0]*ex[i]+pcv->off[a1][1]*ey[i]+pcv->off[a1][2]*ez[i];
+            dant2=pcv->off[a2][0]*ex[i]+pcv->off[a2][1]*ey[i]+pcv->off[a2][2]*ez[i];
+            dant[i]=C1*dant1+C2*dant2;
+        }
     }
 }
 /* satellite position/clock by precise ephemeris/clock -------------------------

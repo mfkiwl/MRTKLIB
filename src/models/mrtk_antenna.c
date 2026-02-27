@@ -32,6 +32,8 @@
 
 /* satid2no remains in rtkcmn.c */
 extern int satid2no(const char *id);
+extern int satsys(int sat, int *prn);
+extern int freq_num2ant_idx(int sys, int freq_num);
 
 /*============================================================================
  * Private Constants
@@ -119,15 +121,15 @@ static int readngspcv(const char *file, pcvs_t *pcvs)
 
     return 1;
 }
-/* read antex file ----------------------------------------------------------*/
+/* read antex file (madocalib version with freq_num2ant_idx) -----------------*/
 static int readantex(const char *file, pcvs_t *pcvs)
 {
     FILE *fp;
     static const pcv_t pcv0={0};
     pcv_t pcv;
     double neu[3];
-    int i,f,freq=0,state=0,freqs[]={1,2,5,0};
-    char buff[256];
+    int i,f,idx=-1,state=0,sys;
+    char buff[256],s=0;
 
     trace(NULL,3,"readantex: file=%s\n",file);
 
@@ -163,25 +165,31 @@ static int readantex(const char *file, pcvs_t *pcvs)
             if (!str2time(buff,0,43,&pcv.te)) continue;
         }
         else if (strstr(buff+60,"START OF FREQUENCY")) {
-            if (!pcv.sat&&buff[3]!='G') continue; /* only read rec ant for GPS */
-            if (sscanf(buff+4,"%d",&f)<1) continue;
-            for (i=0;freqs[i];i++) if (freqs[i]==f) break;
-            if (freqs[i]) freq=i+1;
+            if (pcv.sat) { /* for satellite */
+                if (sscanf(buff+4,"%d",&f)<1) continue;
+                s=0;
+                sys=satsys(pcv.sat,NULL);
+            }
+            else { /* for station */
+                if (sscanf(buff+3,"%c%d",&s,&f)<2) continue;
+                sys=satsys(satid2no(buff+3),NULL);
+            }
+            if ((idx=freq_num2ant_idx(sys,f))>=NFREQPCV) continue;
         }
         else if (strstr(buff+60,"END OF FREQUENCY")) {
-            freq=0;
+            idx=-1;
         }
         else if (strstr(buff+60,"NORTH / EAST / UP")) {
-            if (freq<1||NFREQ<freq) continue;
+            if (idx<0||(NFREQPCV-1)<=idx) continue;
             if (decodef(buff,3,neu)<3) continue;
-            pcv.off[freq-1][0]=neu[pcv.sat?0:1]; /* x or e */
-            pcv.off[freq-1][1]=neu[pcv.sat?1:0]; /* y or n */
-            pcv.off[freq-1][2]=neu[2];           /* z or u */
+            pcv.off[idx][0]=neu[pcv.sat?0:1]; /* x or e */
+            pcv.off[idx][1]=neu[pcv.sat?1:0]; /* y or n */
+            pcv.off[idx][2]=neu[2];           /* z or u */
         }
         else if (strstr(buff,"NOAZI")) {
-            if (freq<1||NFREQ<freq) continue;
-            if ((i=decodef(buff+8,19,pcv.var[freq-1]))<=0) continue;
-            for (;i<19;i++) pcv.var[freq-1][i]=pcv.var[freq-1][i-1];
+            if (idx<0||NFREQPCV<=idx) continue;
+            if ((i=decodef(buff+8,19,pcv.var[idx]))<=0) continue;
+            for (;i<19;i++) pcv.var[idx][i]=pcv.var[idx][i-1];
         }
     }
     fclose(fp);
@@ -215,29 +223,118 @@ extern int readpcv(const char *file, pcvs_t *pcvs)
 {
     pcv_t *pcv;
     char *ext;
-    int i,j,stat;
+    int i,f,stat;
 
     trace(NULL,3,"readpcv: file=%s\n",file);
 
     if (!(ext=strrchr(file,'.'))) ext="";
 
-    if (!strcmp(ext,".atx")||!strcmp(ext,".ATX")) {
-        stat=readantex(file,pcvs);
-    }
-    else {
+    if (!strcmp(ext,".pcv")||!strcmp(ext,".PCV")) {
         stat=readngspcv(file,pcvs);
     }
+    else {
+        stat=readantex(file,pcvs);
+    }
+
+    /* use G02 if GPS IIF */
     for (i=0;i<pcvs->n;i++) {
         pcv=pcvs->pcv+i;
-        trace(NULL,4,"sat=%2d type=%20s code=%s off=%8.4f %8.4f %8.4f  %8.4f %8.4f %8.4f\n",
-              pcv->sat,pcv->type,pcv->code,pcv->off[0][0],pcv->off[0][1],
-              pcv->off[0][2],pcv->off[1][0],pcv->off[1][1],pcv->off[1][2]);
+        if (pcv->sat==0) continue;
+        if (!strstr(pcv->type,"BLOCK IIF" )) continue;
+        if (norm(pcv->off[2],3)>0.0||
+            norm(pcv->var[2],19)>0.0) continue;
+        matcpy(pcv->off[2],pcv->off[1], 3,1);
+        matcpy(pcv->var[2],pcv->var[1],19,1);
+    }
+    /* antenna index=2 : use G02 if no G05 E05 J05 C05 S05 I05 */
+    for (i=0;i<pcvs->n;i++) {
+        pcv=pcvs->pcv+i;
+        if (pcv->sat>0) continue;
+        if (norm(pcv->off[2],3)>0.0||
+            norm(pcv->var[2],19)>0.0) continue;
+        matcpy(pcv->off[2],pcv->off[1], 3,1);
+        matcpy(pcv->var[2],pcv->var[1],19,1);
+    }
+    /* antenna index=3 : use G01 if no R01 R04 */
+    for (i=0;i<pcvs->n;i++) {
+        pcv=pcvs->pcv+i;
+        if (pcv->sat>0) continue;
+        if (norm(pcv->off[3],3)>0.0||
+            norm(pcv->var[3],19)>0.0) continue;
+        matcpy(pcv->off[3],pcv->off[0], 3,1);
+        matcpy(pcv->var[3],pcv->var[0],19,1);
+    }
+    /* antenna index=4 : use G01 if no C02 */
+    for (i=0;i<pcvs->n;i++) {
+        pcv=pcvs->pcv+i;
+        if (pcv->sat>0) continue;
+        if (norm(pcv->off[4],3)>0.0||
+            norm(pcv->var[4],19)>0.0) continue;
+        matcpy(pcv->off[4],pcv->off[0], 3,1);
+        matcpy(pcv->var[4],pcv->var[0],19,1);
+    }
+    /* antenna index=5 : use G02 if no E06 J06 */
+    for (i=0;i<pcvs->n;i++) {
+        pcv=pcvs->pcv+i;
+        if (pcv->sat>0) continue;
+        if (norm(pcv->off[5],3)>0.0||
+            norm(pcv->var[5],19)>0.0) continue;
+        matcpy(pcv->off[5],pcv->off[1], 3,1);
+        matcpy(pcv->var[5],pcv->var[1],19,1);
+    }
+    /* antenna index=6 : use G02 if no C06 */
+    for (i=0;i<pcvs->n;i++) {
+        pcv=pcvs->pcv+i;
+        if (pcv->sat>0) continue;
+        if (norm(pcv->off[6],3)>0.0||
+            norm(pcv->var[6],19)>0.0) continue;
+        matcpy(pcv->off[6],pcv->off[1], 3,1);
+        matcpy(pcv->var[6],pcv->var[1],19,1);
+    }
+    /* antenna index=7 : use G02 if no R02 R06 */
+    for (i=0;i<pcvs->n;i++) {
+        pcv=pcvs->pcv+i;
+        if (pcv->sat>0) continue;
+        if (norm(pcv->off[7],3)>0.0||
+            norm(pcv->var[7],19)>0.0) continue;
+        matcpy(pcv->off[7],pcv->off[1], 3,1);
+        matcpy(pcv->var[7],pcv->var[1],19,1);
+    }
+    /* antenna index=8 : use G02 if no E07 C07 */
+    for (i=0;i<pcvs->n;i++) {
+        pcv=pcvs->pcv+i;
+        if (pcv->sat>0) continue;
+        if (norm(pcv->off[8],3)>0.0||
+            norm(pcv->var[8],19)>0.0) continue;
+        matcpy(pcv->off[8],pcv->off[1], 3,1);
+        matcpy(pcv->var[8],pcv->var[1],19,1);
+    }
+    /* antenna index=9 : use G02 if no R03 */
+    for (i=0;i<pcvs->n;i++) {
+        pcv=pcvs->pcv+i;
+        if (pcv->sat>0) continue;
+        if (norm(pcv->off[9],3)>0.0||
+            norm(pcv->var[9],19)>0.0) continue;
+        matcpy(pcv->off[9],pcv->off[1], 3,1);
+        matcpy(pcv->var[9],pcv->var[1],19,1);
+    }
+    /* antenna index=10 : use G05 if no E08 C08 */
+    for (i=0;i<pcvs->n;i++) {
+        pcv=pcvs->pcv+i;
+        if (pcv->sat>0) continue;
+        if (norm(pcv->off[10],3)>0.0||
+            norm(pcv->var[10],19)>0.0) continue;
+        matcpy(pcv->off[10],pcv->off[2], 3,1);
+        matcpy(pcv->var[10],pcv->var[2],19,1);
+    }
 
-        /* apply L2 to L3,L4,... if no pcv data */
-        for (j=2;j<NFREQ;j++) { /* L3,L4,... */
-            if (norm(pcv->off[j],3)>0.0) continue;
-            matcpy(pcv->off[j],pcv->off[1], 3,1);
-            matcpy(pcv->var[j],pcv->var[1],19,1);
+    for (i=0;i<pcvs->n;i++) {
+        pcv=pcvs->pcv+i;
+        for (f=0;f<NFREQPCV;f++) {
+            if (norm(pcv->off[f],3)==0.0) continue;
+            trace(NULL,4,"readpcv: sat=%2d type=%20s code=%s f=%2d off=%8.4f %8.4f %8.4f\n",
+                  pcv->sat,pcv->type,pcv->code,f,
+                  pcv->off[f][0],pcv->off[f][1],pcv->off[f][2]);
         }
     }
     return stat;
@@ -312,7 +409,7 @@ extern void antmodel(const pcv_t *pcv, const double *del, const double *azel,
     e[1]=cos(azel[0])*cosel;
     e[2]=sin(azel[1]);
 
-    for (i=0;i<NFREQ;i++) {
+    for (i=0;i<NFREQPCV;i++) {
         for (j=0;j<3;j++) off[j]=pcv->off[i][j]+del[j];
 
         dant[i]=-dot(off,e,3)+(opt?interpvar(90.0-azel[1]*R2D,pcv->var[i]):0.0);
@@ -332,7 +429,7 @@ extern void antmodel_s(const pcv_t *pcv, double nadir, double *dant)
 
     trace(NULL,4,"antmodel_s: nadir=%6.1f\n",nadir*R2D);
 
-    for (i=0;i<NFREQ;i++) {
+    for (i=0;i<NFREQPCV;i++) {
         dant[i]=interpvar(nadir*R2D*5.0,pcv->var[i]);
     }
     trace(NULL,5,"antmodel_s: dant=%6.3f %6.3f\n",dant[0],dant[1]);

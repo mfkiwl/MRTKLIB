@@ -211,6 +211,8 @@ typedef struct prcopt_t {        /* processing options type */
     char staname[32];   /* station name */
     int  ppp_engine;    /* PPP engine selection (MRTK_PPP_ENGINE_xxx) */
     char *l6dpath[MIONO_MAX_PRN]; /* MADOCA-PPP L6D file paths */
+    int  ionocorr;      /* MADOCA-PPP ionospheric correction (0:off,1:on) */
+    double uraratio;    /* ratio for external URA in PPP variance */
 } prcopt_t;
 
 /*============================================================================

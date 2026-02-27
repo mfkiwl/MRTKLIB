@@ -865,17 +865,17 @@ extern int mcssr_sel_biascode(const int sys, const int code)
             case CODE_L2X: return CODE_L2X; /* L2C(M+L) */
             case CODE_L2P:                  /* L2P */
             case CODE_L2W: return CODE_L2W; /* L2 Z-tracking */
-            case CODE_L5I:                  /* L5I */
-            case CODE_L5Q:                  /* L5Q */
+            case CODE_L5I: return CODE_L5I; /* L5I */
+            case CODE_L5Q: return CODE_L5Q; /* L5Q */
             case CODE_L5X: return CODE_L5X; /* L5X */
         }
         break;
     case SYS_GLO:
         switch (code) {
-            case CODE_L1C: return CODE_L1C; /* G1C/A */
-            case CODE_L1P: return CODE_L1P; /* G1P */
-            case CODE_L2C: return CODE_L2C; /* G2C/A */
-            case CODE_L2P: return CODE_L2P; /* G2P */
+            case CODE_L1C:                  /* G1C/A */
+            case CODE_L1P: return CODE_L1C; /* G1P */
+            case CODE_L2C:                  /* G2C/A */
+            case CODE_L2P: return CODE_L2C; /* G2P */
         }
         break;
     case SYS_GAL:
@@ -907,7 +907,27 @@ extern int mcssr_sel_biascode(const int sys, const int code)
             case CODE_L5Q:                  /* L5Q */
             case CODE_L5X: return CODE_L5X; /* L5X */
             case CODE_L1E: return CODE_L1E; /* L1C/B */
-	}
+        }
+        break;
+    case SYS_CMP:
+        switch (code) {
+            case CODE_L2I:                  /* B1I */
+            case CODE_L2Q:                  /* B1Q */
+            case CODE_L2X: return CODE_L2I; /* B1I+Q */
+            case CODE_L6I:                  /* B3I */
+            case CODE_L6Q:                  /* B3Q */
+            case CODE_L6X: return CODE_L6I; /* B3I+Q */
+            case CODE_L7I:                  /* B2I */
+            case CODE_L7Q:                  /* B2Q */
+            case CODE_L7X: return CODE_L7I; /* B2I+Q */
+            case CODE_L5D: return CODE_L5D; /* B2aI */
+            case CODE_L5P: return CODE_L5P; /* B2aQ */
+            case CODE_L5X: return CODE_L5X; /* B2aI+Q */
+            case CODE_L1D: return CODE_L1D; /* B1C(D) */
+            case CODE_L1P: return CODE_L1P; /* B1C(P) */
+            case CODE_L1X: return CODE_L1X; /* B1C(D+P) */
+            case CODE_L7D: return CODE_L7D; /* B2b */
+        }
         break;
     }
     return CODE_NONE;

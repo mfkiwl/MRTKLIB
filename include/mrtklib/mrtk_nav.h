@@ -43,8 +43,8 @@ typedef struct {        /* antenna parameter type */
     char type[MAXANT];  /* antenna type */
     char code[MAXANT];  /* serial number or satellite code */
     gtime_t ts,te;      /* valid time start and end */
-    double off[NFREQ][ 3]; /* phase center offset e/n/u or x/y/z (m) */
-    double var[NFREQ][19]; /* phase center variation (m) */
+    double off[NFREQPCV][ 3]; /* phase center offset e/n/u or x/y/z (m) */
+    double var[NFREQPCV][19]; /* phase center variation (m) */
                         /* el=90,85,...,0 or nadir=0,1,2,3,... (deg) */
 } pcv_t;
 

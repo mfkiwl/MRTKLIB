@@ -41,6 +41,7 @@ extern "C" {
 #define NFREQ       3                   /* number of carrier frequencies */
 #endif
 #define NFREQGLO    2                   /* number of carrier frequencies of GLONASS */
+#define NFREQPCV    12                  /* number of carrier frequencies for pcv_t */
 
 #ifndef NEXOBS
 #define NEXOBS      0                   /* number of extended obs codes */
@@ -99,6 +100,7 @@ extern "C" {
 #define MAXPRNCMP   63                  /* max satellite sat number of BeiDou */
 #define NSATCMP     (MAXPRNCMP-MINPRNCMP+1) /* number of BeiDou satellites */
 #define NSYSCMP     1
+#define MINPRNBDS3  19                  /* min satellite sat number of BeiDou-3 */
 #else
 #define MINPRNCMP   0
 #define MAXPRNCMP   0

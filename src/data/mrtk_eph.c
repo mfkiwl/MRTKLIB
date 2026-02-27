@@ -445,8 +445,12 @@ static eph_t *seleph(gtime_t time, int sat, int iode, const nav_t *nav)
 
     for (i=0;i<nav->n;i++) {
         if (nav->eph[i].sat!=sat) continue;
-        if (sys!=SYS_CMP&&iode>=0&&nav->eph[i].iode!=iode) continue;
-        if (sys==SYS_CMP&&iode>=0&&(int)nav->eph[i].toes % 8192!=iode) continue; /* DF470 ref [12] */
+        if (sys==SYS_CMP) {
+            if (iode>=0&&((int)nav->eph[i].toes%2048)!=(iode*8)%2048) continue;
+        }
+        else {
+            if (iode>=0&&nav->eph[i].iode!=iode) continue;
+        }
         if (sys==SYS_GAL) {
             sel=getseleph(SYS_GAL);
             if (sel==0&&!(nav->eph[i].code&(1<<9))) continue; /* I/NAV */

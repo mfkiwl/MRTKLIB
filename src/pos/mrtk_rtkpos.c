@@ -888,7 +888,7 @@ static int zdres(int base, const obsd_t *obs, int n, const double *rs,
                  const nav_t *nav, const double *rr, const prcopt_t *opt,
                  int index, double *y, double *e, double *azel, double *freq)
 {
-    double r,rr_[3],pos[3],dant[NFREQ]={0},disp[3];
+    double r,rr_[3],pos[3],dant[NFREQPCV]={0},disp[3];
     double zhd,zazel[]={0.0,90.0*D2R};
     int i,nf=NF(opt);
     
@@ -2178,7 +2178,7 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
     /* rover position by single point positioning */
     if (!pntpos(ctx,obs,nu,nav,&rtk->opt,&rtk->sol,NULL,rtk->ssat,msg)) {
         errmsg(rtk,"point pos error (%s)\n",msg);
-        
+
         if (!rtk->opt.dynamics) {
             trace(ctx,4,"obs=\n"); traceobs(ctx,4,obs,n);
             outsolstat(rtk);
@@ -2186,7 +2186,7 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
         }
     }
     if (time.time!=0) rtk->tt=timediff(rtk->sol.time,time);
-    
+
     /* single point positioning */
     if (opt->mode==PMODE_SINGLE) {
         trace(ctx,4,"obs=\n"); traceobs(ctx,4,obs,n);

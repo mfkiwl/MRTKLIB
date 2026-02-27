@@ -82,6 +82,7 @@ add_library(mrtklib STATIC
     src/pos/mrtk_rtkpos.c
     src/pos/mrtk_ppp_ar.c
     src/pos/mrtk_ppp.c
+    src/pos/mrtk_ppp_iono.c
     src/pos/mrtk_lambda.c
     src/pos/mrtk_postpos.c
     src/pos/mrtk_sol.c
