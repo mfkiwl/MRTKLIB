@@ -77,7 +77,7 @@ static double miono_delay(const nav_t *nav, const int sat,
     stec = c[0];                    /* STEC poly.coef.{C00,C01,C10,C11,C02,C20} */
     if(a->type >= 1) stec += c[1] *    (ll[0] - a->ref[0]) + c[2] *    (ll[1] - a->ref[1]);
     if(a->type >= 2) stec += c[3] *    (ll[0] - a->ref[0])        *    (ll[1] - a->ref[1]);
-    if(a->type >= 3) stec += c[4] * SQR(ll[0] - a->ref[0]) + c[5] * SQR(ll[1] - a->ref[1]);
+    if(a->type >= 3) stec += c[4] * SQR(ll[0] - a->ref[0]) + c[2] * SQR(ll[1] - a->ref[1]);
 
     delay = fact * stec;
     trace(NULL,5,"miono_delay: sat=%d,fact=%5.3f,stec=%8.3f,delay=%7.3f,coef=%7.2f,%7.2f,%7.2f,%7.2f,%8.3f,%8.3f\n",
@@ -146,7 +146,7 @@ extern int miono_get_corr(const double *rr, nav_t *nav)
     int i;
     double pos[3],latlon[2];
 
-    if (!nav->pppiono || !nav->pppiono->valid) return 0;
+    if (!nav->pppiono) return 0;
 
     trace(NULL,4,"miono_get_corr: rr=%.3f,%.3f,%.3f\n",rr[0],rr[1],rr[2]);
 
@@ -231,7 +231,7 @@ extern int const_iono_corr(rtk_t *rtk, const obsd_t *obs, const nav_t *nav,
     char *p,*tstr,satid[8];
     const int sys[NSYS]={SYS_GPS,SYS_GLO,SYS_GAL,SYS_QZS,0};
 
-    if (!nav->pppiono || !nav->pppiono->valid) return 0;
+    if (!nav->pppiono) return 0;
 
     if ((p=strstr(rtk->opt.pppopt,"-IONOCORR_THRE_H="))) {
         sscanf(p,"-IONOCORR_THRE_H=%lf",&thre[0]);

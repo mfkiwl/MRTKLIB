@@ -96,6 +96,10 @@ static FILE *fp_rtcm=NULL;      /* rtcm data file pointer */
 static char qzssl6e_file[1024]="";/* QZSS L6E data file */
 static char qzssl6e_path[1024]="";/* QZSS L6E data path */
 static FILE *fp_qzssl6e=NULL;     /* QZSS L6E data file pointer */
+static mdcl6d_t mdcl6d[MIONO_MAX_PRN]; /* QZSS L6D control struct */
+static char qzssl6d_file[MIONO_MAX_PRN][1024]; /* QZSS L6D data file */
+static char qzssl6d_path[MIONO_MAX_PRN][1024]; /* QZSS L6D data path */
+static FILE *fp_qzssl6d[MIONO_MAX_PRN]; /* QZSS L6D data file pointer */
 static char stat_file[1024]=""; /* stat data file */
 static char cstat_file[1024]="";/* current stat data file */
 static FILE *fp_stat=NULL;      /* stat data file pointer */
@@ -300,6 +304,72 @@ static void update_qzssl6e(gtime_t time)
         if (input_qzssl6ef(&l6e, fp_qzssl6e)<-1) break;
     }
 }
+/* initialize QZSS L6D control struct ----------------------------------------*/
+static void init_mdcl6d(gtime_t time, const char *pppopt)
+{
+    int i,j,k;
+    trace(NULL,2, "init_mdcl6d: time=%s\n",time_str(time, 0));
+
+    for (k=0;k<MIONO_MAX_PRN;k++) {
+        strcpy(mdcl6d[k].opt, pppopt);
+        mdcl6d[k].time=time;
+        mdcl6d[k].nbyte=mdcl6d[k].re.rvalid=0;
+        for (i = 0; i < MIONO_MAX_ANUM; i++) {
+            mdcl6d[k].re.area[i].avalid=0;
+            for (j = 0; j < MAXSAT; j++) {
+                mdcl6d[k].re.area[i].sat[j].t0.time=0;
+            }
+        }
+        init_miono(time);
+    }
+}
+/* update QZSS L6D MADOCA-PPP ionospheric corrections ------------------------*/
+static void update_qzssl6d(gtime_t time, int n, const char *pppopt)
+{
+    static int init_flg=1;
+    char path[1024],tstr[32];
+    int i,j;
+
+    /* open or swap QZSS L6D file */
+    reppath(qzssl6d_file[n],path,timeadd(time,-1),"", "");
+
+    if (strcmp(path, qzssl6d_path[n])) {
+        strcpy(qzssl6d_path[n], path);
+
+        if (fp_qzssl6d[n]) fclose(fp_qzssl6d[n]);
+        fp_qzssl6d[n]=fopen(path, "rb");
+        if (fp_qzssl6d[n]) {
+            trace(NULL,2, "qzssl6d file open: %s\n", path);
+        }
+        else {
+            trace(NULL,2, "qzssl6d file open error: %s\n", path);
+        }
+    }
+    if (!fp_qzssl6d[n]) return;
+
+    if (init_flg) {
+        init_mdcl6d(time,pppopt);
+        init_flg=0;
+    }
+    while (timediff(mdcl6d[n].time,time)<1E-3) {
+        strcpy(tstr,time_str(mdcl6d[n].time, 3));
+        trace(NULL,3, "update_qzssl6d: %s %s\n", time_str(time, 3), tstr);
+
+        /* update QZSS L6D MADOCA-PPP ionospheric corrections */
+        if(mdcl6d[n].re.rvalid) {
+            navs.pppiono->re[mdcl6d[n].rid] = mdcl6d[n].re;
+            mdcl6d[n].re.rvalid=0;
+            for (i = 0; i < MIONO_MAX_ANUM; i++) {
+                mdcl6d[n].re.area[i].avalid=0;
+                for (j = 0; j < MAXSAT; j++) {
+                    mdcl6d[n].re.area[i].sat[j].t0.time=0;
+                }
+            }
+        }
+
+        if (input_qzssl6df(&mdcl6d[n], fp_qzssl6d[n])<-1) break;
+    }
+}
 /* update stat corrections ---------------------------------------------------*/
 static void update_stat(gtime_t time)
 {
@@ -393,6 +463,15 @@ static int inputobs(obsd_t *obs, int solq, const prcopt_t *popt)
         if (*qzssl6e_file) {
             update_qzssl6e(obs[0].time);
         }
+        /* update QZSS L6D MADOCA-PPP ionospheric corrections */
+        if (popt->ionocorr) {
+            int j;
+            for (j=0;j<MIONO_MAX_PRN;j++) {
+                if (*qzssl6d_file[j]) {
+                    update_qzssl6d(obs[0].time, j, popt->pppopt);
+                }
+            }
+        }
         /* update stat corrections */
         if (*stat_file) {
             update_stat(obs[0].time);
@@ -455,7 +534,9 @@ static void procpos(mrtk_ctx_t *ctx, FILE *fp, const prcopt_t *popt, const solop
         if (n<=0) continue;
         
         if (!rtkpos(ctx,&rtk,obs,n,&navs)) continue;
-        
+
+        for (i=0;i<6;i++) rtk.prev_qr[i] = rtk.sol.qr[i];
+
         if (mode==0) { /* forward/backward */
             if (!solstatic) {
                 outsol(fp,&rtk.sol,rtk.rb,sopt);
@@ -659,8 +740,11 @@ static void readpreceph(char **infile, int n, const prcopt_t *prcopt,
     /* set rtcm file and initialize rtcm struct */
     rtcm_file[0]   =rtcm_path[0]   ='\0'; fp_rtcm   =NULL;
     qzssl6e_file[0]=qzssl6e_path[0]='\0'; fp_qzssl6e=NULL;
+    for (i=0;i<MIONO_MAX_PRN;i++) {
+        qzssl6d_file[i][0]=qzssl6d_path[i][0]='\0'; fp_qzssl6d[i]=NULL;
+    }
     stat_file[0]   =cstat_file[0]='\0'  ; fp_stat=NULL;
-    
+
     for (i=0;i<n;i++) {
         if ((ext=strrchr(infile[i],'.'))&&
             (!strcmp(ext,".rtcm3")||!strcmp(ext,".RTCM3"))) {
@@ -671,16 +755,34 @@ static void readpreceph(char **infile, int n, const prcopt_t *prcopt,
         }
     }
 
-    for (i=0;i<n;i++) {
-        if ((ext=strrchr(infile[i],'.'))&&
-            (!strcmp(ext,".l6")||!strcmp(ext,".L6"))) {
-            strcpy(qzssl6e_file,infile[i]);
-            init_rtcm(&l6e);
-            strcpy(l6e.opt, prcopt->rtcmopt);
-            break;
+    /* MADOCA-PPP L6 files: discriminate L6D (.200.l6/.201.l6) from L6E */
+    {
+        int nf_l6d=0;
+
+        for (i=0;i<n;i++) {
+            if ((ext=strrchr(infile[i],'.'))&&
+                (!strcmp(ext,".l6")||!strcmp(ext,".L6"))) {
+
+                /* L6D (PRN=200,201) */
+                if ((ext-infile[i]>=4) &&
+                    (!strcmp(ext-4,".200.l6")||!strcmp(ext-4,".200.L6")||
+                     !strcmp(ext-4,".201.l6")||!strcmp(ext-4,".201.L6"))) {
+                    if (nf_l6d<MIONO_MAX_PRN) strcpy(qzssl6d_file[nf_l6d++],infile[i]);
+                }
+                else if (!*qzssl6e_file) { /* L6E (first match only) */
+                    strcpy(qzssl6e_file,infile[i]);
+                    init_rtcm(&l6e);
+                    strcpy(l6e.opt, prcopt->rtcmopt);
+                }
+            }
+        }
+
+        /* allocate pppiono if L6D files found */
+        if (nf_l6d > 0 && !nav->pppiono) {
+            nav->pppiono = (pppiono_t *)calloc(1, sizeof(pppiono_t));
         }
     }
-    
+
     for (i=0;i<n;i++) {
         if ((ext=strrchr(infile[i],'.'))&&
             (!strcmp(ext,".stat")||!strcmp(ext,".STAT"))) {
