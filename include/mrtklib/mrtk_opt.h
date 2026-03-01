@@ -49,13 +49,6 @@ extern "C" {
 #define PMODE_PPP_FIXED  8          /* positioning mode: PPP-fixed */
 
 /*============================================================================
- * PPP Engine Selection Constants
- *===========================================================================*/
-
-#define MRTK_PPP_ENGINE_MALIB  0    /* PPP engine: MALIB (default) */
-#define MRTK_PPP_ENGINE_MADOCA 1    /* PPP engine: MADOCALIB */
-
-/*============================================================================
  * Solution Format / Quality Constants
  *===========================================================================*/
 
@@ -211,7 +204,6 @@ typedef struct prcopt_t {        /* processing options type */
     char rtcmopt[256];  /* rtcm options */
     int  pppsig[5];     /* signal selection [0]GPS,[1]QZS,[2]GAL,[3]BDS2,[4]BDS3 */
     char staname[32];   /* station name */
-    int  ppp_engine;    /* PPP engine selection (MRTK_PPP_ENGINE_xxx) */
     char *l6dpath[MIONO_MAX_PRN]; /* MADOCA-PPP L6D file paths */
     int  ionocorr;      /* MADOCA-PPP ionospheric correction (0:off,1:on) */
     double uraratio;    /* ratio for external URA in PPP variance */
