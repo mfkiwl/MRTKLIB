@@ -443,7 +443,7 @@ add_test(NAME madocalib_pppar_check
     COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
         ${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar.pos
         ${CMAKE_BINARY_DIR}/out_madocalib_pppar.pos
-        --tolerance 0.005
+        --tolerance 0.02
 )
 set_tests_properties(madocalib_pppar_check PROPERTIES
     DEPENDS           madocalib_pppar

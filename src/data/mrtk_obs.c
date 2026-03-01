@@ -53,6 +53,7 @@ extern double time2gpst(gtime_t t, int *week);
 #define SYS_CMP     0x20                /* navigation system: BeiDou */
 #define SYS_IRN     0x40                /* navigation system: NavIC */
 #define SYS_LEO     0x80                /* navigation system: LEO */
+#define SYS_BD2     0x100               /* navigation system: BeiDou-2 */
 #define SYS_ALL     0xFF                /* navigation system: all */
 
 #define MAXFREQ     7                   /* max NFREQ */
@@ -94,8 +95,8 @@ static char codepris[7][MAXFREQ][16]={  /* code priority (obsdef order) */
    /*    0         1          2          3         4         5     */
     {"C"       ,"PYWCMNDLXS","QXI"     ,""       ,""       ,""      ,""}, /* GPS: L1,L2,L5 */
     {"CP"      ,"CP"        ,""        ,""       ,""       ,""      ,""}, /* GLO: G1,G2 */
-    {"CABXZ"   ,"QXI"       ,"QXI"     ,"BCX"    ,"QXI"    ,""      ,""}, /* GAL: E1,E5a,E5b,E6,E5ab */
-    {"LXSCE"   ,"QXI"       ,"LXS"     ,"SLX"    ,""       ,""      ,""}, /* QZS: L1,L5,L2,L6 */
+    {"CABXZ"   ,"QXI"       ,"QXI"     ,"CXE"    ,"QXI"    ,""      ,""}, /* GAL: E1,E5a,E5b,E6,E5ab */
+    {"LXSCE"   ,"QXI"       ,"LXS"     ,"SEZ"    ,""       ,""      ,""}, /* QZS: L1,L5,L2,L6 */
     {"C"       ,"IQX"       ,""        ,""       ,""       ,""      ,""}, /* SBS: L1,L5 */
     {"IQX"     ,"IQX"       ,"DIQX"    ,"DPX"    ,"DPX"    ,"PXD"   ,""}, /* BDS: B1I,B3I,B2I,B1C,B2a,B2 */
     {"ABCX"    ,"ABCX"      ,""        ,""       ,""       ,""      ,""}  /* IRN: L5,S */
@@ -423,6 +424,7 @@ extern int getcodepri(int sys, uint8_t code, const char *opt)
         case SYS_SBS: i=4; optstr="-SL%2s"; break;
         case SYS_CMP: i=5; optstr="-CL%2s"; break;
         case SYS_IRN: i=6; optstr="-IL%2s"; break;
+        case SYS_BD2: i=5; optstr="-CL%2s"; break;
         default: return 0;
     }
     if ((j=code2freq_idx(sys,code))<0) return 0;
@@ -433,8 +435,11 @@ extern int getcodepri(int sys, uint8_t code, const char *opt)
         if (sscanf(p,optstr,str)<1||str[0]!=obs[0]) continue;
         return str[1]==obs[1]?15:0;
     }
-    /* search code priority */
-    return (p=strchr(codepris[i][j],obs[1]))?14-(int)(p-codepris[i][j]):0;
+    /* search code priority (use obsdef table for current frequency order) */
+    {
+        const char *pri=get_codepris(sys,j);
+        return (p=strchr(pri,obs[1]))?14-(int)(p-pri):0;
+    }
 }
 /* sort and unique observation data --------------------------------------------
 * sort and unique observation data by time, rcv, sat

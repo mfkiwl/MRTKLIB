@@ -141,6 +141,7 @@ int main(int argc, char **argv)
             resetsysopts();
             if (!loadopts(argv[++i],sysopts)) return -1;
             getsysopts(&prcopt,&solopt,&filopt);
+            apply_pppsig(prcopt.pppsig);
         }
     }
     for (i=1,n=0;i<argc;i++) {

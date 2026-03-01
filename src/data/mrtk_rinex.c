@@ -37,6 +37,7 @@
 #define SYS_QZS     0x10
 #define SYS_CMP     0x20
 #define SYS_IRN     0x40
+#define SYS_BD2     0x100
 #define SYS_ALL     0xFF
 
 #define TSYS_GPS    0
@@ -62,7 +63,7 @@
 #define SQR(x)      ((x)*(x))
 
 #define NAVEXP      "D"                 /* exponent letter in RINEX NAV */
-#define NUMSYS      7                   /* number of systems */
+#define NUMSYS      8                   /* number of systems (incl. BD2) */
 #define MAXRNXLEN   (16*MAXOBSTYPE+4)   /* max RINEX record length */
 #define MAXPOSHEAD  1024                /* max head line position */
 #define MINFREQ_GLO -7                  /* min frequency number GLONASS */
@@ -726,14 +727,15 @@ static int decode_obsdata(FILE *fp, char *buff, int ver, int mask,
     else if (!(satsys(obs->sat,NULL)&mask)) {
         stat=0;
     }
-    /* read observation data fields */
-    switch (satsys(obs->sat,NULL)) {
+    /* read observation data fields (use satsys_bd2 to route BDS-2 to BD2 index) */
+    switch (satsys_bd2(obs->sat,NULL)) {
         case SYS_GLO: ind=index+1; break;
         case SYS_GAL: ind=index+2; break;
         case SYS_QZS: ind=index+3; break;
         case SYS_SBS: ind=index+4; break;
         case SYS_CMP: ind=index+5; break;
         case SYS_IRN: ind=index+6; break;
+        case SYS_BD2: ind=index+7; break;
         default:      ind=index  ; break;
     }
     for (i=0,j=(ver<=299)?0:3;i<ind->n;i++,j+=16) {
@@ -961,6 +963,7 @@ static int readrnxobsb(FILE *fp, const char *opt, int ver, int *tsys,
     if (nsys>=5) set_index(ver,SYS_SBS,opt,tobs[4],index+4);
     if (nsys>=6) set_index(ver,SYS_CMP,opt,tobs[5],index+5);
     if (nsys>=7) set_index(ver,SYS_IRN,opt,tobs[6],index+6);
+    if (nsys>=8) set_index(ver,SYS_BD2,opt,tobs[5],index+7); /* BDS-2 */
     
     /* read record */
     while (fgets(buff,MAXRNXLEN,fp)) {

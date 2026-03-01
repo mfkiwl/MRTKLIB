@@ -461,6 +461,14 @@ double sat2freq(int sat, uint8_t code, const nav_t *nav);
 int satsys_bd2(int sat, int *prn);
 
 /**
+ * @brief Get code priority string for system and frequency index.
+ * @param[in] sys       Satellite system (SYS_???)
+ * @param[in] freq_idx  Frequency index (0,1,2,...)
+ * @return Code priority string from obsdef table ("" on error)
+ */
+const char *get_codepris(int sys, int freq_idx);
+
+/**
  * @brief Convert frequency index to frequency number using obsdef table.
  * @param[in] sys       Satellite system (SYS_???)
  * @param[in] freq_idx  Frequency index (0,1,2,...)
@@ -500,6 +508,19 @@ int freq_num2ant_idx(int sys, int freq_num);
  * @return Antenna PCV index (0..NFREQPCV-1) (NFREQPCV: error)
  */
 int freq_idx2ant_idx(int sys, int freq_idx);
+
+/**
+ * @brief Rearrange obsdef table for a satellite system by frequency numbers.
+ * @param[in] sys        Satellite system (SYS_???)
+ * @param[in] freq_nums  Array of frequency numbers [MAXFREQ] (0=unused)
+ */
+void set_obsdef(int sys, const int *freq_nums);
+
+/**
+ * @brief Apply PPP signal selection options to obsdef tables.
+ * @param[in] pppsig  Signal selection array [5]: GPS,QZS,GAL,BDS2,BDS3
+ */
+void apply_pppsig(const int *pppsig);
 
 /*============================================================================
  * Navigation Data I/O Functions

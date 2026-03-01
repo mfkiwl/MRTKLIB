@@ -168,7 +168,7 @@ static obsdef_t obsdef_GAL[MAXFREQ]={ /* freq-index:freq */
     { 1, FREQ1, "CABXZ"  },    /* 0:E1 */
     { 5, FREQ5, "QXI"    },    /* 1:E5a */
     { 7, FREQ7, "QXI"    },    /* 2:E5b */
-    { 6, FREQ6, "BCX"    },    /* 3:E6 */
+    { 6, FREQ6, "CXE"    },    /* 3:E6 */
     { 8, FREQ8, "QXI"    },    /* 4:E5ab */
     { 0,   0.0, ""       },    /* 5 */
     { 0,   0.0, ""       },    /* 6 */
@@ -177,7 +177,7 @@ static obsdef_t obsdef_QZS[MAXFREQ]={ /* freq-index:freq */
     { 1, FREQ1, "LXSCE"  }, /* 0:L1 */
     { 5, FREQ5, "QXI"    }, /* 1:L5 */
     { 2, FREQ2, "LXS"    }, /* 2:L2 */
-    { 6, FREQ6, "SLX"    }, /* 3:L6 */
+    { 6, FREQ6, "SEZ"    }, /* 3:L6 */
     { 0,   0.0, ""       }, /* 4 */
     { 0,   0.0, ""       }, /* 5 */
     { 0,   0.0, ""       }, /* 6 */
@@ -195,8 +195,8 @@ static obsdef_t obsdef_BDS[MAXFREQ]={ /* freq-index:freq */
     { 2, FREQ1_CMP, "IQX"  },  /* 0:B1I */
     { 6, FREQ3_CMP, "IQX"  },  /* 1:B3I */
     { 7, FREQ2_CMP, "DIQX" },  /* 2:B2I/B2b */
-    { 1, FREQ1,     "DPX"  },  /* 3:B1C */
-    { 5, FREQ5,     "DPX"  },  /* 4:B2a */
+    { 1, FREQ1,     "PXD"  },  /* 3:B1C */
+    { 5, FREQ5,     "PXD"  },  /* 4:B2a */
     { 8, FREQ8,     "PXD"  },  /* 5:B2 */
     { 0,       0.0, ""     },  /* 6 */
 };
@@ -232,6 +232,105 @@ static obsdef_t *get_obsdef(int sys)
         case SYS_IRN: return obsdef_IRN;
         default: return NULL;
     }
+}
+/* set observation definition by frequency number array -----------------------
+* rearrange obsdef table so that freq_nums[0..MAXFREQ-1] appear at indices
+* 0,1,2,... — used to apply pos2-sig* signal selection options.
+* args   : int    sys         I   satellite system (SYS_GPS,SYS_CMP,...)
+*          const int *freq_nums I  array of frequency numbers (1 x MAXFREQ)
+* return : none
+*-----------------------------------------------------------------------------*/
+extern void set_obsdef(int sys, const int *freq_nums)
+{
+    obsdef_t obsdef_tmp[MAXFREQ]={{0}};
+    obsdef_t *obsdef;
+    obsdef_t obsdef0={0};
+    int i,j;
+
+    if (!(obsdef=get_obsdef(sys))) return;
+
+    for (i=0;i<MAXFREQ;i++) {
+        obsdef_tmp[i]=obsdef[i];
+        obsdef[i]=obsdef0;
+    }
+    for (i=0;i<MAXFREQ;i++) {
+        for (j=0;j<MAXFREQ;j++) {
+            if (obsdef_tmp[j].freq_num==freq_nums[i]) break;
+        }
+        if (j==MAXFREQ) continue;
+        obsdef[i].freq_num = obsdef_tmp[j].freq_num;
+        obsdef[i].freq_hz  = obsdef_tmp[j].freq_hz;
+        strcpy(obsdef[i].codepris,obsdef_tmp[j].codepris);
+    }
+}
+/* apply PPP signal selection options to obsdef tables -----------------------
+* rearrange obsdef tables based on pppsig[] options for madocalib PPP engine.
+* args   : const int *pppsig  I   signal selection [0]GPS,[1]QZS,[2]GAL,
+*                                 [3]BDS2,[4]BDS3 (from prcopt_t.pppsig)
+* return : none
+*-----------------------------------------------------------------------------*/
+extern void apply_pppsig(const int *pppsig)
+{
+    static const int fn_l1l2  [MAXFREQ]={1,2,0,0,0,0,0};
+    static const int fn_l1l5  [MAXFREQ]={1,5,0,0,0,0,0};
+    static const int fn_l1l2l5[MAXFREQ]={1,2,5,0,0,0,0};
+    static const int fn_l1l5l2[MAXFREQ]={1,5,2,0,0,0,0};
+
+    static const int fn_e1e5a      [MAXFREQ]={1,5,0,0,0,0,0};
+    static const int fn_e1e5b      [MAXFREQ]={1,7,0,0,0,0,0};
+    static const int fn_e1e6       [MAXFREQ]={1,6,0,0,0,0,0};
+    static const int fn_e1e5ae5be6 [MAXFREQ]={1,5,7,6,0,0,0};
+    static const int fn_e1e5ae6e5b [MAXFREQ]={1,5,6,7,0,0,0};
+
+    static const int fn_b1b3      [MAXFREQ]={2,6,0,0,0,0,0};
+    static const int fn_b1b2i     [MAXFREQ]={2,7,0,0,0,0,0};
+    static const int fn_b1b2a     [MAXFREQ]={2,5,0,0,0,0,0};
+    static const int fn_b1b3b2i   [MAXFREQ]={2,6,7,0,0,0,0};
+    static const int fn_b1b3b2a   [MAXFREQ]={2,6,5,0,0,0,0};
+
+    /* GPS signal selection */
+    switch (pppsig[0]) {
+        case 0: set_obsdef(SYS_GPS,fn_l1l2  ); break;
+        case 1: set_obsdef(SYS_GPS,fn_l1l5  ); break;
+        case 2: set_obsdef(SYS_GPS,fn_l1l2l5); break;
+    }
+    /* QZS signal selection */
+    switch (pppsig[1]) {
+        case 0: set_obsdef(SYS_QZS,fn_l1l5  ); break;
+        case 1: set_obsdef(SYS_QZS,fn_l1l2  ); break;
+        case 2: set_obsdef(SYS_QZS,fn_l1l5l2); break;
+    }
+    /* GAL signal selection */
+    switch (pppsig[2]) {
+        case 0: set_obsdef(SYS_GAL,fn_e1e5a      ); break;
+        case 1: set_obsdef(SYS_GAL,fn_e1e5b      ); break;
+        case 2: set_obsdef(SYS_GAL,fn_e1e6        ); break;
+        case 3: set_obsdef(SYS_GAL,fn_e1e5ae5be6  ); break;
+        case 4: set_obsdef(SYS_GAL,fn_e1e5ae6e5b  ); break;
+    }
+    /* BDS-2 signal selection */
+    switch (pppsig[3]) {
+        case 0: set_obsdef(SYS_BD2,fn_b1b3   ); break;
+        case 1: set_obsdef(SYS_BD2,fn_b1b2i  ); break;
+        case 2: set_obsdef(SYS_BD2,fn_b1b3b2i); break;
+    }
+    /* BDS-3 signal selection */
+    switch (pppsig[4]) {
+        case 0: set_obsdef(SYS_CMP,fn_b1b3   ); break;
+        case 1: set_obsdef(SYS_CMP,fn_b1b2a  ); break;
+        case 2: set_obsdef(SYS_CMP,fn_b1b3b2a); break;
+    }
+}
+/* get code priority string for system and frequency index --------------------
+* args   : int    sys        I   satellite system
+*          int    freq_idx   I   frequency index (0,1,2,...)
+* return : code priority string (from obsdef table) or "" on error
+*-----------------------------------------------------------------------------*/
+extern const char *get_codepris(int sys, int freq_idx)
+{
+    obsdef_t *obsdef=get_obsdef(sys);
+    if (!obsdef||freq_idx<0||MAXFREQ<=freq_idx) return "";
+    return obsdef[freq_idx].codepris;
 }
 /* convert frequency index to frequency number --------------------------------
 * args   : int    sys        I   satellite system

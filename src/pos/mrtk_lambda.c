@@ -19,7 +19,7 @@
 
 /* constants/macros ----------------------------------------------------------*/
 
-#define LOOPMAX     80000           /* maximum count of search loop */
+#define LOOPMAX     10000           /* maximum count of search loop */
 
 #define SGN(x)      ((x)<=0.0?-1.0:1.0)
 #define ROUND(x)    (floor((x)+0.5))

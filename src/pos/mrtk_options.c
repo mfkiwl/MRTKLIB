@@ -452,11 +452,6 @@ static void buff2sysopts(void)
             prcopt_.snrmask.mask[i][j++]=atof(p);
         }
     }
-    /* number of frequency (4:L1+L5) */
-    if (prcopt_.nf==4) {
-        prcopt_.nf=3;
-        prcopt_.freqopt=1;
-    }
 }
 /* options to system options buffer ------------------------------------------*/
 static void sysopts2buff(void)
@@ -498,11 +493,6 @@ static void sysopts2buff(void)
         for (j=0;j<9;j++) {
             p+=sprintf(p,"%s%.0f",j>0?",":"",prcopt_.snrmask.mask[i][j]);
         }
-    }
-    /* number of frequency (4:L1+L5) */
-    if (prcopt_.nf==3&&prcopt_.freqopt==1) {
-        prcopt_.nf=4;
-        prcopt_.freqopt=0;
     }
 }
 /* reset system options to default ---------------------------------------------
