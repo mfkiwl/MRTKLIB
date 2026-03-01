@@ -50,7 +50,7 @@ DESCRIPTIONS = {
     "mrtk_rtcm2.c":            "RTCM version 2 message functions",
     "mrtk_rtcm3.c":            "RTCM version 3 message decoder functions",
     "mrtk_rtcm3e.c":           "RTCM version 3 message encoder functions",
-    "mrtk_rtcm3lcl.c":         "RTCM3 local correction message encoder/decoder",
+    "mrtk_rtcm3_local_corr.c": "RTCM3 local correction message encoder/decoder",
     "mrtk_ionex.c":            "IONEX TEC grid functions",
     "mrtk_opt.c":              "processing and solution option defaults",
     "mrtk_sol.c":              "solution I/O functions",

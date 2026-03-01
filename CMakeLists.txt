@@ -71,13 +71,13 @@ add_library(mrtklib STATIC
     src/rtcm/mrtk_rtcm2.c
     src/rtcm/mrtk_rtcm3.c
     src/rtcm/mrtk_rtcm3e.c
-    src/rtcm/mrtk_rtcm3lcl.c
+    src/rtcm/mrtk_rtcm3_local_corr.c
     # ── madoca/ (MADOCA-PPP固有処理) ───────────────────────────────────────────
     src/madoca/mrtk_madoca.c
     src/madoca/mrtk_mdciono.c
     src/madoca/mrtk_madoca_local_corr.c
     src/madoca/mrtk_madoca_local_comb.c
-    src/madoca/mrtk_ppp_madoca.c
+
     # ── pos/ (測位アルゴリズム・オプション) ────────────────────────────────────
     src/pos/mrtk_spp.c
     src/pos/mrtk_rtkpos.c

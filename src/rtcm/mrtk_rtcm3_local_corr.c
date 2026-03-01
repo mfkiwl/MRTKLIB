@@ -1,5 +1,5 @@
 /*------------------------------------------------------------------------------
- * mrtk_rtcm3lcl.c : RTCM3 local correction message encoder/decoder
+ * mrtk_rtcm3_local_corr.c : RTCM3 local correction message encoder/decoder
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
  * Copyright (C) 2023-2025 Cabinet Office, Japan
@@ -12,7 +12,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *----------------------------------------------------------------------------*/
 /**
- * @file mrtk_rtcm3lcl.c
+ * @file mrtk_rtcm3_local_corr.c
  * @brief MRTKLIB RTCM Module — RTCM3 local correction message functions.
  */
 #include "mrtklib/mrtk_rtcm.h"

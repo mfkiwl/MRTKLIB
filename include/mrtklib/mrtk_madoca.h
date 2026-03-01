@@ -80,17 +80,6 @@ int input_qzssl6ef(rtcm_t *rtcm, FILE *fp);
  */
 int mcssr_sel_biascode(const int sys, const int code);
 
-/**
- * @brief MADOCA PPP engine compute stub.
- * @param[in]     ctx  MRTKLIB context
- * @param[in,out] rtk  RTK control/result struct
- * @param[in]     obs  Observation data array
- * @param[in]     n    Number of observations
- * @param[in]     nav  Navigation data
- * @note This is a stub; will be replaced by actual MADOCALIB integration.
- */
-void mrtk_ppp_madoca_compute(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs,
-                             int n, const nav_t *nav);
 
 #ifdef __cplusplus
 }
