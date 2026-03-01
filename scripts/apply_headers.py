@@ -59,6 +59,7 @@ DESCRIPTIONS = {
     "mrtk_spp.c":              "standard single-point positioning",
     "mrtk_madoca_local_corr.c":"MADOCA local correction common functions",
     "mrtk_madoca_local_comb.c":"MADOCA local correction data combination",
+    "mrtk_madoca_iono.c":      "QZSS L6D MADOCA-PPP wide area ionospheric correction",
     "mrtk_madoca.c":           "MADOCA-PPP processing functions",
     "mrtk_lambda.c":           "integer ambiguity resolution (LAMBDA/MLAMBDA)",
     "mrtk_ppp_ar.c":           "PPP ambiguity resolution functions",

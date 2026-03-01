@@ -1,5 +1,5 @@
 /*------------------------------------------------------------------------------
-* mrtk_mdciono.c : QZSS L6D MADOCA-PPP wide area ionospheric correction
+* mrtk_madoca_iono.c : QZSS L6D MADOCA-PPP wide area ionospheric correction
 *                  message decode functions
 *
 * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)

@@ -74,7 +74,7 @@ add_library(mrtklib STATIC
     src/rtcm/mrtk_rtcm3_local_corr.c
     # ── madoca/ (MADOCA-PPP固有処理) ───────────────────────────────────────────
     src/madoca/mrtk_madoca.c
-    src/madoca/mrtk_mdciono.c
+    src/madoca/mrtk_madoca_iono.c
     src/madoca/mrtk_madoca_local_corr.c
     src/madoca/mrtk_madoca_local_comb.c
 

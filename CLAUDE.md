@@ -43,7 +43,7 @@ mrtklib/
 ├── include/mrtklib/  # Public headers
 ├── src/           # Core implementation (mrtk_*.c / .cpp)
 │   ├── pos/       # Positioning engines (ppp, ppp_ar, ppp_iono, spp, rtkpos, postpos)
-│   ├── madoca/    # MADOCA-PPP L6E/L6D decoders (mrtk_madoca.c, mrtk_mdciono.c)
+│   ├── madoca/    # MADOCA-PPP L6E/L6D decoders (mrtk_madoca.c, mrtk_madoca_iono.c)
 │   ├── models/    # Atmospheric, antenna, tides models
 │   ├── data/      # Ephemeris, observation, navigation data handlers
 │   ├── rtcm/      # RTCM3 encoder/decoder
