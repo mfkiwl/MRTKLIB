@@ -14,18 +14,18 @@ The MADOCALIB PPP algorithm integration (PPP, PPP-AR, PPP-AR+iono) is **complete
 2. ~~PPP Engine Swap~~ — MADOCALIB PPP/PPP-AR/PPP-AR+iono algorithms integrated ✅
 3. **CLAS Engine Unification** — Merging claslib into the unified parameter framework (current)
 
-### Test Status (29/30 pass)
+### Test Status (30/30 pass)
 
 | Test | Status | Notes |
 |------|--------|-------|
 | Unit tests (12) | PASS | |
 | SPP regression | PASS | |
 | Receiver bias | PASS | |
+| rtkrcv_rt | PASS | Real-time PPP via SBF file stream replay |
 | MADOCA PPP | PASS | <0.5cm 3D RMS |
 | MADOCA PPP-AR (mdc-004) | PASS | 1.562cm (tolerance 0.02m, LAPACK diff) |
 | MADOCA PPP-AR (mdc-003) | PASS | |
 | MADOCA PPP-AR+iono | PASS | 3.778cm (tolerance 0.04m, LAPACK diff) |
-| rtkrcv_rt | FAIL | Pre-existing BLAS error (MALIB PPP code path) |
 
 ## 2. Your Role (AI Assistant)
 

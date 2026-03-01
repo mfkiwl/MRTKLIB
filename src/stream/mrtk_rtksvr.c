@@ -671,6 +671,7 @@ static void *rtksvrthread(void *arg)
             /* rtk positioning */
             rtksvrlock(svr);
             rtkpos(ctx,&svr->rtk,obs.data,obs.n,&svr->nav);
+            {int ii; for (ii=0;ii<6;ii++) svr->rtk.prev_qr[ii]=svr->rtk.sol.qr[ii];}
             rtksvrunlock(svr);
             
             if (svr->rtk.sol.stat!=SOLQ_NONE) {

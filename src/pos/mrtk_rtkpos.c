@@ -1691,6 +1691,7 @@ extern void rtkinit(rtk_t *rtk, const prcopt_t *opt)
         rtk->ssat[i]=ssat0;
     }
     for (i=0;i<MAXERRMSG;i++) rtk->errbuf[i]=0;
+    for (i=0;i<6;i++) rtk->prev_qr[i]=0.0;
     rtk->opt=*opt;
 }
 /* free rtk control ------------------------------------------------------------
