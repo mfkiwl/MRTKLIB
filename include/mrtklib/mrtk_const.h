@@ -2,6 +2,8 @@
  * mrtk_const.h : physical, navigation, and system constants
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -207,8 +209,11 @@ extern "C" {
 #ifndef SYS_LEO
 #define SYS_LEO     0x80                /* navigation system: LEO */
 #endif
+#ifndef SYS_BD2
+#define SYS_BD2     0x100               /* navigation system: BeiDou-2 */
+#endif
 #ifndef SYS_ALL
-#define SYS_ALL     0xFF                /* navigation system: all */
+#define SYS_ALL     0xFFF               /* navigation system: all */
 #endif
 
 /*============================================================================
@@ -412,6 +417,9 @@ extern "C" {
 #define SSR_VENDOR_L6   0               /* vendor type L6(MADOCA-PPP) */
 #define SSR_VENDOR_RTCM 1               /* vendor type RTCM3(JAXA-MADOCA) */
 #define MAXAGESSRL6     60.0            /* max age of ssr satellite code and phase bias (s) */
+#define MIONO_MAX_AGE   300.0           /* max age of STEC correction (s) (Table 6.3.2-3) */
+#define SSR_INVALID_CBIAS  -81.92       /* invalid value of ssr code bias (m) */
+#define SSR_INVALID_PBIAS  -52.4288     /* invalid value of ssr phase bias (m) */
 
 /*============================================================================
  * Satellite Attitude / Type Constants

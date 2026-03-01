@@ -2,6 +2,8 @@
  * mrtk_lambda.c : integer ambiguity resolution (LAMBDA/MLAMBDA)
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -19,7 +21,7 @@
 
 /* constants/macros ----------------------------------------------------------*/
 
-#define LOOPMAX     80000           /* maximum count of search loop */
+#define LOOPMAX     10000           /* maximum count of search loop */
 
 #define SGN(x)      ((x)<=0.0?-1.0:1.0)
 #define ROUND(x)    (floor((x)+0.5))

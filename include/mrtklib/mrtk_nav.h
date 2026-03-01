@@ -2,6 +2,8 @@
  * mrtk_nav.h : navigation data type definitions and functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -43,8 +45,8 @@ typedef struct {        /* antenna parameter type */
     char type[MAXANT];  /* antenna type */
     char code[MAXANT];  /* serial number or satellite code */
     gtime_t ts,te;      /* valid time start and end */
-    double off[NFREQ][ 3]; /* phase center offset e/n/u or x/y/z (m) */
-    double var[NFREQ][19]; /* phase center variation (m) */
+    double off[NFREQPCV][ 3]; /* phase center offset e/n/u or x/y/z (m) */
+    double var[NFREQPCV][19]; /* phase center variation (m) */
                         /* el=90,85,...,0 or nadir=0,1,2,3,... (deg) */
 } pcv_t;
 
@@ -183,6 +185,9 @@ typedef struct {        /* SSR correction type */
     float  cbias[MAXCODE]; /* code biases (m) */
     double pbias[MAXCODE]; /* phase biases (m) */
     float  stdpb[MAXCODE]; /* std-dev of phase biases (m) */
+    int vcbias[MAXCODE]; /* code biases valid flag (0:invalid, 1:valid) */
+    int vpbias[MAXCODE]; /* phase biases valid flag (0:invalid, 1:valid) */
+    int discnt[MAXCODE]; /* phase biases discontinuity counter */
     double yaw_ang,yaw_rate; /* yaw angle and yaw rate (deg,deg/s) */
     uint8_t update;     /* update flag (0:no update,1:update) */
     int vendor;         /* vendor type(0:L6(MADOCA-PPP),1:RTCM3(JAXA-MADOCA)) */
@@ -200,6 +205,47 @@ typedef struct {        /* stec data type */
     int vrsyscb[MAXBSNXSYS][MAXCODE];  /* valid flag(0:invlalid,1:valid) */
     int vrsatcb[MAXSAT][MAXCODE];      /* valid flag(0:invlalid,1:valid) */
 } osb_t;
+
+/*============================================================================
+ * MADOCA-PPP L6D Ionospheric Correction Types
+ *===========================================================================*/
+
+typedef struct {        /* MADOCA-PPP L6D STEC polynomial type */
+    gtime_t t0;         /* correction time */
+    int sqi;            /* SSR STEC quality indicator */
+    double coef[6];     /* STEC poly.coef. {C00,C01,C10,C11,C02,C20} */
+} miono_sat_t;
+
+typedef struct {        /* MADOCA-PPP L6D area type */
+    int avalid;         /* 0:invalid, 1:valid */
+    int sid;            /* shape ID {rectangle, circle} */
+    int type;           /* STEC correction type */
+    double ref[2];      /* reference point {Lat., Lon.} */
+    double span[2];     /* rect.{Lat.,Lon.}, span{Effective range, N/A} */
+    miono_sat_t sat[MAXSAT]; /* satellite STEC polynomial coefficients */
+} miono_area_t;
+
+typedef struct {        /* MADOCA-PPP L6D region type */
+    int rvalid;         /* 0:invalid, 1:valid */
+    int ralert;         /* region alert flag */
+    int narea;          /* number of areas */
+    miono_area_t area[MIONO_MAX_ANUM]; /* areas */
+} miono_region_t;
+
+typedef struct {        /* PPP ionospheric correction data type */
+    gtime_t time;       /* update time (GPST) */
+    gtime_t t0[MAXSAT]; /* correction time */
+    double  dly[MAXSAT]; /* L1 slant delay (m) */
+    double  std[MAXSAT]; /* L1 slant delay std (m) */
+} pppiono_corr_t;
+
+typedef struct {        /* PPP ionospheric correction type */
+    pppiono_corr_t corr; /* ionospheric correction data */
+    miono_region_t re[MIONO_MAX_RID]; /* MADOCA-PPP L6D regions */
+    int rid;            /* MADOCA-PPP L6D region id */
+    int anum;           /* MADOCA-PPP L6D area number */
+    int valid;          /* PPP iono correction flag (0:invalid, 1:valid) */
+} pppiono_t;
 
 /*============================================================================
  * Station Correction Types
@@ -356,6 +402,7 @@ typedef struct {        /* navigation data type */
     sbsion_t sbsion[MAXBAND+1]; /* SBAS ionosphere corrections */
     dgps_t dgps[MAXSAT]; /* DGPS corrections */
     ssr_t ssr[MAXSAT];  /* SSR corrections */
+    pppiono_t *pppiono; /* PPP ionospheric corrections (MADOCA-PPP L6D) (heap) */
     stat_t stat;        /* stat corrections */
     osb_t osb;          /* Observable-specific Signal Bias data */
     char biapath [MAXSTRPATH]; /* bias sinex file path */
@@ -406,6 +453,76 @@ void satno2id(int sat, char *id);
  * @return Carrier frequency (Hz) (0.0: error)
  */
 double sat2freq(int sat, uint8_t code, const nav_t *nav);
+
+/**
+ * @brief Distinguish BDS-2 from BDS-3.
+ * @param[in]  sat  Satellite number
+ * @param[out] prn  PRN number (NULL: not output)
+ * @return Satellite system (SYS_CMP for BDS-3, SYS_BD2 for BDS-2)
+ */
+int satsys_bd2(int sat, int *prn);
+
+/**
+ * @brief Get code priority string for system and frequency index.
+ * @param[in] sys       Satellite system (SYS_???)
+ * @param[in] freq_idx  Frequency index (0,1,2,...)
+ * @return Code priority string from obsdef table ("" on error)
+ */
+const char *get_codepris(int sys, int freq_idx);
+
+/**
+ * @brief Convert frequency index to frequency number using obsdef table.
+ * @param[in] sys       Satellite system (SYS_???)
+ * @param[in] freq_idx  Frequency index (0,1,2,...)
+ * @return Frequency number (1,2,5,...) (0: error)
+ */
+int freq_idx2freq_num(int sys, int freq_idx);
+
+/**
+ * @brief Convert frequency number to frequency index using obsdef table.
+ * @param[in] sys       Satellite system (SYS_???)
+ * @param[in] freq_num  Frequency number (1,2,5,...)
+ * @return Frequency index (0,1,2,...) (-1: error)
+ */
+int freq_num2freq_idx(int sys, int freq_num);
+
+/**
+ * @brief Convert frequency number to frequency in Hz.
+ * @param[in] sys       Satellite system (SYS_???)
+ * @param[in] freq_num  Frequency number (1,2,5,...)
+ * @param[in] fcn       GLONASS frequency channel number (-7..6)
+ * @return Frequency (Hz) (0.0: error)
+ */
+double freq_num2freq(int sys, int freq_num, int fcn);
+
+/**
+ * @brief Convert frequency number to antenna PCV index.
+ * @param[in] sys       Satellite system (SYS_???)
+ * @param[in] freq_num  Frequency number (1,2,5,...)
+ * @return Antenna PCV index (0..NFREQPCV-1) (NFREQPCV: error)
+ */
+int freq_num2ant_idx(int sys, int freq_num);
+
+/**
+ * @brief Convert frequency index to antenna PCV index.
+ * @param[in] sys       Satellite system (SYS_???)
+ * @param[in] freq_idx  Frequency index (0,1,2,...)
+ * @return Antenna PCV index (0..NFREQPCV-1) (NFREQPCV: error)
+ */
+int freq_idx2ant_idx(int sys, int freq_idx);
+
+/**
+ * @brief Rearrange obsdef table for a satellite system by frequency numbers.
+ * @param[in] sys        Satellite system (SYS_???)
+ * @param[in] freq_nums  Array of frequency numbers [MAXFREQ] (0=unused)
+ */
+void set_obsdef(int sys, const int *freq_nums);
+
+/**
+ * @brief Apply PPP signal selection options to obsdef tables.
+ * @param[in] pppsig  Signal selection array [5]: GPS,QZS,GAL,BDS2,BDS3
+ */
+void apply_pppsig(const int *pppsig);
 
 /*============================================================================
  * Navigation Data I/O Functions

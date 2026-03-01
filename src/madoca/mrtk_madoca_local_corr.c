@@ -2,6 +2,8 @@
  * mrtk_madoca_local_corr.c : MADOCA local correction common functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -40,7 +42,7 @@
 extern int satid2no(const char *id);
 extern char *time_str(gtime_t t, int n);
 
-/* initblkinf moved to mrtk_rtcm3lcl.c (mrtklib) */
+/* initblkinf moved to mrtk_rtcm3_local_corr.c (mrtklib) */
 /* get point no ----------------------------------------------------------------
 * search for a point by name or add a new point if not found
 * args   : stat_t *stat        IO   local correction data

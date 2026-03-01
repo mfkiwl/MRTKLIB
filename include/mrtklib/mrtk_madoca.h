@@ -2,6 +2,8 @@
  * mrtk_madoca.h : MADOCA-PPP processing functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -27,8 +29,12 @@ extern "C" {
 #endif
 
 #include "mrtklib/mrtk_foundation.h"
+#include "mrtklib/mrtk_context.h"
 #include "mrtklib/mrtk_time.h"
+#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_nav.h"
 #include "mrtklib/mrtk_rtcm.h"
+#include "mrtklib/mrtk_rtkpos.h"
 
 /*============================================================================
  * MADOCA-PPP Functions
@@ -73,6 +79,7 @@ int input_qzssl6ef(rtcm_t *rtcm, FILE *fp);
  * @return MADOCA-PPP CB/PB code
  */
 int mcssr_sel_biascode(const int sys, const int code);
+
 
 #ifdef __cplusplus
 }

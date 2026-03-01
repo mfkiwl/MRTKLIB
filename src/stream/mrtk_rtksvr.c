@@ -2,6 +2,8 @@
  * mrtk_rtksvr.c : real-time RTK server functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -671,6 +673,7 @@ static void *rtksvrthread(void *arg)
             /* rtk positioning */
             rtksvrlock(svr);
             rtkpos(ctx,&svr->rtk,obs.data,obs.n,&svr->nav);
+            {int ii; for (ii=0;ii<6;ii++) svr->rtk.prev_qr[ii]=svr->rtk.sol.qr[ii];}
             rtksvrunlock(svr);
             
             if (svr->rtk.sol.stat!=SOLQ_NONE) {

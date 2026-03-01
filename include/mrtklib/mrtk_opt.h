@@ -2,6 +2,8 @@
  * mrtk_opt.h : processing and solution option type definitions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -166,7 +168,7 @@ typedef struct prcopt_t {        /* processing options type */
                         /* [1-3]:error factor a/b/c of phase (m) */
                         /* [4]:doppler frequency (hz) */
     double std[3];      /* initial-state std [0]bias,[1]iono [2]trop */
-    double prn[6];      /* process-noise std [0]bias,[1]iono [2]trop [3]acch [4]accv [5] pos */
+    double prn[7];      /* process-noise std [0]bias,[1]iono [2]trop [3]acch [4]accv [5]pos [6]ifb */
     double sclkstab;    /* satellite clock stability (sec/sec) */
     double thresar[8];  /* AR validation threshold */
     double elmaskar;    /* elevation mask of AR for rising satellite (deg) */
@@ -200,8 +202,11 @@ typedef struct prcopt_t {        /* processing options type */
     int16_t elmaskopt[360]; /* elevation mask pattern */
     char pppopt[256];   /* ppp option */
     char rtcmopt[256];  /* rtcm options */
-    int  pppsig[6];     /* signal selection [0]GPS IIR-M,[1]GPS IIF,[2]GPS IIIA,[3]QZS-1/2,[4]BDS-3,[5]GAL */
+    int  pppsig[5];     /* signal selection [0]GPS,[1]QZS,[2]GAL,[3]BDS2,[4]BDS3 */
     char staname[32];   /* station name */
+    char *l6dpath[MIONO_MAX_PRN]; /* MADOCA-PPP L6D file paths */
+    int  ionocorr;      /* MADOCA-PPP ionospheric correction (0:off,1:on) */
+    double uraratio;    /* ratio for external URA in PPP variance */
 } prcopt_t;
 
 /*============================================================================

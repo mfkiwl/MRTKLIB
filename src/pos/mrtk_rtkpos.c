@@ -2,6 +2,8 @@
  * mrtk_rtkpos.c : RTK positioning functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -56,7 +58,8 @@
 #define SSR_VENDOR_RTCM 1               /* SSR vendor: RTCM */
 #define MAXAGESSRL6 60.0                /* max age of SSR L6 (s) */
 
-/* forward declarations (implemented in rtkcmn.c, resolved at link time) */
+/* forward declarations (implemented in rtkcmn.c/ppp_iono.c, resolved at link time) */
+extern int miono_get_corr(const double *rr, nav_t *nav);
 
 /* constants/macros ----------------------------------------------------------*/
 
@@ -888,7 +891,7 @@ static int zdres(int base, const obsd_t *obs, int n, const double *rs,
                  const nav_t *nav, const double *rr, const prcopt_t *opt,
                  int index, double *y, double *e, double *azel, double *freq)
 {
-    double r,rr_[3],pos[3],dant[NFREQ]={0},disp[3];
+    double r,rr_[3],pos[3],dant[NFREQPCV]={0},disp[3];
     double zhd,zazel[]={0.0,90.0*D2R};
     int i,nf=NF(opt);
     
@@ -1690,6 +1693,7 @@ extern void rtkinit(rtk_t *rtk, const prcopt_t *opt)
         rtk->ssat[i]=ssat0;
     }
     for (i=0;i<MAXERRMSG;i++) rtk->errbuf[i]=0;
+    for (i=0;i<6;i++) rtk->prev_qr[i]=0.0;
     rtk->opt=*opt;
 }
 /* free rtk control ------------------------------------------------------------
@@ -1706,94 +1710,6 @@ extern void rtkfree(rtk_t *rtk)
     free(rtk->P ); rtk->P =NULL;
     free(rtk->xa); rtk->xa=NULL;
     free(rtk->Pa); rtk->Pa=NULL;
-}
-
-/* signal selection for PPP --------------------------------------------------*/
-static void signal_sel_ppp(obsd_t *pppobs, const nav_t *nav, const prcopt_t *opt, int ns)
-{
-    char sattype[MAXANT],satid[8],*tstr=time_str(pppobs->time, 3);
-    int  i,j,sigtype,sys;
-
-    for(i=0;i<ns;i++) {
-        sys=satsys(pppobs->sat,NULL);
-        sigtype=0; /* 0:GPS=L1C/A-L2P, GLO=G1-G2, GAL=E1-E5a, QZS=L1C-L5, BDS=B1_2-B3 */
-        strcpy(sattype,nav->pcvs[pppobs->sat-1].type);
-        for(j=strlen(sattype)-1;j>0;j--) {
-            if(sattype[j]!=' ')break;
-            sattype[j]='\0'; /* delete tail blank */
-        }
-        if      (0==strcmp(sattype,"BLOCK IIR-M")) sigtype=opt->pppsig[0]; /* 1:L1C/A-L2C */
-        else if (0==strcmp(sattype,"BLOCK IIF"  )) sigtype=opt->pppsig[1]; /* 1:L1C/A-L2C, 2:L1C/A-L5 */
-        else if (0==strcmp(sattype,"BLOCK IIIA" )) sigtype=opt->pppsig[2];
-        else if (0==strcmp(sattype,"QZSS"       )) sigtype=opt->pppsig[3]; /* 1:L1C/A-L2C */
-        else if (0==strcmp(sattype,"QZSS-2G"    )) sigtype=opt->pppsig[3];
-        else if (0==strcmp(sattype,"QZSS-2I"    )) sigtype=opt->pppsig[3];
-        else if (0==strcmp(sattype,"QZSS-2A"    )) sigtype=opt->pppsig[3];
-        else if (0==strcmp(sattype,"BEIDOU-3G-CAST" )) sigtype=opt->pppsig[4]; /* 1:B1-B2a */
-        else if (0==strcmp(sattype,"BEIDOU-3I"      )) sigtype=opt->pppsig[4];
-        else if (0==strcmp(sattype,"BEIDOU-3M-CAST" )) sigtype=opt->pppsig[4];
-        else if (0==strcmp(sattype,"BEIDOU-3M-SECM" )) sigtype=opt->pppsig[4];
-        else if (0==strcmp(sattype,"BEIDOU-3SI-CAST")) sigtype=opt->pppsig[4];
-        else if (0==strcmp(sattype,"BEIDOU-3SI-SECM")) sigtype=opt->pppsig[4];
-        else if (0==strcmp(sattype,"BEIDOU-3SM-CAST")) sigtype=opt->pppsig[4];
-        else if (0==strcmp(sattype,"GALILEO-1"  )) sigtype=opt->pppsig[5];
-        else if (0==strcmp(sattype,"GALILEO-2"  )) sigtype=opt->pppsig[5];
-
-        switch (sys) {
-        case SYS_GPS:
-            signal_replace(pppobs,0,'1',"C");
-            if       (sigtype==0){  /* L1C/A-L2P */
-                signal_replace(pppobs,1,'2',"PYWCMND"); /* Note, codepries="PYWCMNDLXS" */
-            } else if(sigtype==1){  /* L1C/A-L2C */
-                signal_replace(pppobs,1,'2',"LXS");
-            } else if(sigtype==2){  /* L1C/A-L5 */
-                signal_replace(pppobs,1,'5',"QXI");
-            }
-            break;
-        case SYS_GLO:
-            signal_replace(pppobs,0,'1',"CP");
-            signal_replace(pppobs,1,'2',"PC");
-            break;
-        case SYS_GAL:
-            if (sigtype == 0) { /* E1-E5a */
-                signal_replace(pppobs,0,'1',"CBX");
-                signal_replace(pppobs,1,'5',"QXI");
-            } else if (sigtype == 1) { /* E1-E5b */
-                signal_replace(pppobs,0,'1',"CBX");
-                signal_replace(pppobs,1,'7',"QXI");
-            }
-            break;
-        case SYS_QZS:
-            if       (sigtype==0){  /* L1C-L5 */
-                signal_replace(pppobs,0,'1',"LXS");
-                signal_replace(pppobs,1,'5',"QXI");
-            } else if(sigtype==1){  /* L1C/A-L2C */
-                signal_replace(pppobs,0,'1',"C");
-                signal_replace(pppobs,1,'2',"LXS");
-            } else if(sigtype==2){  /* L1C/B-L5 */
-                signal_replace(pppobs,0,'1',"E");
-                signal_replace(pppobs,1,'5',"QXI");
-            } else if(sigtype==10){  /* L1C/AorB-L5 */
-                signal_replace(pppobs,0,'1',"CE");
-                signal_replace(pppobs,1,'5',"QXI");
-            }
-            break;
-        case SYS_CMP:
-            if       (sigtype==0){  /* B1-B3 */
-                signal_replace(pppobs,0,'2',"QXI");
-                signal_replace(pppobs,1,'6',"QXI");
-            } else if(sigtype==1){  /* B1C-B2a */
-                signal_replace(pppobs,0,'1',"PXD");
-                signal_replace(pppobs,1,'5',"PXD");
-            }
-            break;
-        }
-        satno2id(pppobs->sat, satid);
-        trace(NULL,3,"signal_sel_ppp %s %s %-18s code=%2d,%2d P=%13.3f,%13.3f L=%13.3f,%13.3f LLI=%d,%d SNR=%6.2f,%6.2f\n",
-            tstr,satid,sattype,pppobs->code[0],pppobs->code[1],pppobs->P[0],pppobs->P[1],pppobs->L[0],pppobs->L[1],
-            pppobs->LLI[0],pppobs->LLI[1],pppobs->SNR[0]*0.001,pppobs->SNR[1]*0.001);
-        pppobs++;
-    }
 }
 
 /* update satellite code bias ------------------------------------------------*/
@@ -2152,7 +2068,6 @@ static void udbiass(gtime_t gt, prcopt_t *popt, nav_t *nav)
 *-----------------------------------------------------------------------------*/
 extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav)
 {
-    static obsd_t pppobs[MAXOBS];
     prcopt_t *opt=&rtk->opt;
     sol_t solb={{0}};
     gtime_t time;
@@ -2178,7 +2093,7 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
     /* rover position by single point positioning */
     if (!pntpos(ctx,obs,nu,nav,&rtk->opt,&rtk->sol,NULL,rtk->ssat,msg)) {
         errmsg(rtk,"point pos error (%s)\n",msg);
-        
+
         if (!rtk->opt.dynamics) {
             trace(ctx,4,"obs=\n"); traceobs(ctx,4,obs,n);
             outsolstat(rtk);
@@ -2186,7 +2101,7 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
         }
     }
     if (time.time!=0) rtk->tt=timediff(rtk->sol.time,time);
-    
+
     /* single point positioning */
     if (opt->mode==PMODE_SINGLE) {
         trace(ctx,4,"obs=\n"); traceobs(ctx,4,obs,n);
@@ -2199,10 +2114,9 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
     }
     /* precise point positioning */
     if (opt->mode>=PMODE_PPP_KINEMA) {
-        memcpy(pppobs,obs,sizeof(obsd_t)*nu);
-        signal_sel_ppp(pppobs,nav,opt,nu);
-        trace(ctx,4,"obs=\n"); traceobs(ctx,4,pppobs,n);
-        pppos(ctx,rtk,pppobs,nu,nav);
+        miono_get_corr(rtk->sol.rr,nav);
+        trace(ctx,4,"obs=\n"); traceobs(ctx,4,obs,n);
+        pppos(ctx,rtk,obs,nu,nav);
         outsolstat(rtk);
         return 1;
     }

@@ -2,6 +2,8 @@
  * mrtk_rtcm.c : RTCM common functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -70,6 +72,7 @@ int init_rtcm(rtcm_t *rtcm)
     rtcm->obs.data=NULL;
     rtcm->nav.eph =NULL;
     rtcm->nav.geph=NULL;
+    rtcm->nav.pppiono=NULL;
     
     /* reallocate memory for observation and ephemeris buffer */
     if (!(rtcm->obs.data=(obsd_t *)malloc(sizeof(obsd_t)*MAXOBS))||

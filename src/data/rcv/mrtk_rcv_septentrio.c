@@ -2,6 +2,8 @@
  * mrtk_rcv_septentrio.c : Septentrio receiver raw data decoder
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -194,7 +196,7 @@ static int sig2idx(int sat, int sig, const char *opt, uint8_t *code)
     
     if (sig<0||sig>SBF_MAXSIG||sig_tbl[sig][0]!=sys) return -1;
     *code=sig_tbl[sig][1];
-    idx=code2idx(sys,*code);
+    idx=code2freq_idx(sys,*code);
     
     /* resolve code priority in a freq-index */
     if (sys==SYS_GPS) {

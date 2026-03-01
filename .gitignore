@@ -29,3 +29,17 @@ tests/data/malib/COD0OPSFIN_*.INX
 
 # rtkrcv writes a navigation cache at the working directory
 rtkrcv.nav
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# MacOS metadata files
+.DS_Store
+
+# Task tracking (session-specific, not source code)
+tasks/
+
+# Reference repositories
+upstream/madocalib/
+upstream/MALIB/

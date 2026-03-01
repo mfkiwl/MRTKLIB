@@ -2,6 +2,8 @@
  * mrtk_rcv_novatel.c : NovAtel receiver raw data decoder
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -349,7 +351,7 @@ static int decode_track_stat(uint32_t stat, int *sys, int *code, int *track,
             trace(NULL,2,"oem4 unknown system: sys=%d\n",satsys);
             return -1;
     }
-    if (!(*code=sig2code(*sys,sigtype))||(idx=code2idx(*sys,*code))<0) {
+    if (!(*code=sig2code(*sys,sigtype))||(idx=code2freq_idx(*sys,*code))<0) {
         trace(NULL,2,"oem4 signal type error: sys=%d sigtype=%d\n",*sys,sigtype);
         return -1;
     }
