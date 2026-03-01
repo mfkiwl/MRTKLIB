@@ -161,8 +161,8 @@ opt_t sysopts[]={
     {"stats-prniono",   1,  (void *)&prcopt_.prn[1],     "m"    },
     {"stats-prntrop",   1,  (void *)&prcopt_.prn[2],     "m"    },
     {"stats-prnpos",    1,  (void *)&prcopt_.prn[5],     "m"    },
-    {"stats-prndcb",    1,  (void *)&prcopt_.prn[6],     "m"    },
     {"stats-prnifb",    1,  (void *)&prcopt_.prn[6],     "m"    },
+    {"stats-prndcb",    1,  (void *)&prcopt_.prn[6],     "m"    }, /* alias for prnifb (legacy name) */
     {"stats-uraratio",  1,  (void *)&prcopt_.uraratio,   ""     },
     {"stats-clkstab",   1,  (void *)&prcopt_.sclkstab,   "s/s"  },
     
