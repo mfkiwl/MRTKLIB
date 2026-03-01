@@ -2,6 +2,8 @@
  * mrtk_mat.c : matrix and vector functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -227,7 +229,10 @@ extern void dgetrs_(const char *trans, const int *n, const int *nrhs,
 extern void matmul(const char *tr, int n, int k, int m, double alpha,
                    const double *A, const double *B, double beta, double *C)
 {
-    int lda=tr[0]=='T'?m:n,ldb=tr[1]=='T'?k:m;
+    int lda,ldb;
+
+    if (n<=0||k<=0||m<=0) return;
+    lda=tr[0]=='T'?m:n; ldb=tr[1]=='T'?k:m;
 
     dgemm_((char *)tr,(char *)tr+1,&n,&k,&m,&alpha,(double *)A,&lda,(double *)B,
            &ldb,&beta,C,&n);

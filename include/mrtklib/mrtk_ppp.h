@@ -2,6 +2,8 @@
  * mrtk_ppp.h : precise point positioning functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -32,6 +34,58 @@ extern "C" {
 #include "mrtklib/mrtk_nav.h"
 #include "mrtklib/mrtk_opt.h"
 #include "mrtklib/mrtk_rtkpos.h"
+
+/*============================================================================
+ * MADOCA-PPP L6D Ionospheric Correction (mdciono)
+ *===========================================================================*/
+
+/**
+ * @brief QZSS L6D message control struct.
+ *
+ * Holds state for decoding MADOCA-PPP L6D ionospheric correction messages
+ * from a single PRN (200/201).
+ */
+typedef struct {
+    gtime_t time;           /**< decoded message time (GPST) */
+    int nbyte;              /**< number of bytes in message buffer */
+    uint8_t buff[256];      /**< message buffer */
+    char opt[256];          /**< MADOCA-PPP L6D dependent options */
+    int rid;                /**< decoded region ID */
+    miono_region_t re;      /**< decoded region data */
+} mdcl6d_t;
+
+/**
+ * @brief Initialize MADOCA-PPP L6D ionospheric correction control.
+ * @param[in] gt  GPST for week number determination
+ */
+extern void init_miono(gtime_t gt);
+
+/**
+ * @brief Decode QZSS L6D message.
+ * @param[in,out] mdcl6d  L6D message control struct
+ * @return status (-1: error, 0: no message, 10: iono correction decoded)
+ */
+extern int decode_qzss_l6dmsg(mdcl6d_t *mdcl6d);
+
+/**
+ * @brief Input QZSS L6D message byte-by-byte.
+ * @param[in,out] mdcl6d  L6D message control struct
+ * @param[in]     data    L6D 1-byte data
+ * @return status (-1: error, 0: no message, 10: iono correction decoded)
+ */
+extern int input_qzssl6d(mdcl6d_t *mdcl6d, uint8_t data);
+
+/**
+ * @brief Input QZSS L6D message from file.
+ * @param[in,out] mdcl6d  L6D message control struct
+ * @param[in]     fp      file pointer
+ * @return status (-2: EOF, -1..10: same as input_qzssl6d)
+ */
+extern int input_qzssl6df(mdcl6d_t *mdcl6d, FILE *fp);
+
+/*============================================================================
+ * PPP Engine Functions
+ *===========================================================================*/
 
 /**
  * @brief Precise point positioning.

@@ -2,6 +2,8 @@
  * mrtk_foundation.h : common types, standard includes, and system constants
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -41,6 +43,7 @@ extern "C" {
 #define NFREQ       3                   /* number of carrier frequencies */
 #endif
 #define NFREQGLO    2                   /* number of carrier frequencies of GLONASS */
+#define NFREQPCV    12                  /* number of carrier frequencies for pcv_t */
 
 #ifndef NEXOBS
 #define NEXOBS      0                   /* number of extended obs codes */
@@ -99,6 +102,7 @@ extern "C" {
 #define MAXPRNCMP   63                  /* max satellite sat number of BeiDou */
 #define NSATCMP     (MAXPRNCMP-MINPRNCMP+1) /* number of BeiDou satellites */
 #define NSYSCMP     1
+#define MINPRNBDS3  19                  /* min satellite sat number of BeiDou-3 */
 #else
 #define MINPRNCMP   0
 #define MAXPRNCMP   0
@@ -259,6 +263,14 @@ extern "C" {
 #define MAXTRPSTA       512             /* max number of tropospheric station blocks */
 #define MAXIONSTA       256             /* max number of ionospheric station blocks */
 #define MAX_REJ_SITES   5               /* max number of reject sites */
+
+/*============================================================================
+ * MADOCA-PPP L6D Ionospheric Correction Constants
+ *===========================================================================*/
+
+#define MIONO_MAX_RID   256             /* max region id (IS-QZSS-MDC-002 Table 6.3.2-4) */
+#define MIONO_MAX_ANUM   32             /* max area number (Table 6.3.2-4) */
+#define MIONO_MAX_PRN    (2+1)          /* max MADOCA-PPP L6D signal (Table 3-1) + 1 reserved */
 
 /*============================================================================
  * Platform-Dependent Lock / Thread Types

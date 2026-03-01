@@ -2,6 +2,8 @@
  * mrtk_rcv_binex.c : BINEX receiver raw data decoder
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -1048,7 +1050,7 @@ static uint8_t *decode_bnx_7f_05_obs(raw_t *raw, uint8_t *buff, int sat,
     
     /* get code priority */
     for (i=0;i<nobs;i++) {
-        idx[i]=code2idx(sys,codes[code[i]]);
+        idx[i]=code2freq_idx(sys,codes[code[i]]);
         pri[i]=getcodepri(sys,codes[code[i]],raw->opt);
     }
     for (i=0;i<NFREQ;i++) {

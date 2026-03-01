@@ -2,6 +2,8 @@
  * mrtk_rtcm3.c : RTCM version 3 message decoder functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -1700,9 +1702,10 @@ static int decode_ssr3(rtcm_t *rtcm, int sys, int subtype)
     const uint8_t *sigs;
     double udint,bias,cbias[MAXCODE];
     int i,j,k,type,mode,sync,iod,nsat,prn,sat,nbias,np,offp;
-    
+    int vcbias[MAXCODE]={0};
+
     type=getbitu(rtcm->buff,24,12);
-    
+
     if ((nsat=decode_ssr2_head(rtcm,sys,subtype,&sync,&iod,&udint,&i))<0) {
         trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
         return -1;
@@ -1724,13 +1727,17 @@ static int decode_ssr3(rtcm_t *rtcm, int sys, int subtype)
     for (j=0;j<nsat&&i+5+np<=rtcm->len*8;j++) {
         prn  =getbitu(rtcm->buff,i,np)+offp; i+=np;
         nbias=getbitu(rtcm->buff,i, 5);      i+= 5;
-        
-        for (k=0;k<MAXCODE;k++) cbias[k]=0.0;
+
+        for (k=0;k<MAXCODE;k++) {
+            cbias[k]=0.0;
+            vcbias[k]=0;
+        }
         for (k=0;k<nbias&&i+19<=rtcm->len*8;k++) {
             mode=getbitu(rtcm->buff,i, 5);      i+= 5;
             bias=getbits(rtcm->buff,i,14)*0.01; i+=14;
             if (sigs[mode]) {
-                cbias[sigs[mode]-1]=(float)bias;
+                cbias [sigs[mode]-1]=(float)bias;
+                vcbias[sigs[mode]-1]=1; /* 1:output */
             }
             else {
                 trace(NULL,2,"rtcm3 %d not supported mode: mode=%d\n",type,mode);
@@ -1744,9 +1751,10 @@ static int decode_ssr3(rtcm_t *rtcm, int sys, int subtype)
         rtcm->ssr[sat-1].t0 [4]=rtcm->time;
         rtcm->ssr[sat-1].udi[4]=udint;
         rtcm->ssr[sat-1].iod[4]=iod;
-        
+
         for (k=0;k<MAXCODE;k++) {
-            rtcm->ssr[sat-1].cbias[k]=(float)cbias[k];
+            rtcm->ssr[sat-1].cbias [k]=(float)cbias[k];
+            rtcm->ssr[sat-1].vcbias[k]=vcbias[k];
         }
         rtcm->ssr[sat-1].update=1;
     }
@@ -1946,9 +1954,10 @@ static int decode_ssr7(rtcm_t *rtcm, int sys, int subtype)
     double udint,bias,std=0.0,pbias[MAXCODE],stdpb[MAXCODE];
     int i,j,k,type,mode,sync,iod,nsat,prn,sat,nbias,np,mw,offp,sii,swl;
     int dispe,sdc,yaw_ang,yaw_rate;
-    
+    int vpbias[MAXCODE]={0},discnt[MAXCODE]={0};
+
     type=getbitu(rtcm->buff,24,12);
-    
+
     if ((nsat=decode_ssr7_head(rtcm,sys,subtype,&sync,&iod,&udint,&dispe,&mw,
                                &i))<0) {
         trace(NULL,2,"rtcm3 %d length error: len=%d\n",type,rtcm->len);
@@ -1972,8 +1981,11 @@ static int decode_ssr7(rtcm_t *rtcm, int sys, int subtype)
         nbias   =getbitu(rtcm->buff,i, 5);      i+= 5;
         yaw_ang =getbitu(rtcm->buff,i, 9);      i+= 9;
         yaw_rate=getbits(rtcm->buff,i, 8);      i+= 8;
-        
-        for (k=0;k<MAXCODE;k++) pbias[k]=stdpb[k]=0.0;
+
+        for (k=0;k<MAXCODE;k++) {
+            pbias[k]=stdpb[k]=0.0;
+            discnt[k]=vpbias[k]=0;
+        }
         for (k=0;k<nbias&&i+((subtype==0)?49:32)<=rtcm->len*8;k++) {
             mode=getbitu(rtcm->buff,i, 5); i+= 5;
             sii =getbitu(rtcm->buff,i, 1); i+= 1; /* integer-indicator */
@@ -1984,8 +1996,10 @@ static int decode_ssr7(rtcm_t *rtcm, int sys, int subtype)
                 std=getbitu(rtcm->buff,i,17); i+=17; /* phase bias std-dev (m) */
             }
             if (sigs[mode]) {
-                pbias[sigs[mode]-1]=bias*0.0001; /* (m) */
-                stdpb[sigs[mode]-1]=std *0.0001; /* (m) */
+                pbias [sigs[mode]-1]=bias*0.0001; /* (m) */
+                stdpb [sigs[mode]-1]=std *0.0001; /* (m) */
+                discnt[sigs[mode]-1]=sdc;
+                vpbias[sigs[mode]-1]=1; /* 1:output */
             }
             else {
                 trace(NULL,2,"rtcm3 %d not supported mode: mode=%d\n",type,mode);
@@ -2001,10 +2015,12 @@ static int decode_ssr7(rtcm_t *rtcm, int sys, int subtype)
         rtcm->ssr[sat-1].iod[5]=iod;
         rtcm->ssr[sat-1].yaw_ang =yaw_ang / 256.0*180.0; /* (deg) */
         rtcm->ssr[sat-1].yaw_rate=yaw_rate/8192.0*180.0; /* (deg/s) */
-        
+
         for (k=0;k<MAXCODE;k++) {
-            rtcm->ssr[sat-1].pbias[k]=pbias[k];
-            rtcm->ssr[sat-1].stdpb[k]=(float)stdpb[k];
+            rtcm->ssr[sat-1].pbias [k]=pbias[k];
+            rtcm->ssr[sat-1].stdpb [k]=(float)stdpb[k];
+            rtcm->ssr[sat-1].vpbias[k]=vpbias[k];
+            rtcm->ssr[sat-1].discnt[k]=discnt[k];
         }
     }
     return sync?0:10;
@@ -2084,7 +2100,7 @@ static void save_msm_obs(rtcm_t *rtcm, int sys, msm_h_t *h, const double *r,
         }
         /* signal to rinex obs type */
         code[i]=obs2code(sig[i]);
-        idx[i]=code2idx(sys,code[i]);
+        idx[i]=code2freq_idx(sys,code[i]);
         
         if (code[i]!=CODE_NONE) {
             if (q) q+=sprintf(q,"L%s%s",sig[i],i<h->nsig-1?",":"");

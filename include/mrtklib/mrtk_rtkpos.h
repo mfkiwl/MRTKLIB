@@ -2,6 +2,8 @@
  * mrtk_rtkpos.h : RTK positioning type definitions and functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -55,6 +57,8 @@ typedef struct {        /* RTK control/result type */
     int neb;            /* bytes in error message buffer */
     char errbuf[MAXERRMSG]; /* error message buffer */
     prcopt_t opt;       /* processing options */
+    int miono_info[2];  /* MADOCA-PPP iono info (0:region id, 1:area No.) */
+    double prev_qr[6];  /* previous position variance/covariance (m^2) */
 } rtk_t;
 
 /**

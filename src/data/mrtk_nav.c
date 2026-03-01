@@ -2,6 +2,8 @@
  * mrtk_nav.c : navigation data functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -19,6 +21,7 @@
 
 #include "mrtklib/mrtk_nav.h"
 #include "mrtklib/mrtk_opt.h"
+#include "mrtklib/mrtk_const.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -34,16 +37,7 @@
  * Private Constants
  *===========================================================================*/
 
-#define SYS_NONE    0x00                /* navigation system: none */
-#define SYS_GPS     0x01                /* navigation system: GPS */
-#define SYS_SBS     0x02                /* navigation system: SBAS */
-#define SYS_GLO     0x04                /* navigation system: GLONASS */
-#define SYS_GAL     0x08                /* navigation system: Galileo */
-#define SYS_QZS     0x10                /* navigation system: QZSS */
-#define SYS_CMP     0x20                /* navigation system: BeiDou */
-#define SYS_IRN     0x40                /* navigation system: NavIC */
-#define SYS_LEO     0x80                /* navigation system: LEO */
-#define SYS_ALL     0xFF                /* navigation system: all */
+/* SYS_* constants are defined in mrtk_const.h (included above) */
 
 #define SQR(x)      ((x)*(x))
 #define MAX_VAR_EPH SQR(300.0)  /* max variance eph to reject satellite (m^2) */
@@ -128,6 +122,314 @@ extern int satsys(int sat, int *prn)
     else sat=0;
     if (prn) *prn=sat;
     return sys;
+}
+/* convert satellite number to satellite system (BDS2-aware) -------------------
+* convert satellite number to satellite system, distinguishing BDS-2 from BDS-3
+* args   : int    sat       I   satellite number (1-MAXSAT)
+*          int    *prn      IO  satellite prn/slot number (NULL: no output)
+* return : satellite system (SYS_GPS,SYS_GLO,...,SYS_BD2,SYS_CMP)
+*-----------------------------------------------------------------------------*/
+extern int satsys_bd2(int sat, int *prn)
+{
+    int sys=SYS_NONE,_prn;
+
+    sys=satsys(sat,&_prn);
+#ifdef ENACMP
+    if (sys==SYS_CMP&&(_prn)<MINPRNBDS3) sys=SYS_BD2;
+#endif
+
+    if (prn) *prn=_prn;
+    return sys;
+}
+/* observation definition type for frequency mapping ---------------------------*/
+typedef struct {
+    int    freq_num;       /* frequency number [1,2,5,...] */
+    double freq_hz;        /* frequency [Hz] */
+    char   codepris[16];   /* code priority */
+} obsdef_t;
+
+static obsdef_t obsdef_GPS[MAXFREQ]={ /* freq-index:freq */
+    { 1, FREQ1, "CPYWMNSL"  }, /* 0:L1 */
+    { 2, FREQ2, "PYWCMNDLSX"}, /* 1:L2 */
+    { 5, FREQ5, "QXI"       }, /* 2:L5 */
+    { 0,   0.0, ""          }, /* 3 */
+    { 0,   0.0, ""          }, /* 4 */
+    { 0,   0.0, ""          }, /* 5 */
+    { 0,   0.0, ""          }, /* 6 */
+};
+static obsdef_t obsdef_GLO[MAXFREQ]={ /* freq-index:freq */
+    { 1, FREQ1_GLO, "CP"   },  /* 0:G1 */
+    { 2, FREQ2_GLO, "CP"   },  /* 1:G2 */
+    { 0,       0.0, ""     },  /* 2 */
+    { 0,       0.0, ""     },  /* 3 */
+    { 0,       0.0, ""     },  /* 4 */
+    { 0,       0.0, ""     },  /* 5 */
+    { 0,       0.0, ""     },  /* 6 */
+};
+static obsdef_t obsdef_GAL[MAXFREQ]={ /* freq-index:freq */
+    { 1, FREQ1, "CABXZ"  },    /* 0:E1 */
+    { 5, FREQ5, "QXI"    },    /* 1:E5a */
+    { 7, FREQ7, "QXI"    },    /* 2:E5b */
+    { 6, FREQ6, "CXE"    },    /* 3:E6 */
+    { 8, FREQ8, "QXI"    },    /* 4:E5ab */
+    { 0,   0.0, ""       },    /* 5 */
+    { 0,   0.0, ""       },    /* 6 */
+};
+static obsdef_t obsdef_QZS[MAXFREQ]={ /* freq-index:freq */
+    { 1, FREQ1, "LXSCE"  }, /* 0:L1 */
+    { 5, FREQ5, "QXI"    }, /* 1:L5 */
+    { 2, FREQ2, "LXS"    }, /* 2:L2 */
+    { 6, FREQ6, "SEZ"    }, /* 3:L6 */
+    { 0,   0.0, ""       }, /* 4 */
+    { 0,   0.0, ""       }, /* 5 */
+    { 0,   0.0, ""       }, /* 6 */
+};
+static obsdef_t obsdef_SBS[MAXFREQ]={ /* freq-index:freq */
+    { 1, FREQ1, "C"      }, /* 0:L1 */
+    { 5, FREQ5, "IQX"    }, /* 1:L5 */
+    { 0,   0.0, ""       }, /* 2 */
+    { 0,   0.0, ""       }, /* 3 */
+    { 0,   0.0, ""       }, /* 4 */
+    { 0,   0.0, ""       }, /* 5 */
+    { 0,   0.0, ""       }, /* 6 */
+};
+static obsdef_t obsdef_BDS[MAXFREQ]={ /* freq-index:freq */
+    { 2, FREQ1_CMP, "IQX"  },  /* 0:B1I */
+    { 6, FREQ3_CMP, "IQX"  },  /* 1:B3I */
+    { 7, FREQ2_CMP, "DIQX" },  /* 2:B2I/B2b */
+    { 1, FREQ1,     "PXD"  },  /* 3:B1C */
+    { 5, FREQ5,     "PXD"  },  /* 4:B2a */
+    { 8, FREQ8,     "PXD"  },  /* 5:B2 */
+    { 0,       0.0, ""     },  /* 6 */
+};
+static obsdef_t obsdef_BD2[MAXFREQ]={ /* freq-index:freq */
+    { 2, FREQ1_CMP, "IQX"  },  /* 0:B1I */
+    { 6, FREQ3_CMP, "IQX"  },  /* 1:B3I */
+    { 7, FREQ2_CMP, "IQX"  },  /* 2:B2I */
+    { 0,       0.0, ""     },  /* 3 */
+    { 0,       0.0, ""     },  /* 4 */
+    { 0,       0.0, ""     },  /* 5 */
+    { 0,       0.0, ""     },  /* 6 */
+};
+static obsdef_t obsdef_IRN[MAXFREQ]={ /* freq-index:freq */
+    { 5, FREQ5, "ABCX"  },  /* 0:L5 */
+    { 9, FREQ9, "ABCX"  },  /* 1:S */
+    { 0,   0.0, ""      },  /* 2 */
+    { 0,   0.0, ""      },  /* 3 */
+    { 0,   0.0, ""      },  /* 4 */
+    { 0,   0.0, ""      },  /* 5 */
+    { 0,   0.0, ""      },  /* 6 */
+};
+/* helper: select obsdef table by system -------------------------------------*/
+static obsdef_t *get_obsdef(int sys)
+{
+    switch (sys) {
+        case SYS_GPS: return obsdef_GPS;
+        case SYS_GLO: return obsdef_GLO;
+        case SYS_GAL: return obsdef_GAL;
+        case SYS_QZS: return obsdef_QZS;
+        case SYS_SBS: return obsdef_SBS;
+        case SYS_CMP: return obsdef_BDS;
+        case SYS_BD2: return obsdef_BD2;
+        case SYS_IRN: return obsdef_IRN;
+        default: return NULL;
+    }
+}
+/* set observation definition by frequency number array -----------------------
+* rearrange obsdef table so that freq_nums[0..MAXFREQ-1] appear at indices
+* 0,1,2,... — used to apply pos2-sig* signal selection options.
+* args   : int    sys         I   satellite system (SYS_GPS,SYS_CMP,...)
+*          const int *freq_nums I  array of frequency numbers (1 x MAXFREQ)
+* return : none
+*-----------------------------------------------------------------------------*/
+extern void set_obsdef(int sys, const int *freq_nums)
+{
+    obsdef_t obsdef_tmp[MAXFREQ]={{0}};
+    obsdef_t *obsdef;
+    obsdef_t obsdef0={0};
+    int i,j;
+
+    if (!(obsdef=get_obsdef(sys))) return;
+
+    for (i=0;i<MAXFREQ;i++) {
+        obsdef_tmp[i]=obsdef[i];
+        obsdef[i]=obsdef0;
+    }
+    for (i=0;i<MAXFREQ;i++) {
+        for (j=0;j<MAXFREQ;j++) {
+            if (obsdef_tmp[j].freq_num==freq_nums[i]) break;
+        }
+        if (j==MAXFREQ) continue;
+        obsdef[i].freq_num = obsdef_tmp[j].freq_num;
+        obsdef[i].freq_hz  = obsdef_tmp[j].freq_hz;
+        strcpy(obsdef[i].codepris,obsdef_tmp[j].codepris);
+    }
+}
+/* apply PPP signal selection options to obsdef tables -----------------------
+* rearrange obsdef tables based on pppsig[] options for madocalib PPP engine.
+* args   : const int *pppsig  I   signal selection [0]GPS,[1]QZS,[2]GAL,
+*                                 [3]BDS2,[4]BDS3 (from prcopt_t.pppsig)
+* return : none
+*-----------------------------------------------------------------------------*/
+extern void apply_pppsig(const int *pppsig)
+{
+    static const int fn_l1l2  [MAXFREQ]={1,2,0,0,0,0,0};
+    static const int fn_l1l5  [MAXFREQ]={1,5,0,0,0,0,0};
+    static const int fn_l1l2l5[MAXFREQ]={1,2,5,0,0,0,0};
+    static const int fn_l1l5l2[MAXFREQ]={1,5,2,0,0,0,0};
+
+    static const int fn_e1e5a      [MAXFREQ]={1,5,0,0,0,0,0};
+    static const int fn_e1e5b      [MAXFREQ]={1,7,0,0,0,0,0};
+    static const int fn_e1e6       [MAXFREQ]={1,6,0,0,0,0,0};
+    static const int fn_e1e5ae5be6 [MAXFREQ]={1,5,7,6,0,0,0};
+    static const int fn_e1e5ae6e5b [MAXFREQ]={1,5,6,7,0,0,0};
+
+    static const int fn_b1b3      [MAXFREQ]={2,6,0,0,0,0,0};
+    static const int fn_b1b2i     [MAXFREQ]={2,7,0,0,0,0,0};
+    static const int fn_b1b2a     [MAXFREQ]={2,5,0,0,0,0,0};
+    static const int fn_b1b3b2i   [MAXFREQ]={2,6,7,0,0,0,0};
+    static const int fn_b1b3b2a   [MAXFREQ]={2,6,5,0,0,0,0};
+
+    /* GPS signal selection */
+    switch (pppsig[0]) {
+        case 0: set_obsdef(SYS_GPS,fn_l1l2  ); break;
+        case 1: set_obsdef(SYS_GPS,fn_l1l5  ); break;
+        case 2: set_obsdef(SYS_GPS,fn_l1l2l5); break;
+    }
+    /* QZS signal selection */
+    switch (pppsig[1]) {
+        case 0: set_obsdef(SYS_QZS,fn_l1l5  ); break;
+        case 1: set_obsdef(SYS_QZS,fn_l1l2  ); break;
+        case 2: set_obsdef(SYS_QZS,fn_l1l5l2); break;
+    }
+    /* GAL signal selection */
+    switch (pppsig[2]) {
+        case 0: set_obsdef(SYS_GAL,fn_e1e5a      ); break;
+        case 1: set_obsdef(SYS_GAL,fn_e1e5b      ); break;
+        case 2: set_obsdef(SYS_GAL,fn_e1e6        ); break;
+        case 3: set_obsdef(SYS_GAL,fn_e1e5ae5be6  ); break;
+        case 4: set_obsdef(SYS_GAL,fn_e1e5ae6e5b  ); break;
+    }
+    /* BDS-2 signal selection */
+    switch (pppsig[3]) {
+        case 0: set_obsdef(SYS_BD2,fn_b1b3   ); break;
+        case 1: set_obsdef(SYS_BD2,fn_b1b2i  ); break;
+        case 2: set_obsdef(SYS_BD2,fn_b1b3b2i); break;
+    }
+    /* BDS-3 signal selection */
+    switch (pppsig[4]) {
+        case 0: set_obsdef(SYS_CMP,fn_b1b3   ); break;
+        case 1: set_obsdef(SYS_CMP,fn_b1b2a  ); break;
+        case 2: set_obsdef(SYS_CMP,fn_b1b3b2a); break;
+    }
+}
+/* get code priority string for system and frequency index --------------------
+* args   : int    sys        I   satellite system
+*          int    freq_idx   I   frequency index (0,1,2,...)
+* return : code priority string (from obsdef table) or "" on error
+*-----------------------------------------------------------------------------*/
+extern const char *get_codepris(int sys, int freq_idx)
+{
+    obsdef_t *obsdef=get_obsdef(sys);
+    if (!obsdef||freq_idx<0||MAXFREQ<=freq_idx) return "";
+    return obsdef[freq_idx].codepris;
+}
+/* convert frequency index to frequency number --------------------------------
+* args   : int    sys        I   satellite system
+*          int    freq_idx   I   frequency index (0,1,2,...)
+* return : frequency number (1,2,5,6,7,...) or 0 on error
+*-----------------------------------------------------------------------------*/
+extern int freq_idx2freq_num(int sys, int freq_idx)
+{
+    obsdef_t *obsdef=get_obsdef(sys);
+    if (!obsdef||freq_idx<0||MAXFREQ<=freq_idx) return 0;
+    return obsdef[freq_idx].freq_num;
+}
+/* convert frequency number to frequency index --------------------------------
+* args   : int    sys        I   satellite system
+*          int    freq_num   I   frequency number (1,2,5,6,7,...)
+* return : frequency index (0,1,2,...) or -1 on error
+*-----------------------------------------------------------------------------*/
+extern int freq_num2freq_idx(int sys, int freq_num)
+{
+    obsdef_t *obsdef=get_obsdef(sys);
+    int i;
+    if (!obsdef||freq_num<=0) return -1;
+    for (i=0;i<MAXFREQ;i++) {
+        if (obsdef[i].freq_num==freq_num) return i;
+    }
+    return -1;
+}
+/* convert frequency number to frequency (Hz) ---------------------------------
+* args   : int    sys        I   satellite system
+*          int    freq_num   I   frequency number (1,2,5,6,7,...)
+*          int    fcn        I   GLONASS frequency channel number (-7..6)
+* return : carrier frequency (Hz) or 0.0 on error
+*-----------------------------------------------------------------------------*/
+extern double freq_num2freq(int sys, int freq_num, int fcn)
+{
+    const double dfrq_glo[]={DFRQ1_GLO,DFRQ2_GLO,0.0};
+    obsdef_t *obsdef=get_obsdef(sys);
+    double freq=0.0,dfrq=0.0;
+    int i;
+    if (!obsdef||freq_num<=0) return 0.0;
+
+    if (sys==SYS_GLO) {
+        if (fcn<-7||fcn>6) return 0.0;
+        if (freq_num==1||freq_num==2) {
+            dfrq=dfrq_glo[freq_num-1];
+        }
+    }
+    for (i=0;i<MAXFREQ;i++) {
+        if (obsdef[i].freq_num==freq_num) {
+            freq=obsdef[i].freq_hz+dfrq*fcn;
+            break;
+        }
+    }
+    return freq;
+}
+/* convert frequency number to antenna PCV index ------------------------------
+* args   : int    sys        I   satellite system
+*          int    freq_num   I   frequency number (1,2,5,6,7,...)
+* return : antenna PCV index (0..NFREQPCV-1)
+*-----------------------------------------------------------------------------*/
+extern int freq_num2ant_idx(int sys, int freq_num)
+{
+    int idx=NFREQPCV-1;
+
+    if      ((sys&(SYS_GPS|SYS_GAL|SYS_QZS|SYS_SBS|SYS_CMP|SYS_BD2))&&
+             (freq_num==1)) idx=0;
+    else if ((sys&(SYS_GPS|SYS_QZS))&&
+             (freq_num==2)) idx=1;
+    else if ((sys&(SYS_GPS|SYS_GAL|SYS_QZS|SYS_SBS|SYS_CMP|SYS_BD2))&&
+             (freq_num==5)) idx=2;
+    else if ((sys&SYS_GLO)&&
+             (freq_num==1||freq_num==4)) idx=3;
+    else if ((sys&(SYS_CMP|SYS_BD2))&&
+             (freq_num==2)) idx=4;
+    else if ((sys&(SYS_GAL|SYS_QZS))&&
+             (freq_num==6)) idx=5;
+    else if ((sys&(SYS_CMP|SYS_BD2))&&
+             (freq_num==6)) idx=6;
+    else if ((sys&SYS_GLO)&&
+             (freq_num==2||freq_num==6)) idx=7;
+    else if ((sys&(SYS_GAL|SYS_CMP|SYS_BD2))&&
+             (freq_num==7)) idx=8;
+    else if ((sys&SYS_GLO)&&
+             (freq_num==3)) idx=9;
+    else if ((sys&(SYS_GAL|SYS_CMP|SYS_BD2))&&
+             (freq_num==8)) idx=10;
+    return idx;
+}
+/* convert frequency index to antenna PCV index --------------------------------
+* args   : int    sys        I   satellite system
+*          int    freq_idx   I   frequency index (0,1,2,...)
+* return : antenna PCV index (0..NFREQPCV-1)
+*-----------------------------------------------------------------------------*/
+extern int freq_idx2ant_idx(int sys, int freq_idx)
+{
+    int fn=freq_idx2freq_num(sys,freq_idx);
+    return freq_num2ant_idx(sys,fn);
 }
 /* satellite id to satellite number --------------------------------------------
 * convert satellite id to satellite number
@@ -442,7 +744,7 @@ extern int savenav(const char *file, const nav_t *nav)
 *                               (0x01: gps/qzs ephmeris, 0x02: glonass ephemeris,
 *                                0x04: sbas ephemeris,   0x08: precise ephemeris,
 *                                0x10: precise clock     0x20: almanac,
-*                                0x40: tec data)
+*                                0x40: tec data          0x80: pppiono data)
 * return : none
 *-----------------------------------------------------------------------------*/
 extern void freenav(nav_t *nav, int opt)
@@ -454,6 +756,7 @@ extern void freenav(nav_t *nav, int opt)
     if (opt&0x10) {free(nav->pclk); nav->pclk=NULL; nav->nc=nav->ncmax=0;}
     if (opt&0x20) {free(nav->alm ); nav->alm =NULL; nav->na=nav->namax=0;}
     if (opt&0x40) {free(nav->tec ); nav->tec =NULL; nav->nt=nav->ntmax=0;}
+    if (opt&0x80) {free(nav->pppiono); nav->pppiono=NULL;}
 }
 /* test excluded satellite ------------------------------------------------------
 * test excluded satellite
@@ -474,15 +777,9 @@ int satexclude(int sat, double var, int svh, const struct prcopt_t *opt)
         if (opt->exsats[sat-1]==2) return 0; /* included satellite */
         if (!(sys&opt->navsys)) return 1; /* unselected sat sys */
     }
-    if (sys==SYS_QZS) svh&=0xEE; /* mask QZSS L1C/A,C/B health */
-
-    if (sys==SYS_GLO) {
-        if ((svh&9)||((svh>>1)&3)==2) { /* test Bn and extended SVH */
-            trace(NULL,3,"unhealthy GLO satellite: sat=%3d svh=%02X\n",sat,svh);
-            return 1;
-        }
-    }
-    else if (svh) {
+    if (sys==SYS_QZS) svh&= 0xFE; /* mask QZSS LEX health */
+    if (sys==SYS_CMP) svh&=~0x1D; /* mask BeiDou health by reserved bit */
+    if (svh) {
         trace(NULL,3,"unhealthy satellite: sat=%3d svh=%02X\n",sat,svh);
         return 1;
     }

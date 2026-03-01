@@ -2,6 +2,8 @@
  * mrtk_obs.h : observation data type definitions and functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -89,6 +91,21 @@ char *code2obs(uint8_t code);
  * @return Frequency index (-1: error)
  */
 int code2idx(int sys, uint8_t code);
+
+/**
+ * @brief Extract frequency number from obs code.
+ * @param[in] code  Obs code (CODE_???)
+ * @return Frequency number (1,2,5,...) (0: error)
+ */
+int code2freq_num(uint8_t code);
+
+/**
+ * @brief Convert system and obs code to frequency index (obsdef-based).
+ * @param[in] sys   Satellite system (SYS_???)
+ * @param[in] code  Obs code (CODE_???)
+ * @return Frequency index (-1: error)
+ */
+int code2freq_idx(int sys, uint8_t code);
 
 /**
  * @brief Convert system and obs code to carrier frequency.

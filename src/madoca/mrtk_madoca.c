@@ -2,6 +2,8 @@
  * mrtk_madoca.c : MADOCA-PPP processing functions
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
  * Copyright (C) 2014 T.SUZUKI
@@ -10,6 +12,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *----------------------------------------------------------------------------*/
 #include "mrtklib/mrtk_madoca.h"
+#include "mrtklib/mrtk_const.h"
 #include "mrtklib/mrtk_bits.h"
 
 #include <stdio.h>
@@ -61,6 +64,7 @@ extern char *time_str(gtime_t t, int n);
 #define MCSSR_SYS_GAL               2
 #define MCSSR_SYS_BDS               3
 #define MCSSR_SYS_QZS               4
+#define MCSSR_SYS_BD3               7
 
 #define MCSSR_MAX_SATMASK          40   /* Satellite Mask (Table 4.2.2-8) */
 #define MCSSR_SATMASK_GPS_U  0xFFFFFFFFu /* Note, U and L for -Wlong-long Avoidance */
@@ -73,6 +77,8 @@ extern char *time_str(gtime_t t, int n);
 #define MCSSR_SATMASK_BDS_L  0xFF
 #define MCSSR_SATMASK_QZS_U  0xFFC00000u
 #define MCSSR_SATMASK_QZS_L  0x00
+#define MCSSR_SATMASK_BD3_U  0xFFFFFFFFu
+#define MCSSR_SATMASK_BD3_L  0xFF
 #define MCSSR_SATMASK_RSV_U  0xFFFFFFFFu
 #define MCSSR_SATMASK_RSV_L  0xFF
 
@@ -100,11 +106,15 @@ static const uint8_t cssr_sig_glo[16]={
 };
 static const uint8_t cssr_sig_gal[16]={
     CODE_L1B,CODE_L1C,CODE_L1X,CODE_L5I,CODE_L5Q,CODE_L5X,CODE_L7I,CODE_L7Q,
-    CODE_L7X,CODE_L8I,CODE_L8Q,CODE_L8X,CODE_L6A,CODE_L6B,       0,       0
+    CODE_L7X,CODE_L8I,CODE_L8Q,CODE_L8X,CODE_L6B,CODE_L6C,       0,       0
 };
-static const uint8_t cssr_sig_cmp[16]={
+static const uint8_t cssr_sig_bd2[16]={
     CODE_L2I,CODE_L2Q,CODE_L2X,CODE_L6I,CODE_L6Q,CODE_L6X,CODE_L7I,CODE_L7Q,
     CODE_L7X,       0,       0,       0,       0,       0,       0,       0
+};
+static const uint8_t cssr_sig_bd3[16]={
+    CODE_L2I,CODE_L2Q,       0,CODE_L6I,CODE_L6Q,       0,CODE_L7D,CODE_L7P,
+    CODE_L7Z,CODE_L1D,CODE_L1P,CODE_L1X,CODE_L5D,CODE_L5P,CODE_L5X,       0
 };
 static const uint8_t cssr_sig_qzs[16]={
     CODE_L1C,CODE_L1S,CODE_L1L,CODE_L1X,CODE_L2S,CODE_L2L,CODE_L2X,CODE_L5I,
@@ -139,7 +149,6 @@ typedef struct {
     int frame;                      /* frame counter */
     int tow0;                       /* for Hourly Epoch Time 1s */
     int ep0;                        /* for Hourly Epoch Time 1s regresses check */
-    int valep0;                     /* subtype 1 validity time */
     int iod;                        /* IOD SSR */
 } mcssr_t;
 
@@ -162,6 +171,7 @@ static int gnssid2sys(const int gnssid)
         case MCSSR_SYS_GAL : return SYS_GAL;
         case MCSSR_SYS_BDS : return SYS_CMP;
         case MCSSR_SYS_QZS : return SYS_QZS;
+        case MCSSR_SYS_BD3 : return SYS_CMP;
     }
     return SYS_NONE;
 }
@@ -173,7 +183,15 @@ static int svmask2list(const uint64_t mask, const int gnssid, int *satlist, int 
 
     for(i = 0; i < MCSSR_MAX_SATMASK; i++){
         if(mask & svbit) {
-            offp = (gnssid == MCSSR_SYS_QZS)? 193 : 1;
+            switch(gnssid){
+                case MCSSR_SYS_GPS : offp =   1; break;
+                case MCSSR_SYS_GLO : offp =   1; break;
+                case MCSSR_SYS_GAL : offp =   1; break;
+                case MCSSR_SYS_BDS : offp =   1; break;
+                case MCSSR_SYS_QZS : offp = 193; break;
+                case MCSSR_SYS_BD3 : offp =  19; break;
+                default            : offp =   1;
+            }
             satlist[ns] = satno(gnssid2sys(gnssid),offp+i);
             gidlist[ns] = gnssid;
             ns++;
@@ -194,8 +212,9 @@ static int sigmask2list(const uint16_t mask, const int gnssid, int *siglist)
         case MCSSR_SYS_GPS : sigs = cssr_sig_gps; break;
         case MCSSR_SYS_GLO : sigs = cssr_sig_glo; break;
         case MCSSR_SYS_GAL : sigs = cssr_sig_gal; break;
-        case MCSSR_SYS_BDS : sigs = cssr_sig_cmp; break;
+        case MCSSR_SYS_BDS : sigs = cssr_sig_bd2; break;
         case MCSSR_SYS_QZS : sigs = cssr_sig_qzs; break;
+        case MCSSR_SYS_BD3 : sigs = cssr_sig_bd3; break;
         default            : sigs = cssr_sig_rsv;
     }
 
@@ -251,9 +270,8 @@ static int decode_mcssr_mask(mcssr_t *mc, int i)
 
     i = decode_mcssr_head(mc, &sync, &iod, &ep, &udint, i, MCSSR_ST_MASK);
 
-    mc->tow0   = ep / 3600 * 3600;
-    mc->ep0    = ep % 3600;
-    mc->valep0 = mc->ep0 + (int)udint;
+    mc->tow0 = ep / 3600 * 3600;
+    mc->ep0  = ep % 3600;
     adjweek(&mc->gt, ep);
     mc->iod  = iod;
     mc->ns = 0;
@@ -274,6 +292,7 @@ static int decode_mcssr_mask(mcssr_t *mc, int i)
             case MCSSR_SYS_GAL : gnssmask = ((uint64_t)MCSSR_SATMASK_GAL_U) << 8 | MCSSR_SATMASK_GAL_L; break;
             case MCSSR_SYS_BDS : gnssmask = ((uint64_t)MCSSR_SATMASK_BDS_U) << 8 | MCSSR_SATMASK_BDS_L; break;
             case MCSSR_SYS_QZS : gnssmask = ((uint64_t)MCSSR_SATMASK_QZS_U) << 8 | MCSSR_SATMASK_QZS_L; break;
+            case MCSSR_SYS_BD3 : gnssmask = ((uint64_t)MCSSR_SATMASK_BD3_U) << 8 | MCSSR_SATMASK_BD3_L; break;
             default            : gnssmask = ((uint64_t)MCSSR_SATMASK_RSV_U) << 8 | MCSSR_SATMASK_RSV_L;
                                  trace(NULL,2,"decode_mcssr_mask: reserved gnssid=%d\n",gnssid);
         }
@@ -324,18 +343,15 @@ static int decode_mcssr_oc(mcssr_t *mc, ssr_t *ssr, int i, int apply)
         apply=0;
         return -1;
     }
-    if(mc->ep0 > ep) ep += 3600;
-    if(ep >= mc->valep0) {
-        trace(NULL,2,"decode_mcssr_oc: ep %d,expired ep %d by cssr ST1 mask\n",
-            ep, mc->valep0);
-        return -1;
+    else {
+        if(mc->ep0 > ep) ep += 3600;
+        adjweek(&mc->gt, mc->tow0 + ep);
+        if(mc->iod != iod) {
+            trace(NULL,2,"decode_mcssr_oc: %s,iod mismatch %d != %d\n",
+                time_str(mc->gt,3),mc->iod,iod);
+            apply=0;
+        }
     }
-    if(mc->iod != iod) {
-        trace(NULL,2,"decode_mcssr_oc: ep %d,iod mismatch %d != %d\n",
-            ep,mc->iod,iod);
-        return -1;
-    }
-    adjweek(&mc->gt, mc->tow0 + ep);
     for (j = 0; j < mc->ns; j++) {
         n = (mc->gidlist[j]==MCSSR_SYS_GAL)? 10: 8;
         iode    = getbitu(mc->buff, i,  n); i+= n; /* IODE */
@@ -383,18 +399,15 @@ static int decode_mcssr_cc(mcssr_t *mc, ssr_t *ssr, int i, int apply)
         apply=0;
         return -1;
     }
-    if(mc->ep0 > ep) ep += 3600;
-    if(ep >= mc->valep0) {
-        trace(NULL,2,"decode_mcssr_cc: ep %d,expired ep %d by cssr ST1 mask\n",
-            ep, mc->valep0);
-        return -1;
+    else {
+        if(mc->ep0 > ep) ep += 3600;
+        adjweek(&mc->gt, mc->tow0 + ep);
+        if(mc->iod != iod) {
+            trace(NULL,2,"decode_mcssr_cc: %s,iod mismatch %d != %d\n",
+                time_str(mc->gt,3),mc->iod,iod);
+            apply=0;
+        }
     }
-    if(mc->iod != iod) {
-        trace(NULL,2,"decode_mcssr_cc: ep %d,iod mismatch %d != %d\n",
-            ep,mc->iod,iod);
-        return -1;
-    }
-    adjweek(&mc->gt, mc->tow0 + ep);
     for (j = 0; j < mc->ns; j++) {
         dclk = getbits(mc->buff, i, 15); i+=15; /* Delta Clock C0 */
 
@@ -424,6 +437,7 @@ static int decode_mcssr_cc(mcssr_t *mc, ssr_t *ssr, int i, int apply)
 static int decode_mcssr_cb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
 {
     int j, k, sync, iod, ep, sat, nsig, mask, cb, flg;
+    int vcbias[MAXCODE]={0};
     double udint,cbias[MAXCODE];
     char satid[8];
 
@@ -434,20 +448,20 @@ static int decode_mcssr_cb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
         apply=0;
         return -1;
     }
-    if(mc->ep0 > ep) ep += 3600;
-    if(ep >= mc->valep0) {
-        trace(NULL,2,"decode_mcssr_cb: ep %d,expired ep %d by cssr ST1 mask\n",
-            ep, mc->valep0);
-        return -1;
+    else {
+        if(mc->ep0 > ep) ep += 3600;
+        adjweek(&mc->gt, mc->tow0 + ep);
+        if(mc->iod != iod) {
+            trace(NULL,2,"decode_mcssr_cb: %s,iod mismatch %d != %d\n",
+                time_str(mc->gt,3),mc->iod,iod);
+            apply=0;
+        }
     }
-    if(mc->iod != iod) {
-        trace(NULL,2,"decode_mcssr_cb: ep %d,iod mismatch %d != %d\n",
-            ep,mc->iod,iod);
-        return -1;
-    }
-    adjweek(&mc->gt, mc->tow0 + ep);
     for (j = 0; j < mc->ns; j++) {
-        for (k=0;k<MAXCODE;k++) cbias[k]=0.0;
+        for (k = 0; k < MAXCODE; k++) {
+            cbias[k]=0.0;
+            vcbias[k]=0;
+        }
         sat = mc->satlist[j];
         satno2id(sat, satid);
         nsig = mc->nsig[mc->gidlist[j]];
@@ -455,13 +469,19 @@ static int decode_mcssr_cb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
         for (k = 0; k < nsig; k++) {
             if((flg = (mc->cellmask[j] & mask))) {
                 cb = getbits(mc->buff, i, 11); i+=11; /* Code Bias */
-                trace(NULL,4,"decode_mcssr_cb :%s,i=%4d,j=%3d,k=%2d,sat=%s,flg=0x%2X,sig=%2d,cb=%5d,%6.2f\n",
+                trace(NULL,4,"decode_mcssr_cb: %s,i=%4d,j=%3d,k=%2d,sat=%s,flg=0x%2X,sig=%2d,cb=%5d,%6.2f\n",
                     time_str(mc->gt,3),i,j,k,satid,flg,mc->siglist[mc->gidlist[j]][k],cb,cb*0.02);
 
                 if(sat == 0) continue; /* unsupprted sat */
-                if(cb == MCSSR_INVALID_11BIT) continue; /* invalid value */
 
-                cbias[mc->siglist[mc->gidlist[j]][k]-1] = cb * 0.02;
+                cbias [mc->siglist[mc->gidlist[j]][k]-1] = cb * 0.02;
+                vcbias[mc->siglist[mc->gidlist[j]][k]-1] = 1; /* 1:output */
+
+                if(cb == MCSSR_INVALID_11BIT) { /* invalid value */
+                    cbias [mc->siglist[mc->gidlist[j]][k]-1]=SSR_INVALID_CBIAS;
+                    trace(NULL,3,"decode_mcssr_cb: invalid cbias %s %s %s\n",
+                        time_str(mc->gt,3),satid,code2obs(mc->siglist[mc->gidlist[j]][k]));
+                }
             }
             mask >>= 1;
         }
@@ -469,7 +489,10 @@ static int decode_mcssr_cb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
             ssr[sat-1].t0[4]   = mc->gt;
             ssr[sat-1].udi[4]  = udint;
             ssr[sat-1].iod[4]  = iod;
-            for (k=0;k<MAXCODE;k++) ssr[sat-1].cbias[k]=(float)cbias[k];
+            for (k=0;k<MAXCODE;k++) {
+                ssr[sat-1].cbias [k]=(float)cbias[k];
+                ssr[sat-1].vcbias[k]=vcbias[k];
+            }
             ssr[sat-1].update=1;
         }
     }
@@ -480,6 +503,7 @@ static int decode_mcssr_cb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
 static int decode_mcssr_pb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
 {
     int j, k, sync, iod, ep, sat, nsig, mask, pb, di, flg;
+    int discnt[MAXCODE]={0},vpbias[MAXCODE]={0};
     double udint,pbias[MAXCODE];
     char satid[8];
 
@@ -490,20 +514,20 @@ static int decode_mcssr_pb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
         apply=0;
         return -1;
     }
-    if(mc->ep0 > ep) ep += 3600;
-    if(ep >= mc->valep0) {
-        trace(NULL,2,"decode_mcssr_pb: ep %d,expired ep %d by cssr ST1 mask\n",
-            ep, mc->valep0);
-        return -1;
+    else {
+        if(mc->ep0 > ep) ep += 3600;
+        adjweek(&mc->gt, mc->tow0 + ep);
+        if(mc->iod != iod) {
+            trace(NULL,2,"decode_mcssr_pb: %s,iod mismatch %d != %d\n",
+                time_str(mc->gt,3),mc->iod,iod);
+            apply=0;
+        }
     }
-    if(mc->iod != iod) {
-        trace(NULL,2,"decode_mcssr_pb: ep %d,iod mismatch %d != %d\n",
-            ep,mc->iod,iod);
-        return -1;
-    }
-    adjweek(&mc->gt, mc->tow0 + ep);
     for (j = 0; j < mc->ns; j++) {
-        for (k=0;k<MAXCODE;k++) pbias[k]=0.0;
+        for (k = 0;k<MAXCODE;k++) {
+            pbias[k]=0.0;
+            discnt[k]=vpbias[k]=0;
+        }
         sat = mc->satlist[j];
         satno2id(sat, satid);
         nsig = mc->nsig[mc->gidlist[j]];
@@ -513,13 +537,18 @@ static int decode_mcssr_pb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
                 pb = getbits(mc->buff, i, 15); i+=15; /* Phase Bias */
                 di = getbitu(mc->buff, i,  2); i+= 2; /* Discontinuity Indicator */
 
-                trace(NULL,4,"decode_mcssr_pb :%s,i=%4d,j=%3d,k=%2d,sat=%s,flg=0x%2X,sig=%2d,di=%d,pb=%5d,%7.3f\n",
+                trace(NULL,4,"decode_mcssr_pb: %s,i=%4d,j=%3d,k=%2d,sat=%s,flg=0x%2X,sig=%2d,di=%d,pb=%5d,%7.3f\n",
                     time_str(mc->gt,3),i,j,k,satid,flg,mc->siglist[mc->gidlist[j]][k],di,pb,pb*0.001);
 
                 if(sat == 0) continue; /* unsupprted sat */
-                if(pb == MCSSR_INVALID_15BIT) continue; /* invalid value */
 
-                pbias[mc->siglist[mc->gidlist[j]][k]-1] = pb * 0.001;
+                pbias [mc->siglist[mc->gidlist[j]][k]-1] = pb * 0.001;
+                vpbias[mc->siglist[mc->gidlist[j]][k]-1] = 1; /* 1:output */
+                discnt[mc->siglist[mc->gidlist[j]][k]-1] = di;
+
+                if(pb == MCSSR_INVALID_15BIT) { /* invalid value */
+                    pbias [mc->siglist[mc->gidlist[j]][k]-1] = SSR_INVALID_PBIAS;
+                }
             }
             mask >>= 1;
         }
@@ -529,7 +558,11 @@ static int decode_mcssr_pb(mcssr_t *mc, ssr_t *ssr, int i, int apply)
             ssr[sat-1].iod[5]   = iod;
             ssr[sat-1].yaw_ang  = 0.0;
             ssr[sat-1].yaw_rate = 0.0;
-            for (k=0;k<MAXCODE;k++) ssr[sat-1].pbias[k] = (float)pbias[k];
+            for (k=0;k<MAXCODE;k++) {
+                ssr[sat-1].pbias [k] = (float)pbias[k];
+                ssr[sat-1].vpbias[k] = vpbias[k];
+                ssr[sat-1].discnt[k] = discnt[k];
+            }
             ssr[sat-1].update=1;
         }
     }
@@ -545,23 +578,20 @@ static int decode_mcssr_ura(mcssr_t *mc, ssr_t *ssr, int i, int apply)
 
     i = decode_mcssr_head(mc, &sync, &iod, &ep, &udint, i, MCSSR_ST_URA);
     if(mc->tow0 < 0) {
-        trace(NULL,2,"decode_mcssr_ura :%s,unprocessed mask\n",
+        trace(NULL,2,"decode_mcssr_ura: %s,unprocessed mask\n",
             time_str(mc->gt,3));
         apply=0;
         return -1;
     }
-    if(mc->ep0 > ep) ep += 3600;
-    if(ep >= mc->valep0) {
-        trace(NULL,2,"decode_mcssr_ura: ep %d,expired ep %d by cssr ST1 mask\n",
-            ep, mc->valep0);
-        return -1;
+    else {
+        if(mc->ep0 > ep) ep += 3600;
+        adjweek(&mc->gt, mc->tow0 + ep);
+        if(mc->iod != iod) {
+            trace(NULL,2,"decode_mcssr_ura: %s,iod mismatch %d != %d\n",
+                time_str(mc->gt,3),mc->iod,iod);
+            apply=0;
+        }
     }
-    if(mc->iod != iod) {
-        trace(NULL,2,"decode_mcssr_ura: ep %d,iod mismatch %d != %d\n",
-            ep,mc->iod,iod);
-        return -1;
-    }
-    adjweek(&mc->gt, mc->tow0 + ep);
     for (j = 0; j < mc->ns; j++) {
         ura = getbitu(mc->buff, i, 6); i+=6;
 
@@ -847,17 +877,17 @@ extern int mcssr_sel_biascode(const int sys, const int code)
             case CODE_L2X: return CODE_L2X; /* L2C(M+L) */
             case CODE_L2P:                  /* L2P */
             case CODE_L2W: return CODE_L2W; /* L2 Z-tracking */
-            case CODE_L5I:                  /* L5I */
-            case CODE_L5Q:                  /* L5Q */
+            case CODE_L5I: return CODE_L5I; /* L5I */
+            case CODE_L5Q: return CODE_L5Q; /* L5Q */
             case CODE_L5X: return CODE_L5X; /* L5X */
         }
         break;
     case SYS_GLO:
         switch (code) {
-            case CODE_L1C: return CODE_L1C; /* G1C/A */
-            case CODE_L1P: return CODE_L1P; /* G1P */
-            case CODE_L2C: return CODE_L2C; /* G2C/A */
-            case CODE_L2P: return CODE_L2P; /* G2P */
+            case CODE_L1C:                  /* G1C/A */
+            case CODE_L1P: return CODE_L1C; /* G1P */
+            case CODE_L2C:                  /* G2C/A */
+            case CODE_L2P: return CODE_L2C; /* G2P */
         }
         break;
     case SYS_GAL:
@@ -889,7 +919,27 @@ extern int mcssr_sel_biascode(const int sys, const int code)
             case CODE_L5Q:                  /* L5Q */
             case CODE_L5X: return CODE_L5X; /* L5X */
             case CODE_L1E: return CODE_L1E; /* L1C/B */
-	}
+        }
+        break;
+    case SYS_CMP:
+        switch (code) {
+            case CODE_L2I:                  /* B1I */
+            case CODE_L2Q:                  /* B1Q */
+            case CODE_L2X: return CODE_L2I; /* B1I+Q */
+            case CODE_L6I:                  /* B3I */
+            case CODE_L6Q:                  /* B3Q */
+            case CODE_L6X: return CODE_L6I; /* B3I+Q */
+            case CODE_L7I:                  /* B2I */
+            case CODE_L7Q:                  /* B2Q */
+            case CODE_L7X: return CODE_L7I; /* B2I+Q */
+            case CODE_L5D: return CODE_L5D; /* B2aI */
+            case CODE_L5P: return CODE_L5P; /* B2aQ */
+            case CODE_L5X: return CODE_L5X; /* B2aI+Q */
+            case CODE_L1D: return CODE_L1D; /* B1C(D) */
+            case CODE_L1P: return CODE_L1P; /* B1C(P) */
+            case CODE_L1X: return CODE_L1X; /* B1C(D+P) */
+            case CODE_L7D: return CODE_L7D; /* B2b */
+        }
         break;
     }
     return CODE_NONE;

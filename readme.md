@@ -8,7 +8,7 @@
 
 It is designed to overcome the architectural limitations of the original legacy [RTKLIB](https://www.rtklib.com/), providing a robust foundation for next-generation GNSS applications, including high-scale server processing, containerized environments, and seamless integration of Japanese QZSS augmentation services.
 
-Currently, the core algorithms are based on **MALIB (MADOCA-PPP Library) feature/1.2.0**, developed by JAXA and TOSHIBA.
+The structural foundation is based on **MALIB (MADOCA-PPP Library) feature/1.2.0** developed by JAXA and TOSHIBA, with the PPP positioning engine replaced by **MADOCALIB**'s implementation for higher-accuracy PPP/PPP-AR processing. Both post-processing (`rnx2rtkp`) and real-time processing (`rtkrcv`) are supported, including L6E (SSR orbit/clock/bias) and L6D (ionospheric STEC) correction streams.
 
 ---
 
@@ -23,12 +23,25 @@ MRTKLIB is not just another fork; it is a ground-up architectural redesign aimed
 
 ## 🗺️ Roadmap: The QZSS Grand Integration
 
-The ultimate goal of Phase 3 development is to unify the fragmented QZSS augmentation ecosystem. MRTKLIB plans to integrate:
-1. **MALIB** (MADOCA-PPP) - *Integrated (Current Base)*
-2. **MADOCALIB** (Upstream syncing)
-3. **CLASLIB** (Centimeter Level Augmentation Service)
+The ultimate goal is to unify the fragmented QZSS augmentation ecosystem into a single, conflict-free library. Current integration status:
 
-By combining these into a single, conflict-free library, users will be able to process both L6E and L6D streams seamlessly within the same unified application.
+| Component | Version | Description | Status |
+|-----------|---------|-------------|--------|
+| **MALIB** | feature/1.2.0 (`f006a34`) | MADOCA-PPP structural base (directory layout, threading, streams) | Integrated |
+| **MADOCALIB** | ver.2.0 (`8091004`) | PPP/PPP-AR engine, L6E SSR decoder, L6D ionospheric decoder | Integrated |
+| **CLASLIB** | — | Centimeter Level Augmentation Service | Planned |
+
+With the MADOCALIB integration complete, users can process L6E (orbit/clock/bias corrections) and L6D (ionospheric STEC corrections) streams seamlessly in both post-processing and real-time modes.
+
+### Known Limitations
+
+| Mode | L6E (SSR) | L6D (Ionospheric) | Notes |
+|------|-----------|-------------------|-------|
+| **Post-processing** (`rnx2rtkp`) | Multiple `.l6` files | Multiple `.l6` files | Full PPP/PPP-AR/PPP-AR+iono support |
+| **Real-time** (`rtkrcv`) | Single stream (`inpstr3`) | Not yet supported | PPP/PPP-AR only |
+
+* **Real-time correction stream**: The rtksvr architecture provides a single correction input (`inpstr3`). Multiple QZSS L6E channels (e.g., QZS-3 and QZS-4) are supported when the receiver multiplexes them into one SBF stream, which is the typical configuration for Septentrio and similar receivers.
+* **Real-time L6D**: Ionospheric STEC correction (L6D) input is not yet available in real-time mode. PPP-AR+iono requires post-processing.
 
 ---
 

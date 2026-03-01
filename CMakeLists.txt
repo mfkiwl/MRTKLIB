@@ -71,16 +71,19 @@ add_library(mrtklib STATIC
     src/rtcm/mrtk_rtcm2.c
     src/rtcm/mrtk_rtcm3.c
     src/rtcm/mrtk_rtcm3e.c
-    src/rtcm/mrtk_rtcm3lcl.c
+    src/rtcm/mrtk_rtcm3_local_corr.c
     # ── madoca/ (MADOCA-PPP固有処理) ───────────────────────────────────────────
     src/madoca/mrtk_madoca.c
+    src/madoca/mrtk_madoca_iono.c
     src/madoca/mrtk_madoca_local_corr.c
     src/madoca/mrtk_madoca_local_comb.c
+
     # ── pos/ (測位アルゴリズム・オプション) ────────────────────────────────────
     src/pos/mrtk_spp.c
     src/pos/mrtk_rtkpos.c
     src/pos/mrtk_ppp_ar.c
     src/pos/mrtk_ppp.c
+    src/pos/mrtk_ppp_iono.c
     src/pos/mrtk_lambda.c
     src/pos/mrtk_postpos.c
     src/pos/mrtk_sol.c
@@ -199,6 +202,10 @@ foreach(test IN LISTS _UTEST_SOURCES)
     set_tests_properties(utest_${test} PROPERTIES LABELS "utest")
 endforeach()
 
+# ── Python-based comparison tool ─────────────────────────────────────────────
+find_package(Python3 COMPONENTS Interpreter)
+set(_COMPARE_POS ${CMAKE_SOURCE_DIR}/scripts/tests/compare_pos.py)
+
 # ── Regression test data ─────────────────────────────────────────────────────
 set(_TESTDATA  ${CMAKE_SOURCE_DIR}/tests/data/malib)
 set(_REFDATA   ${CMAKE_SOURCE_DIR}/tests/data/malib)
@@ -235,35 +242,6 @@ set_tests_properties(regression_cleanup PROPERTIES
     FIXTURES_CLEANUP regression_data
 )
 
-# ── rnx2rtkp PPP regression ───────────────────────────────────────────────────
-add_test(NAME rnx2rtkp_ppp
-    COMMAND $<TARGET_FILE:rnx2rtkp>
-        -k ${CMAKE_SOURCE_DIR}/conf/malib/rnx2rtkp.conf
-        -o ${CMAKE_BINARY_DIR}/out_ppp.pos
-        ${_TESTDATA}/MALIB_OSS_data_obsnav_240822-1100.obs
-        ${_TESTDATA}/MALIB_OSS_data_obsnav_240822-1100.nav
-        ${_TESTDATA}/2024235L.209.l6
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-set_tests_properties(rnx2rtkp_ppp PROPERTIES
-    FIXTURES_REQUIRED regression_data
-    TIMEOUT           180
-    LABELS            "regression;ppp"
-)
-
-add_test(NAME rnx2rtkp_ppp_check
-    COMMAND ${CMAKE_COMMAND}
-        -DOUTPUT=${CMAKE_BINARY_DIR}/out_ppp.pos
-        -DREFERENCE=${_REFDATA}/MALIB_OSS_data_obsnav_240822-1100.pp.pos
-        -DTHRESHOLD=90
-        -P ${_TESTCMAKE}/compare_pos.cmake
-)
-set_tests_properties(rnx2rtkp_ppp_check PROPERTIES
-    DEPENDS           rnx2rtkp_ppp
-    FIXTURES_REQUIRED regression_data
-    LABELS            "regression;ppp"
-)
-
 # ── rnx2rtkp SPP regression ───────────────────────────────────────────────────
 add_test(NAME rnx2rtkp_spp
     COMMAND $<TARGET_FILE:rnx2rtkp>
@@ -280,11 +258,10 @@ set_tests_properties(rnx2rtkp_spp PROPERTIES
 )
 
 add_test(NAME rnx2rtkp_spp_check
-    COMMAND ${CMAKE_COMMAND}
-        -DOUTPUT=${CMAKE_BINARY_DIR}/out_spp.pos
-        -DREFERENCE=${_REFDATA}/MALIB_OSS_data_obsnav_240822-1100.pp.spp.pos
-        -DTHRESHOLD=90
-        -P ${_TESTCMAKE}/compare_pos.cmake
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_REFDATA}/MALIB_OSS_data_obsnav_240822-1100.pp.spp.pos
+        ${CMAKE_BINARY_DIR}/out_spp.pos
+        --tolerance 0.005
 )
 set_tests_properties(rnx2rtkp_spp_check PROPERTIES
     DEPENDS           rnx2rtkp_spp
@@ -343,3 +320,180 @@ set_tests_properties(rtkrcv_rt PROPERTIES
     TIMEOUT           300
     LABELS            "regression;realtime"
 )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MADOCALIB regression tests
+# ═══════════════════════════════════════════════════════════════════════════════
+# Data: MIZU station, 2025/04/01 Session A (00:00-00:59)
+# Source: upstream/madocalib/sample_data
+# Test data archive: tests/data/madocalib/madocalib_testdata.tar.gz
+#
+# Tests:
+#   madocalib_ppp         PPP (sample.conf)           L6E mdc-004
+#   madocalib_pppar       PPP-AR (sample_pppar.conf)  L6E mdc-004
+#   madocalib_pppar_003   PPP-AR (sample_pppar.conf)  L6E mdc-003
+#   madocalib_pppar_ion   PPP-AR+iono (sample_pppar_iono.conf) L6E+L6D mdc-004
+#   madocalib_cssr2ssr    CSSR→SSR conversion (cssr2ssr, not yet ported)
+set(_MDLDATA  ${CMAKE_SOURCE_DIR}/tests/data/madocalib)
+
+# ── Fixture: extract / clean madocalib test data archive ─────────────────────
+add_test(NAME madocalib_setup
+    COMMAND bash -c "tar xzf ${_MDLDATA}/madocalib_testdata.tar.gz -C ${_MDLDATA}"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_setup PROPERTIES
+    FIXTURES_SETUP  madocalib_data
+    TIMEOUT         30
+    LABELS          "regression;madocalib"
+)
+
+add_test(NAME madocalib_cleanup
+    COMMAND bash -c "rm -f \
+        ${_MDLDATA}/MIZU00JPN_R_20250910000_01D_30S_MO.obs \
+        ${_MDLDATA}/BRDM00DLR_S_20250910000_01D_MN.rnx \
+        ${_MDLDATA}/2025091A.204.l6 \
+        ${_MDLDATA}/2025091A.206.l6 \
+        ${_MDLDATA}/2025091A.204.mdc003.l6 \
+        ${_MDLDATA}/2025091A.206.mdc003.l6 \
+        ${_MDLDATA}/2025091A.200.l6 \
+        ${_MDLDATA}/2025091A.201.l6 \
+        ${_MDLDATA}/igs20.atx"
+)
+set_tests_properties(madocalib_cleanup PROPERTIES
+    FIXTURES_CLEANUP madocalib_data
+    LABELS           "regression;madocalib"
+)
+
+# ── rnx2rtkp MADOCA-PPP regression ──────────────────────────────────────────
+add_test(NAME madocalib_ppp
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/madocalib/rnx2rtkp.conf
+        -ts 2025/04/01 0:00:00 -te 2025/04/01 0:59:30 -ti 30
+        -o ${CMAKE_BINARY_DIR}/out_madocalib_ppp.pos
+        ${_MDLDATA}/MIZU00JPN_R_20250910000_01D_30S_MO.obs
+        ${_MDLDATA}/BRDM00DLR_S_20250910000_01D_MN.rnx
+        ${_MDLDATA}/2025091A.204.l6
+        ${_MDLDATA}/2025091A.206.l6
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_ppp PROPERTIES
+    FIXTURES_REQUIRED madocalib_data
+    TIMEOUT           180
+    LABELS            "regression;madocalib;ppp"
+)
+
+add_test(NAME madocalib_ppp_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_MDLDATA}/madocalib_MIZU_20250401-0000.pp.pos
+        ${CMAKE_BINARY_DIR}/out_madocalib_ppp.pos
+        --tolerance 0.005
+)
+set_tests_properties(madocalib_ppp_check PROPERTIES
+    DEPENDS           madocalib_ppp
+    FIXTURES_REQUIRED madocalib_data
+    LABELS            "regression;madocalib;ppp"
+)
+
+# ── rnx2rtkp MADOCA PPP-AR regression (mdc-004) ─────────────────────────────
+add_test(NAME madocalib_pppar
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/madocalib/rnx2rtkp_pppar.conf
+        -ts 2025/04/01 0:00:00 -te 2025/04/01 0:59:30 -ti 30
+        -o ${CMAKE_BINARY_DIR}/out_madocalib_pppar.pos
+        ${_MDLDATA}/MIZU00JPN_R_20250910000_01D_30S_MO.obs
+        ${_MDLDATA}/BRDM00DLR_S_20250910000_01D_MN.rnx
+        ${_MDLDATA}/2025091A.204.l6
+        ${_MDLDATA}/2025091A.206.l6
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_pppar PROPERTIES
+    FIXTURES_REQUIRED madocalib_data
+    TIMEOUT           180
+    LABELS            "regression;madocalib;pppar"
+)
+
+add_test(NAME madocalib_pppar_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar.pos
+        ${CMAKE_BINARY_DIR}/out_madocalib_pppar.pos
+        --tolerance 0.02
+)
+set_tests_properties(madocalib_pppar_check PROPERTIES
+    DEPENDS           madocalib_pppar
+    FIXTURES_REQUIRED madocalib_data
+    LABELS            "regression;madocalib;pppar"
+)
+
+# ── rnx2rtkp MADOCA PPP-AR regression (mdc-003) ─────────────────────────────
+add_test(NAME madocalib_pppar_003
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/madocalib/rnx2rtkp_pppar.conf
+        -ts 2025/04/01 0:00:00 -te 2025/04/01 0:59:30 -ti 30
+        -o ${CMAKE_BINARY_DIR}/out_madocalib_pppar_003.pos
+        ${_MDLDATA}/MIZU00JPN_R_20250910000_01D_30S_MO.obs
+        ${_MDLDATA}/BRDM00DLR_S_20250910000_01D_MN.rnx
+        ${_MDLDATA}/2025091A.204.mdc003.l6
+        ${_MDLDATA}/2025091A.206.mdc003.l6
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_pppar_003 PROPERTIES
+    FIXTURES_REQUIRED madocalib_data
+    TIMEOUT           180
+    LABELS            "regression;madocalib;pppar"
+)
+
+add_test(NAME madocalib_pppar_003_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar_003.pos
+        ${CMAKE_BINARY_DIR}/out_madocalib_pppar_003.pos
+        --tolerance 0.005
+)
+set_tests_properties(madocalib_pppar_003_check PROPERTIES
+    DEPENDS           madocalib_pppar_003
+    FIXTURES_REQUIRED madocalib_data
+    LABELS            "regression;madocalib;pppar"
+)
+
+# ── rnx2rtkp MADOCA PPP-AR + ionosphere regression ──────────────────────────
+# Uses L6E (.204/.206) + L6D (.200/.201) for ionospheric correction
+add_test(NAME madocalib_pppar_ion
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/madocalib/rnx2rtkp_pppar_iono.conf
+        -ts 2025/04/01 0:00:00 -te 2025/04/01 0:59:30 -ti 30
+        -o ${CMAKE_BINARY_DIR}/out_madocalib_pppar_ion.pos
+        ${_MDLDATA}/MIZU00JPN_R_20250910000_01D_30S_MO.obs
+        ${_MDLDATA}/BRDM00DLR_S_20250910000_01D_MN.rnx
+        ${_MDLDATA}/2025091A.204.l6
+        ${_MDLDATA}/2025091A.206.l6
+        ${_MDLDATA}/2025091A.200.l6
+        ${_MDLDATA}/2025091A.201.l6
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_pppar_ion PROPERTIES
+    FIXTURES_REQUIRED madocalib_data
+    TIMEOUT           180
+    LABELS            "regression;madocalib;pppar"
+)
+
+add_test(NAME madocalib_pppar_ion_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS}
+        ${_MDLDATA}/madocalib_MIZU_20250401-0000.pppar_ion.pos
+        ${CMAKE_BINARY_DIR}/out_madocalib_pppar_ion.pos
+        --tolerance 0.04
+)
+set_tests_properties(madocalib_pppar_ion_check PROPERTIES
+    DEPENDS           madocalib_pppar_ion
+    FIXTURES_REQUIRED madocalib_data
+    LABELS            "regression;madocalib;pppar"
+)
+
+# ── cssr2ssr regression (not yet ported) ─────────────────────────────────────
+# TODO: cssr2ssr binary is not yet integrated into MRTKLIB.
+#       When ported, add:
+#   add_test(NAME madocalib_cssr2ssr
+#       COMMAND $<TARGET_FILE:cssr2ssr>
+#           ${_MDLDATA}/2025091A.204.l6
+#           -o ${CMAKE_BINARY_DIR}/out_cssr2ssr.rtcm3
+#           -td 2025/04/01 -d
+#       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+#   )
