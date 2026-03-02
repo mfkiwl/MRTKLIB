@@ -79,6 +79,7 @@ add_library(mrtklib STATIC
     src/madoca/mrtk_madoca_local_comb.c
     # ── clas/ (CLAS CSSR処理) ──────────────────────────────────────────────────
     src/clas/mrtk_clas.c
+    src/clas/mrtk_clas_grid.c
 
     # ── pos/ (測位アルゴリズム・オプション) ────────────────────────────────────
     src/pos/mrtk_spp.c

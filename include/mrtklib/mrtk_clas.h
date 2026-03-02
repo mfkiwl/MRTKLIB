@@ -706,6 +706,69 @@ int clas_read_grid_def(clas_ctx_t *ctx, const char *file);
 int clas_get_correct_fac(int msgid);
 
 /*============================================================================
+ * Grid Interpolation (mrtk_clas_grid.c)
+ *===========================================================================*/
+
+/**
+ * @brief Select surrounding grid points and compute interpolation weights.
+ * @param[in,out] ctx      CLAS context (grid_pos, grid_stat)
+ * @param[in]     pos      Receiver position {lat,lon,hgt} (rad,m)
+ * @param[out]    grid     Interpolation result (weights, indices, matrix)
+ * @param[in]     gridsel  Grid selection threshold (m), 0=always multi-grid
+ * @param[in]     obstime  Observation time (reserved)
+ * @return Number of selected grids (0=error, 1/3/4=ok)
+ */
+int clas_get_grid_index(clas_ctx_t *ctx, const double *pos,
+                        clas_grid_t *grid, int gridsel, gtime_t obstime);
+
+/**
+ * @brief Interpolate STEC (ionosphere delay) from grid points.
+ * @param[in]  corr    Merged correction snapshot
+ * @param[in]  index   Selected grid point indices
+ * @param[in]  time    Time (GPST)
+ * @param[in]  sat     Satellite number
+ * @param[in]  n       Number of grids (1-4)
+ * @param[in]  weight  Interpolation weights
+ * @param[in]  Gmat    Interpolation matrix (4x4, can be NULL)
+ * @param[in]  Emat    Basis vector (4x1, can be NULL)
+ * @param[out] iono    Interpolated L1 ionosphere delay (m)
+ * @param[out] rate    Interpolated ionosphere rate (m/s)
+ * @param[out] var     Interpolated variance (m^2)
+ * @param[out] brk     Slip break flag
+ * @return 1=ok, 0=error
+ */
+int clas_stec_grid_data(clas_corr_t *corr, const int *index,
+                        gtime_t time, int sat, int n,
+                        const double *weight, const double *Gmat,
+                        const double *Emat, double *iono, double *rate,
+                        double *var, int *brk);
+
+/**
+ * @brief Interpolate troposphere delay from grid points.
+ * @param[in]  corr    Merged correction snapshot
+ * @param[in]  index   Selected grid point indices
+ * @param[in]  time    Time (GPST)
+ * @param[in]  n       Number of grids (1-4)
+ * @param[in]  weight  Interpolation weights
+ * @param[in]  Gmat    Interpolation matrix (4x4, can be NULL)
+ * @param[in]  Emat    Basis vector (4x1, can be NULL)
+ * @param[out] zwd     Interpolated zenith wet delay
+ * @param[out] ztd     Interpolated zenith total delay
+ * @param[out] tbrk    Validity flag (0=all valid, 1=partial)
+ * @return 1=ok, 0=error
+ */
+int clas_trop_grid_data(clas_corr_t *corr, const int *index,
+                        gtime_t time, int n, const double *weight,
+                        const double *Gmat, const double *Emat,
+                        double *zwd, double *ztd, int *tbrk);
+
+/**
+ * @brief Initialize ocean loading data in context.
+ * @param[in,out] ctx  CLAS context
+ */
+void clas_init_oload(clas_ctx_t *ctx);
+
+/*============================================================================
  * CSSR Helper Functions
  *===========================================================================*/
 
