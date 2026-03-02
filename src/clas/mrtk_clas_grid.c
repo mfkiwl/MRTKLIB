@@ -690,8 +690,8 @@ static int trop_data(zwd_t *z, gtime_t time, double *ztd, double *zwd,
 
     tt = timediff(time, z->data[k].time);
     if (fabs(tt) > MAXAGESSR_TROP) {
-        trace(NULL, 2, "age of ssr trop error %s tt=%.0f\n",
-              time_str(time, 0), tt);
+        trace(NULL, 2, "age of ssr trop error %s tt=%.0f idx=%d\n",
+              time_str(time, 0), tt, idx);
         return 0;
     }
 

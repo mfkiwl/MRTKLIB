@@ -50,6 +50,7 @@ typedef struct {        /* RTK control/result type */
     int nx,na;          /* number of float states/fixed states */
     double tt;          /* time difference between current and previous (s) */
     double *x, *P;      /* float states and their covariance */
+    double *Q;          /* process noise covariance (adaptive filter) */
     double *xa,*Pa;     /* fixed states and their covariance */
     int nfix;           /* number of continuous fixes of ambiguity */
     ambc_t ambc[MAXSAT]; /* ambibuity control */

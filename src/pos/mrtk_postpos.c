@@ -426,6 +426,17 @@ static void update_clas(gtime_t time)
     int ch,ret;
     char path[1024];
 
+    /* initialize GPS week reference from observation time (once) */
+    if (clas_ctx && clas_ctx->week_ref[0]==0 && time.time!=0) {
+        int i,week;
+        time2gpst(time,&week);
+        for (i=0;i<CSSR_REF_MAX;i++) {
+            clas_ctx->week_ref[i]=week;
+            clas_ctx->tow_ref[i]=-1;  /* mark as unset for rollover detection */
+        }
+        trace(NULL,2,"clas week_ref initialized: week=%d\n",week);
+    }
+
     for (ch=0;ch<CLAS_CH_NUM;ch++) {
         if (!*clas_file[ch]) continue;
 
@@ -447,12 +458,39 @@ static void update_clas(gtime_t time)
             ret=clas_input_cssrf(clas_ctx,fp_clas[ch],ch);
             if (ret<-1) break; /* EOF */
             if (ret==10) {
-                /* new CSSR message decoded: merge bank and update nav */
-                clas_bank_get_close(clas_ctx,clas_ctx->l6buf[ch].time,
-                                    clas_ctx->grid[ch].network,ch,
-                                    &clas_ctx->current[ch]);
-                clas_update_global(&navs,&clas_ctx->current[ch],ch);
+                int net=clas_ctx->grid[ch].network;
+                if (net>0) {
+                    /* normal: merge bank for known network */
+                    if (clas_bank_get_close(clas_ctx,clas_ctx->l6buf[ch].time,
+                                           net,ch,&clas_ctx->current[ch])==0) {
+                        clas_update_global(&navs,&clas_ctx->current[ch],ch);
+                        clas_check_grid_status(clas_ctx,&clas_ctx->current[ch],ch);
+                    }
+                }
             }
+        }
+        /* bootstrap: when network is unknown, scan all networks to
+         * populate grid_stat so clas_get_grid_index() can determine
+         * the correct network from the rover position.
+         * Uses a heap-allocated temporary corr to avoid corrupting
+         * current[ch] and stack overflow (clas_corr_t is ~352KB). */
+        if (clas_ctx->grid[ch].network<=0 && clas_ctx->bank[ch]->use) {
+            clas_corr_t *tmp_corr=(clas_corr_t *)calloc(1,sizeof(clas_corr_t));
+            int net;
+            if (tmp_corr) {
+                for (net=1;net<CLAS_MAX_NETWORK;net++) {
+                    if (clas_bank_get_close(clas_ctx,clas_ctx->l6buf[ch].time,
+                                           net,ch,tmp_corr)==0) {
+                        clas_check_grid_status(clas_ctx,tmp_corr,ch);
+                        /* apply global corrections (orbit/clock/bias) from any
+                         * successful network — these are shared across networks */
+                        clas_update_global(&navs,tmp_corr,ch);
+                    }
+                }
+                free(tmp_corr);
+            }
+            trace(NULL,3,"clas bootstrap: scanned %d networks for ch=%d\n",
+                  CLAS_MAX_NETWORK-1,ch);
         }
     }
 }
@@ -805,10 +843,11 @@ static void readpreceph(char **infile, int n, const prcopt_t *prcopt,
         }
     }
 
-    /* MADOCA-PPP L6 and CLAS L6 files: discriminate by PRN and -clas option */
+    /* MADOCA-PPP L6 and CLAS L6 files: discriminate by PRN and mode */
     {
         int nf_l6d=0,nf_clas=0;
-        int clas_mode=strstr(prcopt->pppopt,"-clas")!=NULL;
+        int clas_mode=(prcopt->mode==PMODE_PPP_RTK)||
+                      strstr(prcopt->pppopt,"-clas")!=NULL;
 
         for (i=0;i<n;i++) {
             if ((ext=strrchr(infile[i],'.'))&&
@@ -820,10 +859,8 @@ static void readpreceph(char **infile, int n, const prcopt_t *prcopt,
                      !strcmp(ext-4,".201.l6")||!strcmp(ext-4,".201.L6"))) {
                     if (nf_l6d<MIONO_MAX_PRN) strcpy(qzssl6d_file[nf_l6d++],infile[i]);
                 }
-                /* CLAS (PRN=204,206) — only when -clas option specified */
-                else if (clas_mode&&(ext-infile[i]>=4) &&
-                    (!strcmp(ext-4,".204.l6")||!strcmp(ext-4,".204.L6")||
-                     !strcmp(ext-4,".206.l6")||!strcmp(ext-4,".206.L6"))) {
+                /* CLAS: all non-L6D .l6 files in PPP-RTK or -clas mode */
+                else if (clas_mode) {
                     if (nf_clas<CLAS_CH_NUM) strcpy(clas_file[nf_clas++],infile[i]);
                 }
                 else if (!*qzssl6e_file) { /* L6E (first match only) */
@@ -1253,6 +1290,12 @@ static int execses(mrtk_ctx_t *ctx, gtime_t ts, gtime_t te, double ti, const prc
     /* read ocean tide loading parameters */
     if (popt_.mode>PMODE_SINGLE&&*fopt->blq) {
         readotl(&popt_,fopt->blq,stas);
+    }
+    /* read CLAS grid definition file */
+    if (clas_ctx&&*fopt->grid) {
+        if (clas_read_grid_def(clas_ctx,fopt->grid)!=0) {
+            trace(NULL,1,"clas grid file error: %s\n",fopt->grid);
+        }
     }
     /* rover/reference fixed position */
     if (popt_.mode==PMODE_FIXED) {

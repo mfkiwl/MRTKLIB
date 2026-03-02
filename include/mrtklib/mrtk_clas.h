@@ -168,7 +168,7 @@ enum {
  *===========================================================================*/
 
 #define CLAS_CH_NUM          2          /* L6 channels */
-#define CLAS_MAX_NETWORK     6          /* max networks in bank storage */
+#define CLAS_MAX_NETWORK    13          /* max networks (upstream uses 32, 13 covers networks 1-12) */
 #define CLAS_BANK_NUM       32          /* bank depth (ring buffer entries) */
 #define CLAS_MAX_GP         80          /* max grid points in bank storage */
 
@@ -698,6 +698,19 @@ void clas_update_local(nav_t *nav, const clas_corr_t *corr, int ch);
  * @return 0 on success, -1 on error
  */
 int clas_read_grid_def(clas_ctx_t *ctx, const char *file);
+
+/**
+ * @brief Check and update grid status flags based on correction availability.
+ *
+ * Validates that orbit, trop, and STEC corrections exist for each grid point
+ * and sets grid_stat[ch][network][gp] accordingly. Must be called after
+ * clas_bank_get_close() to enable grid-based positioning.
+ *
+ * @param[in,out] ctx   CLAS context (updates grid_stat)
+ * @param[in]     time  Current observation time
+ * @param[in]     ch    L6 channel index (0..CLAS_CH_NUM-1)
+ */
+void clas_check_grid_status(clas_ctx_t *ctx, const clas_corr_t *corr, int ch);
 
 /**
  * @brief Get L6 facility ID from message ID byte.

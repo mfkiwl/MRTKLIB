@@ -39,6 +39,13 @@ extern "C" {
 int ppp_rtk_nx(const prcopt_t *opt);
 
 /**
+ * @brief Compute number of non-ambiguity states for PPP-RTK.
+ * @param[in] opt  Processing options
+ * @return Number of non-ambiguity states (position + iono + trop)
+ */
+int ppp_rtk_na(const prcopt_t *opt);
+
+/**
  * @brief PPP-RTK positioning for one epoch (CLAS).
  *
  * Main entry point for the CLAS PPP-RTK positioning engine, ported from

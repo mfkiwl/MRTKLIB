@@ -90,6 +90,7 @@ extern "C" {
 #define IONOOPT_TEC  5              /* ionosphere option: IONEX TEC model */
 #define IONOOPT_QZS  6              /* ionosphere option: QZSS broadcast model */
 #define IONOOPT_STEC 8              /* ionosphere option: SLANT TEC model */
+#define IONOOPT_EST_ADPT 9          /* ionosphere option: adaptive estimation */
 
 #define TROPOPT_OFF  0              /* troposphere option: correction off */
 #define TROPOPT_SAAS 1              /* troposphere option: Saastamoinen model */
@@ -196,7 +197,7 @@ typedef struct prcopt_t {        /* processing options type */
     int  initrst;       /* initialize by restart */
     int  outsingle;     /* output single by dgps/float/fix/ppp outage */
     char rnxopt[2][256]; /* rinex options {rover,base} */
-    int  posopt[6];     /* positioning options */
+    int  posopt[11];    /* positioning options */
     int  syncsol;       /* solution sync mode (0:off,1:on) */
     double odisp[2][6*11]; /* ocean tide loading parameters {rov,base} */
     int  freqopt;       /* disable L2-AR */
@@ -208,6 +209,30 @@ typedef struct prcopt_t {        /* processing options type */
     char *l6dpath[MIONO_MAX_PRN]; /* MADOCA-PPP L6D file paths */
     int  ionocorr;      /* MADOCA-PPP ionospheric correction (0:off,1:on) */
     double uraratio;    /* ratio for external URA in PPP variance */
+
+    /* PPP-RTK specific (CLAS) options — appended for ABI stability */
+    int    gridsel;        /* grid select threshold (m), 0=auto */
+    int    alphaar;        /* AR significance index (0:0.1%..5:20%) */
+    int    qzsmodear;      /* QZSS AR mode (0:off,1:on) */
+    int    minamb;         /* min ambiguities for PAR */
+    int    armaxdelsat;    /* max excluded sats for PAR */
+    int    floatcnt;       /* float counter for filter reset */
+    int    poserrcnt;      /* pos error count to reset */
+    int    phasshft;       /* phase shift correction (0:off,1:table) */
+    int    prnadpt;        /* adaptive process noise (0:off,1:on) */
+    double maxinno_ext[5]; /* reject thresholds [0]:L1/L2 [1]:disp [2]:nondisp [3]:F&H [4]:Fix */
+    double varholdamb;     /* hold-ambiguity variance (cycle^2) */
+    double maxdiffp;       /* max pseudorange diff for reset (m) */
+    double maxobsloss_s;   /* max obs gap to reset states (s) */
+    double forgetion;      /* forgetting factor iono (0-1) */
+    double afgainion;      /* adaptive gain iono */
+    double forgetpva;      /* forgetting factor PVA (0-1) */
+    double afgainpva;      /* adaptive gain PVA */
+    double prnionomax;     /* max process noise for adaptive iono (m) */
+    double stats_prnposith; /* process noise std pos h (m) */
+    double stats_prnpositv; /* process noise std pos v (m) */
+    double stats_tconstiono; /* time constant of iono variation (s) */
+    char   rectype[2][MAXANT]; /* receiver types {rover,ref} */
 } prcopt_t;
 
 /*============================================================================
@@ -256,6 +281,9 @@ typedef struct {        /* file options type */
     char trace  [MAXSTRPATH]; /* debug trace file */
     char bia    [MAXSTRPATH]; /* bias sinex data file */
     char fcb    [MAXSTRPATH]; /* fcb data file */
+    char grid   [MAXSTRPATH]; /* CLAS grid definition file */
+    char isb    [MAXSTRPATH]; /* ISB correction table file */
+    char phacyc [MAXSTRPATH]; /* phase cycle shift table file */
 } filopt_t;
 
 /*============================================================================

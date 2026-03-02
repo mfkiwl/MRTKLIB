@@ -1683,7 +1683,7 @@ extern void rtkinit(rtk_t *rtk, const prcopt_t *opt)
     for (i=0;i<6;i++) rtk->rb[i]=0.0;
     if (opt->mode==PMODE_PPP_RTK) {
         rtk->nx=ppp_rtk_nx(opt);
-        rtk->na=ppp_rtk_nx(opt);
+        rtk->na=ppp_rtk_na(opt);
     } else if (opt->mode<=PMODE_FIXED) {
         rtk->nx=NX(opt);
         rtk->na=NR(opt);
@@ -1696,6 +1696,7 @@ extern void rtkinit(rtk_t *rtk, const prcopt_t *opt)
     rtk->P=zeros(rtk->nx,rtk->nx);
     rtk->xa=zeros(rtk->na,1);
     rtk->Pa=zeros(rtk->na,rtk->na);
+    rtk->Q=zeros(rtk->nx,rtk->nx);
     rtk->nfix=rtk->neb=0;
     for (i=0;i<MAXSAT;i++) {
         rtk->ambc[i]=ambc0;
@@ -1717,6 +1718,7 @@ extern void rtkfree(rtk_t *rtk)
     rtk->nx=rtk->na=0;
     free(rtk->x ); rtk->x =NULL;
     free(rtk->P ); rtk->P =NULL;
+    free(rtk->Q ); rtk->Q =NULL;
     free(rtk->xa); rtk->xa=NULL;
     free(rtk->Pa); rtk->Pa=NULL;
 }
@@ -2100,13 +2102,18 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
     udbiass(obs[0].time, opt, nav);
     
     /* rover position by single point positioning */
-    if (!pntpos(ctx,obs,nu,nav,&rtk->opt,&rtk->sol,NULL,rtk->ssat,msg)) {
-        errmsg(rtk,"point pos error (%s)\n",msg);
+    {
+        prcopt_t sppopt=rtk->opt;
+        /* PPP-RTK: force broadcast ephemeris for SPP initial position */
+        if (sppopt.mode==PMODE_PPP_RTK) sppopt.sateph=EPHOPT_BRDC;
+        if (!pntpos(ctx,obs,nu,nav,&sppopt,&rtk->sol,NULL,rtk->ssat,msg)) {
+            errmsg(rtk,"point pos error (%s)\n",msg);
 
-        if (!rtk->opt.dynamics) {
-            trace(ctx,4,"obs=\n"); traceobs(ctx,4,obs,n);
-            outsolstat(rtk);
-            return 0;
+            if (!rtk->opt.dynamics) {
+                trace(ctx,4,"obs=\n"); traceobs(ctx,4,obs,n);
+                outsolstat(rtk);
+                return 0;
+            }
         }
     }
     if (time.time!=0) rtk->tt=timediff(rtk->sol.time,time);

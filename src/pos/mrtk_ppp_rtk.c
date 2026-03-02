@@ -83,7 +83,7 @@ static const double lam_carr[3] = {LAM_CARR_L1, LAM_CARR_L2, LAM_CARR_L5};
 
 #define NF_RTK(opt)   ((opt)->nf)
 #define NP_RTK(opt)   ((opt)->dynamics==0?3:9)
-#define NI_RTK(opt)   ((opt)->ionoopt!=IONOOPT_EST?0:MAXSAT)
+#define NI_RTK(opt)   (((opt)->ionoopt==IONOOPT_EST||(opt)->ionoopt==IONOOPT_EST_ADPT)?MAXSAT:0)
 #define NT_RTK(opt)   ((opt)->tropopt<TROPOPT_EST?0:((opt)->tropopt<TROPOPT_ESTG?1:3))
 #define NR_RTK(opt)   (NP_RTK(opt)+NI_RTK(opt)+NT_RTK(opt))
 #define NB_RTK(opt)   (MAXSAT*NF_RTK(opt))
@@ -452,11 +452,27 @@ static void udion(rtk_t *rtk, double tt, double bl, const obsd_t *obs, int ns)
         j = II_RTK(obs[i].sat, &rtk->opt);
         if (rtk->x[j] == 0.0) {
             initx(rtk, 1E-6, SQR(rtk->opt.std[1]), j);
+            rtk->Q[j + j * rtk->nx] = 0.0;
         } else {
             /* elevation dependent factor of process noise */
             el = rtk->ssat[obs[i].sat - 1].azel[1];
             fact = cos(el);
-            qi = SQR(rtk->opt.prn[1] * fact);
+            if (rtk->opt.ionoopt == IONOOPT_EST_ADPT) {
+                /* adaptive: clamp Q within [prn[1]^2, prnionomax^2] */
+                if (rtk->Q[j + j * rtk->nx] == 0.0) {
+                    rtk->Q[j + j * rtk->nx] = SQR(rtk->opt.prn[1] * fact);
+                } else {
+                    if (rtk->Q[j + j * rtk->nx] > SQR(rtk->opt.prnionomax)) {
+                        rtk->Q[j + j * rtk->nx] = SQR(rtk->opt.prnionomax);
+                    } else if (rtk->Q[j + j * rtk->nx] < SQR(rtk->opt.prn[1])) {
+                        rtk->Q[j + j * rtk->nx] = SQR(rtk->opt.prn[1]);
+                    }
+                }
+                qi = rtk->Q[j + j * rtk->nx];
+            } else {
+                qi = SQR(rtk->opt.prn[1] * fact);
+                rtk->Q[j + j * rtk->nx] = qi;
+            }
             rtk->P[j + j * rtk->nx] += qi * tt;
         }
     }
@@ -1215,7 +1231,8 @@ static int ddres(rtk_t *rtk, const nav_t *nav, double *x, double *pbslip,
                 }
 
                 /* DD ionospheric delay term */
-                if (opt->ionoopt == IONOOPT_EST) {
+                if (opt->ionoopt == IONOOPT_EST ||
+                    opt->ionoopt == IONOOPT_EST_ADPT) {
                     fi = lami / lam_carr[0];
                     fj = lamj / lam_carr[0];
                     didxi = (f < nf ? -1.0 : 1.0) * fi * fi * im[i];
@@ -1605,6 +1622,11 @@ extern int ppp_rtk_nx(const prcopt_t *opt)
     return NX_RTK(opt);
 }
 
+extern int ppp_rtk_na(const prcopt_t *opt)
+{
+    return NR_RTK(opt);
+}
+
 /*============================================================================
  * Public API: PPP-RTK positioning for one epoch
  *===========================================================================*/
@@ -1642,6 +1664,7 @@ extern void ppp_rtk_pos(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav)
 
     trace(NULL, 2, "ppp_rtk_pos: time=%s nx=%d n=%d\n",
           time_str(obs[0].time, 0), rtk->nx, n);
+    /* temporary debug (remove after Phase 5.3) */
 
     /* check CLAS context availability */
     if (!nav->clas_ctx) {
@@ -1690,6 +1713,21 @@ extern void ppp_rtk_pos(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav)
         return;
     }
 
+    /* fetch corrections for detected network — always refresh using
+     * the L6 buffer time (which matches the bank data timing) */
+    if (grid->network > 0 && grid->network != corr->network) {
+        if (clas_bank_get_close(clas, clas->l6buf[0].time, grid->network, 0,
+                                &clas->current[0]) != 0) {
+            trace(NULL, 2, "ppp_rtk_pos: bank lookup failed for net=%d\n",
+                  grid->network);
+            free(azel); free(e); free(y); free(rs); free(dts); free(var);
+            rtk->sol.stat = SOLQ_SINGLE;
+            return;
+        }
+        clas_check_grid_status(clas, &clas->current[0], 0);
+        corr = &clas->current[0];
+    }
+
     /* apply global corrections to nav */
     clas_update_global(nav, corr, 0);
     /* apply local corrections to nav */
@@ -1730,11 +1768,6 @@ extern void ppp_rtk_pos(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav)
                                    &prtk_ctx.osr_ctx, grid, corr,
                                    rtk->ssat, &rtk->opt, &rtk->sol,
                                    NULL, 0);
-
-            /* trop estimation initialization when trop SSR is valid */
-            if (i == 0 && k == 0 && rtk->opt.tropopt >= TROPOPT_EST) {
-                /* check if this is first epoch (position just initialized) */
-            }
 
             if (!nvtmp) {
                 trace(NULL, 2, "rover initial position error\n");
@@ -1797,6 +1830,17 @@ extern void ppp_rtk_pos(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav)
         /* update state and covariance matrix */
         matcpy(rtk->x, xp, rtk->nx, 1);
         matcpy(rtk->P, Pp, rtk->nx, rtk->nx);
+
+        /* adaptive process noise update for ionosphere */
+        if (rtk->opt.ionoopt == IONOOPT_EST_ADPT) {
+            for (i = 0; i < n; i++) {
+                j = II_RTK(obs[i].sat, &rtk->opt);
+                rtk->Q[j + j * rtk->nx] =
+                    rtk->opt.forgetion * rtk->Q[j + j * rtk->nx] +
+                    (1.0 - rtk->opt.forgetion) * SQR(rtk->opt.afgainion) *
+                    Pp[j + j * rtk->nx];
+            }
+        }
 
         /* update ambiguity control struct */
         rtk->sol.ns = 0;

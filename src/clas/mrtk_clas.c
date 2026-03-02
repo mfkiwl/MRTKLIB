@@ -60,6 +60,10 @@ extern int clas_ctx_init(clas_ctx_t *ctx)
             return -1;
         }
     }
+    /* initialize banks (sets bank->use = 1) */
+    for (i = 0; i < CLAS_CH_NUM; i++) {
+        clas_bank_init(ctx, i);
+    }
     /* initialize tow_ref to -1 (unset) */
     for (i = 0; i < CSSR_REF_MAX; i++) {
         ctx->tow_ref[i] = -1;
@@ -1053,6 +1057,46 @@ extern int clas_bank_get_close(const clas_ctx_t *ctx, gtime_t time,
     corr->network = network;
     corr->use = 1;
     return 0;
+}
+
+/*============================================================================
+ * Grid Status Check (from upstream cssr.c:check_cssr_grid_status)
+ *===========================================================================*/
+
+extern void clas_check_grid_status(clas_ctx_t *ctx, const clas_corr_t *corr,
+                                   int ch)
+{
+    int i, valid, network, nvalid=0;
+
+    if (!corr->use) return;
+
+    network = corr->network;
+    if (network <= 0 || network >= CLAS_MAX_NETWORK) return;
+
+    /* orbit + trop corrections must exist */
+    if (corr->orbit_time.time == 0 || corr->trop_time.time == 0) {
+        for (i = 0; i < CLAS_MAX_GP; i++)
+            ctx->grid_stat[ch][network][i] = 0;
+        return;
+    }
+
+    for (i = 0; i < corr->gridnum && i < CLAS_MAX_GP; i++) {
+        /* check trop validity */
+        if (!corr->zwddata[i].valid) {
+            ctx->grid_stat[ch][network][i] = 0;
+            continue;
+        }
+        /* count valid STEC entries (added by add_data_stec with flag=1) */
+        valid = corr->stec[i].n;
+
+        ctx->grid_stat[ch][network][i] = (valid >= 8) ? 1 : 0;
+        if (valid >= 8) nvalid++;
+    }
+    trace(NULL, 4, "grid_status: ch=%d net=%d gridnum=%d nvalid=%d\n",
+          ch, network, corr->gridnum, nvalid);
+    /* clear remaining grid points */
+    for (i = corr->gridnum; i < CLAS_MAX_GP; i++)
+        ctx->grid_stat[ch][network][i] = 0;
 }
 
 /*============================================================================

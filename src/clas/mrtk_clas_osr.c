@@ -515,7 +515,7 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
                        int *pbreset, int ch, clas_osr_ctx_t *osr_ctx)
 {
     double lam[NFREQ + NEXOBS];
-    double vari, dant[NFREQ + NEXOBS] = {0}, compL[NFREQ + NEXOBS] = {0};
+    double vari, dant[NFREQPCV] = {0}, compL[NFREQ + NEXOBS] = {0};
     double stec = 0.0, rate, t5, t6;
     double pbias[NFREQ + NEXOBS] = {0}, cbias[NFREQ + NEXOBS] = {0};
     int i, j, sat, smode, nsig, nf = opt->nf;

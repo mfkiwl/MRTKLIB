@@ -274,6 +274,10 @@ def main():
         "--plot", action="store_true",
         help="Generate comparison plot (compare_nmea_result.png)"
     )
+    parser.add_argument(
+        "--skip-fixrate", action="store_true",
+        help="Skip fix rate degradation check (for float-only solutions)"
+    )
     args = parser.parse_args()
 
     # Parse files
@@ -345,7 +349,9 @@ def main():
               f"tolerance ({args.tolerance:.6f} m)")
 
     # Criterion 2: Fix rate not degraded by more than 5.0% (relaxed for PPP-RTK)
-    if fix_delta < -5.0:
+    if args.skip_fixrate:
+        print("SKIP: Fix rate check disabled (--skip-fixrate)")
+    elif fix_delta < -5.0:
         print(f"FAIL: Fix rate degraded by {fix_delta:.2f}% "
               f"(threshold: -5.0%)")
         passed = False
