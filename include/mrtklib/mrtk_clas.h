@@ -35,6 +35,7 @@ extern "C" {
 #include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_time.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_bits.h"
 
 /*============================================================================
  * CLAS Version
@@ -133,6 +134,24 @@ extern "C" {
  *===========================================================================*/
 
 #define CSSR_INVALID_VALUE  -10000      /* invalid correction marker */
+
+/*============================================================================
+ * L6 Frame Constants
+ *===========================================================================*/
+
+#define L6FRMPREAMB     0x1ACFFC1DU     /* L6 frame preamble (4 bytes) */
+#define BLEN_MSG        218             /* L6 subframe length (bytes) */
+
+/*============================================================================
+ * CSSR Week Reference Indices
+ *===========================================================================*/
+
+enum {
+    CSSR_REF_MASK = 0, CSSR_REF_ORBIT, CSSR_REF_CLOCK,
+    CSSR_REF_CBIAS, CSSR_REF_PBIAS, CSSR_REF_BIAS,
+    CSSR_REF_URA, CSSR_REF_STEC, CSSR_REF_GRID,
+    CSSR_REF_COMBINED, CSSR_REF_ATMOSPHERIC, CSSR_REF_MAX
+};
 
 /*============================================================================
  * CLAS Storage Dimensions (reduced from upstream for memory efficiency)
@@ -247,6 +266,7 @@ typedef struct {                /* CSSR per-network correction data */
     int nsat[CSSR_MAX_GP];      /* number of satellites per GP */
     int sat[CSSR_MAX_GP][CSSR_MAX_LOCAL_SV]; /* satellite list per GP */
     float stec[CSSR_MAX_GP][CSSR_MAX_LOCAL_SV]; /* STEC values per GP */
+    float stec0[CSSR_MAX_GP][CSSR_MAX_LOCAL_SV]; /* STEC polynomial baseline */
     double grid[CSSR_MAX_GP][3]; /* grid point coordinates {lat,lon,hgt} */
     int update[3];              /* update flags {trop,stec,pbias} */
 } ssrn_t;
@@ -475,6 +495,61 @@ typedef struct {                /* observation space representation record */
 } clas_osrd_t;
 
 /*============================================================================
+ * CLAS Decoder Per-Satellite Buffer (replaces upstream rtcm->nav.ssr[])
+ *
+ * The CLAS decoder writes per-satellite corrections here instead of
+ * writing directly to nav_t.ssr[].  Bank management functions read
+ * from this buffer.  Fields match upstream claslib ssr_t semantics.
+ *===========================================================================*/
+
+typedef struct {
+    gtime_t t0[6];              /* epoch time per corr type (GPST) */
+    double  udi[6];             /* update interval (s) */
+    int     iod[6];             /* IOD per correction type */
+    int     iode;               /* issue of data ephemeris */
+    int     ura;                /* URA class value */
+    double  deph[3];            /* orbit {radial,along,cross} (m) */
+    double  ddeph[3];           /* orbit rate (m/s) */
+    double  dclk[3];            /* clock {c0,c1,c2} */
+    double  cbias[MAXCODE];     /* code bias (m) — double for decode precision */
+    double  pbias[MAXCODE];     /* phase bias (m) */
+    int     discnt[MAXCODE];    /* discontinuity indicator */
+    int     smode[MAXCODE];     /* signal tracking mode */
+    int     nsig;               /* number of signals */
+    uint8_t update;             /* general update flag */
+    uint8_t update_oc;          /* orbit correction updated */
+    uint8_t update_cc;          /* clock correction updated */
+    uint8_t update_cb;          /* code bias updated */
+    uint8_t update_pb;          /* phase bias updated */
+    uint8_t update_ura;         /* URA updated */
+} clas_dec_ssr_t;
+
+/*============================================================================
+ * L6 Frame Buffer (one per channel)
+ *
+ * Manages L6 subframe synchronization, bit buffer accumulation, and
+ * decode state.  Replaces the static variables in upstream input_cssr().
+ *===========================================================================*/
+
+typedef struct {
+    uint8_t  buff[1200];        /* bit buffer for CSSR decoder */
+    uint8_t  fbuff[BLEN_MSG];   /* subframe byte buffer */
+    int      nbyte;             /* bytes received in current subframe */
+    int      len;               /* expected subframe length */
+    int      nbit;              /* current decode bit position */
+    int      havebit;           /* total bits available in buff */
+    int      nframe;            /* subframe counter (0-4) */
+    int      decode_start;      /* decode started flag */
+    int      tow;               /* epoch time-of-week */
+    int      tow0;              /* base epoch (floor to hour of mask TOW) */
+    uint32_t preamble;          /* preamble accumulator */
+    uint8_t  frame;             /* subframe receipt bitmap */
+    gtime_t  time;              /* current decode time */
+    int      ctype;             /* CSSR message type (4073) */
+    int      subtype;           /* CSSR subtype (1-12) */
+} clas_l6buf_t;
+
+/*============================================================================
  * CLAS Context Type (NEW — replaces upstream global singletons)
  *
  * Aggregates all CLAS state for thread-safe, multi-channel operation.
@@ -505,8 +580,29 @@ typedef struct {
     /* Ocean loading data per network */
     clas_oload_t        oload[CLAS_MAX_NETWORK];
 
+    /* Per-satellite decoder output (replaces upstream rtcm->nav.ssr[]) */
+    clas_dec_ssr_t      dec_ssr[MAXSAT];
+
+    /* L6 frame buffer per channel */
+    clas_l6buf_t        l6buf[CLAS_CH_NUM];
+
+    /* Week references per subtype (for week rollover handling) */
+    int                 week_ref[CSSR_REF_MAX];
+    gtime_t             obs_ref[CSSR_REF_MAX];   /* observation ref time per subtype */
+    int                 tow_ref[CSSR_REF_MAX];   /* last TOW per subtype (-1=unset) */
+
+    /* L6 delivery/facility per channel */
+    int                 l6delivery[CLAS_CH_NUM];
+    int                 l6facility[CLAS_CH_NUM];
+
+    /* nav_t update flag (signals positioning engine to refresh) */
+    int                 updateac;
+
     /* Current channel index for decoding */
     int                 chidx;
+
+    /* Grid definition version */
+    int                 gridsel;
 
     /* Initialization flag */
     int                 initialized;
@@ -534,36 +630,22 @@ void clas_ctx_free(clas_ctx_t *ctx);
  *===========================================================================*/
 
 /**
- * @brief Decode CSSR compact SSR message (subtypes 1-12).
- * @param[in,out] ctx   CLAS context
- * @param[in,out] nav   Navigation data (receives decoded corrections)
- * @param[in]     buff  Message buffer
- * @param[in]     len   Message length (bits)
- * @param[in]     ch    Channel index (0 or 1)
- * @return Decoded subtype number (1-12), 0 on no message, -1 on error
- */
-int clas_decode_cssr(clas_ctx_t *ctx, nav_t *nav,
-                     const uint8_t *buff, int len, int ch);
-
-/**
  * @brief Input CSSR byte stream (one byte at a time, real-time).
  * @param[in,out] ctx   CLAS context
- * @param[in,out] nav   Navigation data
  * @param[in]     data  Input byte
- * @param[in]     ch    Channel index
+ * @param[in]     ch    Channel index (0 or 1)
  * @return Status (-1:error, 0:no message, 10:SSR message decoded)
  */
-int clas_input_cssr(clas_ctx_t *ctx, nav_t *nav, uint8_t data, int ch);
+int clas_input_cssr(clas_ctx_t *ctx, uint8_t data, int ch);
 
 /**
  * @brief Input CSSR from file (one message at a time, post-processing).
  * @param[in,out] ctx   CLAS context
- * @param[in,out] nav   Navigation data
  * @param[in]     fp    File pointer
  * @param[in]     ch    Channel index
  * @return Status (-2:EOF, -1:error, 0:no message, 10:SSR message decoded)
  */
-int clas_input_cssrf(clas_ctx_t *ctx, nav_t *nav, FILE *fp, int ch);
+int clas_input_cssrf(clas_ctx_t *ctx, FILE *fp, int ch);
 
 /*============================================================================
  * Bank Management Functions
@@ -571,56 +653,22 @@ int clas_input_cssrf(clas_ctx_t *ctx, nav_t *nav, FILE *fp, int ch);
 
 /**
  * @brief Initialize bank control for a channel.
- * @param[out] ctrl     Bank control to initialize
- * @param[in]  facility L6 facility id
+ * @param[in,out] ctx  CLAS context
+ * @param[in]     ch   Channel index
  */
-void clas_bank_init(clas_bank_ctrl_t *ctrl, int facility);
-
-/**
- * @brief Store orbit correction into orbit bank.
- * @param[in,out] ctrl  Bank control
- * @param[in]     cssr  Decoded CSSR state
- */
-void clas_bank_set_orbit(clas_bank_ctrl_t *ctrl, const cssr_t *cssr);
-
-/**
- * @brief Store clock correction into clock bank.
- * @param[in,out] ctrl  Bank control
- * @param[in]     cssr  Decoded CSSR state
- */
-void clas_bank_set_clock(clas_bank_ctrl_t *ctrl, const cssr_t *cssr);
-
-/**
- * @brief Store code bias into bias bank.
- * @param[in,out] ctrl  Bank control
- * @param[in]     cssr  Decoded CSSR state
- */
-void clas_bank_set_cbias(clas_bank_ctrl_t *ctrl, const cssr_t *cssr);
-
-/**
- * @brief Store phase bias into bias bank.
- * @param[in,out] ctrl  Bank control
- * @param[in]     cssr  Decoded CSSR state
- */
-void clas_bank_set_pbias(clas_bank_ctrl_t *ctrl, const cssr_t *cssr);
-
-/**
- * @brief Store troposphere/STEC into trop bank.
- * @param[in,out] ctrl  Bank control
- * @param[in]     cssr  Decoded CSSR state
- */
-void clas_bank_set_trop(clas_bank_ctrl_t *ctrl, const cssr_t *cssr);
+void clas_bank_init(clas_ctx_t *ctx, int ch);
 
 /**
  * @brief Merge closest corrections from all banks into a clas_corr_t snapshot.
- * @param[in]  ctrl     Bank control
+ * @param[in]  ctx      CLAS context
  * @param[in]  time     Target time for matching
  * @param[in]  network  Network id
+ * @param[in]  ch       Channel index
  * @param[out] corr     Output merged correction snapshot
  * @return 0 on success, -1 if no valid corrections found
  */
-int clas_bank_get_close(const clas_bank_ctrl_t *ctrl, gtime_t time,
-                        int network, clas_corr_t *corr);
+int clas_bank_get_close(const clas_ctx_t *ctx, gtime_t time,
+                        int network, int ch, clas_corr_t *corr);
 
 /**
  * @brief Apply global corrections (orbit/clock/bias) to nav_t.ssr[].
@@ -639,85 +687,43 @@ void clas_update_global(nav_t *nav, const clas_corr_t *corr, int ch);
 void clas_update_local(nav_t *nav, const clas_corr_t *corr, int ch);
 
 /*============================================================================
- * Grid Interpolation Functions
- *===========================================================================*/
-
-/**
- * @brief Find surrounding grid points for rover position.
- * @param[in]  pos      Rover position {lat,lon,hgt} (rad,m)
- * @param[in]  gridpos  Grid point coordinates [network][gp][3]
- * @param[in]  ngp      Number of grid points per network
- * @param[in]  nnet     Number of networks
- * @param[out] grid     Grid interpolation result
- * @return 0 on success, -1 if no valid grid found
- */
-int clas_get_grid_index(const double *pos,
-                        const double gridpos[][CLAS_MAX_GP][3],
-                        const int *ngp, int nnet, clas_grid_t *grid);
-
-/**
- * @brief Interpolate troposphere correction at rover position.
- * @param[in]  corr     Merged correction snapshot
- * @param[in]  grid     Grid interpolation result
- * @param[out] ztd      Interpolated zenith total delay (m)
- * @param[out] zwd      Interpolated zenith wet delay (m)
- * @return 0 on success, -1 on error
- */
-int clas_trop_grid_data(const clas_corr_t *corr, const clas_grid_t *grid,
-                        double *ztd, double *zwd);
-
-/**
- * @brief Interpolate STEC correction for a satellite at rover position.
- * @param[in]  corr     Merged correction snapshot
- * @param[in]  grid     Grid interpolation result
- * @param[in]  sat      Satellite number
- * @param[out] stec     Interpolated STEC value (m)
- * @return 0 on success, -1 on error
- */
-int clas_stec_grid_data(const clas_corr_t *corr, const clas_grid_t *grid,
-                        int sat, double *stec);
-
-/*============================================================================
  * Grid Definition I/O
  *===========================================================================*/
 
 /**
  * @brief Read CLAS grid definition file.
- * @param[in]  file     Grid definition file path
- * @param[out] gridpos  Grid point coordinates [network][gp][3]
- * @param[out] ngp      Number of grid points per network
- * @param[out] nnet     Number of networks
+ * @param[in,out] ctx   CLAS context (stores grid positions)
+ * @param[in]     file  Grid definition file path
  * @return 0 on success, -1 on error
  */
-int clas_read_grid_def(const char *file,
-                       double gridpos[][CLAS_MAX_GP][3],
-                       int *ngp, int *nnet);
+int clas_read_grid_def(clas_ctx_t *ctx, const char *file);
 
 /**
- * @brief Get ocean loading parameters for a network.
- * @param[in] ctx      CLAS context
- * @param[in] network  Network id
- * @return Pointer to ocean loading data, NULL if not available
+ * @brief Get L6 facility ID from message ID byte.
+ * @param[in] msgid  L6 message ID byte
+ * @return Facility ID (0-3)
  */
-const clas_oload_t *clas_get_oload(const clas_ctx_t *ctx, int network);
+int clas_get_correct_fac(int msgid);
 
 /*============================================================================
  * CSSR Helper Functions
  *===========================================================================*/
 
 /**
- * @brief Convert CSSR system ID to RTKLIB system ID.
- * @param[in] cssr_sys  CSSR system (CSSR_SYS_GPS, etc.)
- * @return RTKLIB system (SYS_GPS, etc.), 0 on error
+ * @brief Convert CSSR GNSS ID to RTKLIB system bitmask.
+ * @param[in]  gnss  CSSR GNSS ID (CSSR_SYS_GPS, etc.)
+ * @param[out] prn0  Output base PRN offset (can be NULL)
+ * @return RTKLIB system bitmask (SYS_GPS, etc.), 0 on error
  */
-int cssr_sys2sys(int cssr_sys);
+int cssr_gnss2sys(int gnss, int *prn0);
 
 /**
- * @brief Convert RTKLIB system ID to CSSR system ID.
- * @param[in] sys  RTKLIB system (SYS_GPS, etc.)
- * @return CSSR system (CSSR_SYS_GPS, etc.), CSSR_SYS_NONE on error
+ * @brief Convert RTKLIB system bitmask to CSSR GNSS ID.
+ * @param[in]  sys   RTKLIB system (SYS_GPS, etc.)
+ * @param[out] prn0  Output base PRN offset (can be NULL)
+ * @return CSSR GNSS ID, CSSR_SYS_NONE on error
  */
-int cssr_gnss2sys(int sys);
+int cssr_sys2gnss(int sys, int *prn0);
 
 #ifdef __cplusplus
 }
