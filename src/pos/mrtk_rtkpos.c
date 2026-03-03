@@ -28,6 +28,7 @@
 #include "mrtklib/mrtk_madoca.h"
 #include "mrtklib/mrtk_bias_sinex.h"
 #include "mrtklib/mrtk_fcb.h"
+#include "mrtklib/mrtk_clas.h"
 
 #include <stdarg.h>
 #include <string.h>
@@ -2142,6 +2143,16 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
     /* suppress output of single solution */
     if (!opt->outsingle) {
         rtk->sol.stat=SOLQ_NONE;
+    }
+    /* SSR2OSR conversion mode (upstream compat: dispatched via rtkpos) */
+    if (opt->mode >= PMODE_SSR2OSR && opt->mode <= PMODE_SSR2OSR_FIXED) {
+        clas_ctx_t *clas = (clas_ctx_t *)nav->clas_ctx;
+        static clas_osrd_t osr_buf[MAXOBS];
+        if (clas) {
+            clas_ssr2osr(rtk, obs, nu, nav, osr_buf, 0, clas);
+        }
+        outsolstat(rtk);
+        return 1;
     }
     /* PPP-RTK positioning (CLAS) */
     if (opt->mode==PMODE_PPP_RTK) {

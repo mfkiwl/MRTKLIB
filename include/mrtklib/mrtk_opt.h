@@ -48,6 +48,8 @@ extern "C" {
 #define PMODE_PPP_STATIC 7          /* positioning mode: PPP-static */
 #define PMODE_PPP_FIXED  8          /* positioning mode: PPP-fixed */
 #define PMODE_PPP_RTK    9          /* positioning mode: PPP-RTK (CLAS) */
+#define PMODE_SSR2OSR   10          /* conversion mode: SSR2OSR */
+#define PMODE_SSR2OSR_FIXED 11      /* conversion mode: SSR2OSR-fixed */
 #define PMODE_VRS_RTK   12          /* positioning mode: VRS-RTK (CLAS) */
 
 /*============================================================================

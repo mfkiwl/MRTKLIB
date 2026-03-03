@@ -495,6 +495,8 @@ typedef struct {                /* observation space representation record */
     double  sis;                /* signal-in-space error */
 } clas_osrd_t;
 
+typedef clas_osrd_t osrd_t;  /* upstream compat alias */
+
 /*============================================================================
  * CLAS Decoder Per-Satellite Buffer (replaces upstream rtcm->nav.ssr[])
  *
@@ -935,6 +937,24 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
  * @param[out] ctx  OSR context to initialize
  */
 void clas_osr_ctx_init(clas_osr_ctx_t *ctx);
+
+/**
+ * @brief Convert compact SSR corrections to observation-space representations.
+ *
+ * Top-level wrapper that sets up grid/CSSR corrections and calls clas_osr_zdres().
+ * Verbatim port of upstream claslib ssr2osr() from cssr2osr.c.
+ *
+ * @param[in,out] rtk   RTK control structure
+ * @param[in,out] obs   Observation data array
+ * @param[in]     n     Number of observations
+ * @param[in,out] nav   Navigation data
+ * @param[out]    osr   OSR output per satellite
+ * @param[in]     mode  0=normal (upstream compat)
+ * @param[in]     clas  CLAS decoder context
+ * @return Number of valid measurements, 0 on failure
+ */
+int clas_ssr2osr(rtk_t *rtk, obsd_t *obs, int n, nav_t *nav,
+                 clas_osrd_t *osr, int mode, clas_ctx_t *clas);
 
 /*============================================================================
  * CSSR Helper Functions

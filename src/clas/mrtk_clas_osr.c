@@ -751,9 +751,12 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
     double tow;
     int prn;
 
-    /* use local osr array */
-    memset(osrtmp, 0, sizeof(osrtmp));
-    osr = osrtmp;
+    /* use local osr array only when y is provided (PPP-RTK residual mode);
+     * when y == NULL (VRS/ssr2osr mode), fill caller's osr directly */
+    if (y) {
+        memset(osrtmp, 0, sizeof(osrtmp));
+        osr = osrtmp;
+    }
 
     if (n <= 0) return 0;
 
@@ -1048,4 +1051,185 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
 
     free(obs_copy);
     return nv;
+}
+
+/*============================================================================
+ * clas_ssr2osr -- SSR-to-OSR Conversion Wrapper
+ *
+ * Verbatim port of upstream claslib cssr2osr.c ssr2osr() (lines 855-979).
+ * Replaces upstream's global CSSR state with MRTKLIB's clas_ctx_t context.
+ *===========================================================================*/
+
+/**
+ * @brief Convert compact SSR corrections to observation-space representations.
+ *
+ * This is the top-level wrapper that sets up satellite state, grid/CSSR
+ * corrections, then calls clas_osr_zdres() to compute per-satellite residuals.
+ *
+ * @param[in,out] rtk   RTK control structure
+ * @param[in,out] obs   Observation data array (may be modified)
+ * @param[in]     n     Number of observations
+ * @param[in,out] nav   Navigation data (SSR corrections applied here)
+ * @param[out]    osr   OSR output per satellite
+ * @param[in]     mode  0=normal, unused (upstream compat)
+ * @param[in]     clas  CLAS decoder context (replaces upstream globals)
+ * @return Number of valid measurements, 0 on failure
+ */
+int clas_ssr2osr(rtk_t *rtk, obsd_t *obs, int n, nav_t *nav,
+                 clas_osrd_t *osr, int mode, clas_ctx_t *clas)
+{
+    double *rs, *dts, *var, *e, *azel;
+    int i, j, k = 0, nf = rtk->opt.nf, sati;
+    prcopt_t *opt = &rtk->opt;
+    int svh[MAXOBS];
+    clas_grid_t *grid;
+    clas_corr_t *corr;
+    double pos[3];
+    int ch, nn;
+    static clas_osr_ctx_t osr_ctx;
+    static int osr_ctx_init = 0;
+
+    if (!osr_ctx_init) {
+        clas_osr_ctx_init(&osr_ctx);
+        osr_ctx_init = 1;
+    }
+
+    rs = mat(6, n); dts = mat(2, n); var = mat(1, n); azel = zeros(2, n);
+    e = mat(n, 3);
+
+    for (i = 0; i < MAXSAT; i++) {
+        rtk->ssat[i].sys = satsys(i + 1, NULL);
+        for (j = 0; j < NFREQ; j++) rtk->ssat[i].vsat[j] = rtk->ssat[i].snr[j] = 0;
+    }
+    for (i = 0; i < MAXSAT; i++) rtk->ssat[i].fix[0] = 0;
+
+    /* temporal update of states */
+    if (opt->mode == PMODE_SSR2OSR_FIXED) {
+        for (i = 0; i < 3; i++) rtk->x[i] = opt->ru[i];
+    } else {
+        if (norm(rtk->sol.rr, 3) > 0.0) {
+            for (i = 0; i < 3; i++) rtk->x[i] = rtk->sol.rr[i];
+        }
+    }
+
+    /* grid index and CSSR lookup */
+    ch = 0;
+    grid = &clas->grid[ch];
+    corr = &clas->current[ch];
+    ecef2pos(rtk->x, pos);
+
+    if ((nn = clas_get_grid_index(clas, pos, grid, 0, obs[0].time)) <= 0) {
+        trace(NULL, 2, "clas_ssr2osr: no valid grid\n");
+        free(rs); free(dts); free(var); free(e); free(azel);
+        rtk->sol.stat = SOLQ_SINGLE;
+        return 0;
+    }
+
+    /* fetch corrections from bank */
+    if (grid->network > 0 && grid->network != corr->network) {
+        if (clas_bank_get_close(clas, clas->l6buf[ch].time,
+                                grid->network, ch, corr) != 0) {
+            trace(NULL, 2, "clas_ssr2osr: bank lookup failed\n");
+            free(rs); free(dts); free(var); free(e); free(azel);
+            rtk->sol.stat = SOLQ_SINGLE;
+            return 0;
+        }
+        clas_check_grid_status(clas, corr, ch);
+    }
+    clas_update_global(nav, corr, ch);
+    clas_update_local(nav, corr, ch);
+
+    /* SSR age */
+    rtk->sol.age = 1e4;
+    for (i = 0; i < n && i < MAXOBS; i++) {
+        double age_d;
+        sati = obs[i].sat;
+        age_d = timediff(obs[i].time, nav->ssr_ch[ch][sati - 1].t0[1]);
+        if (rtk->sol.age > age_d) rtk->sol.age = age_d;
+    }
+
+    /* satellite positions and clocks */
+    set_ssr_ch_idx(ch);
+    satposs(obs[0].time, obs, n, nav, EPHOPT_SSRAPC, rs, dts, var, svh);
+
+    /* zero-difference residuals */
+    k = clas_osr_zdres(obs, n, rs, dts, var, svh, nav,
+                       rtk->x, NULL, e, azel, rtk, 1,
+                       &osr_ctx, grid, corr, rtk->ssat,
+                       opt, &rtk->sol, osr, ch);
+    if (!k) {
+        trace(NULL, 2, "clas_ssr2osr: zdres failed\n");
+    }
+
+    /* fill VRS pseudo-observations from OSR corrections (CSSR2OSR_VRS path) */
+    {
+        int ko = 0;
+        for (i = 0; i < n && i < MAXOBS; i++) {
+            double lam_v[NFREQ + NEXOBS];
+            int sys_v, f;
+            sati = obs[i].sat;
+            if (sati <= 0) continue;
+            if (osr[i].sat <= 0) continue;
+            sys_v = satsys(sati, NULL);
+
+            obs[ko].time = obs[i].time;
+            obs[ko].sat = sati;
+            obs[ko].rcv = 1;
+
+            /* assign signal codes from corr's smode (CLAS decoder) */
+            for (j = 0; j < nf; j++) {
+                obs[ko].code[j] = corr->smode[sati - 1][j];
+            }
+            /* compute wavelengths from assigned codes */
+            sat_wavelengths(sati, &obs[ko], nav, lam_v);
+
+            for (j = 0; j < nf; j++) {
+                f = j;
+                if (osr[i].p[j] == 0.0 && osr[i].c[j] == 0.0) {
+                    obs[ko].P[j] = 0.0;
+                    obs[ko].L[j] = 0.0;
+                    obs[ko].LLI[j] = 0;
+                    obs[ko].SNR[j] = 0;
+                    continue;
+                }
+                obs[ko].P[j] = osr[i].p[j];
+                obs[ko].L[j] = (lam_v[f] > 0.0) ? osr[i].c[j] / lam_v[f] : 0.0;
+                obs[ko].LLI[j] = 0;
+                obs[ko].SNR[j] = (uint16_t)(40.0 / SNR_UNIT);
+            }
+            /* clear remaining freq slots */
+            for (j = nf; j < NFREQ + NEXOBS; j++) {
+                obs[ko].P[j] = 0.0;
+                obs[ko].L[j] = 0.0;
+                obs[ko].LLI[j] = 0;
+                obs[ko].code[j] = 0;
+                obs[ko].SNR[j] = 0;
+            }
+            ko++;
+        }
+        k = ko;
+    }
+
+    /* save observation state (upstream compat) */
+    for (i = 0; i < k; i++) {
+        for (j = 0; j < nf; j++) {
+            if (obs[i].L[j] == 0.0) continue;
+            rtk->ssat[obs[i].sat - 1].pt[obs[i].rcv - 1][j] = obs[i].time;
+            rtk->ssat[obs[i].sat - 1].ph[obs[i].rcv - 1][j] = obs[i].L[j];
+        }
+    }
+    for (i = 0; i < k; i++) {
+        for (j = 0; j < nf; j++) {
+            rtk->ssat[obs[i].sat - 1].snr[j] = obs[i].SNR[j];
+        }
+    }
+    for (i = 0; i < MAXSAT; i++) {
+        for (j = 0; j < nf; j++) {
+            if (rtk->ssat[i].fix[j] == 2) rtk->ssat[i].fix[j] = 1;
+            if (rtk->ssat[i].slip[j] & 1) rtk->ssat[i].slipc[j] = 1;
+        }
+    }
+
+    free(rs); free(dts); free(var); free(e); free(azel);
+    return k;
 }

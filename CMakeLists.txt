@@ -144,9 +144,15 @@ add_executable(recvbias
 target_compile_definitions(recvbias PRIVATE PROGNAME=\"recvbias\")
 target_link_libraries(recvbias PRIVATE mrtklib)
 
+# ── ssr2obs ──────────────────────────────────────────────────────────────────
+add_executable(ssr2obs
+    apps/ssr2obs/ssr2obs.c
+)
+target_link_libraries(ssr2obs PRIVATE mrtklib)
+
 # ── Install ───────────────────────────────────────────────────────────────────
 # cmake --install build  →  copies binaries to bin/ (matches make install)
-install(TARGETS rnx2rtkp rtkrcv recvbias RUNTIME DESTINATION bin)
+install(TARGETS rnx2rtkp rtkrcv recvbias ssr2obs RUNTIME DESTINATION bin)
 
 # ── Utility tools (optional) ─────────────────────────────────────────────────
 # Build with: cmake --preset default -DBUILD_UTILS=ON
@@ -816,6 +822,53 @@ add_test(NAME claslib_vrs_rtk_2ch_check
 )
 set_tests_properties(claslib_vrs_rtk_2ch_check PROPERTIES
     DEPENDS           claslib_vrs_rtk_2ch
+    FIXTURES_REQUIRED claslib_data
+    LABELS            "regression;claslib;vrs"
+)
+
+# ── ssr2obs regression: generate VRS and verify via VRS-RTK pipeline ─────────
+# Step 1: Generate VRS observations from SSR corrections using ssr2obs
+add_test(NAME claslib_ssr2obs
+    COMMAND $<TARGET_FILE:ssr2obs>
+        -k ${CMAKE_SOURCE_DIR}/conf/claslib/ssr2obs.conf
+        -ts 2019/08/27 16:00:00 -te 2019/08/27 16:59:59 -ti 1
+        -r -o ${CMAKE_BINARY_DIR}/out_ssr2obs_vrs2019239Q.obs
+        ${_CLSDATA}/sept_2019239.nav ${_CLSDATA}/2019239Q.l6
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_ssr2obs PROPERTIES
+    FIXTURES_REQUIRED claslib_data
+    TIMEOUT           300
+    LABELS            "regression;claslib;vrs"
+)
+
+# Step 2: Feed ssr2obs output into VRS-RTK and compare against reference
+add_test(NAME claslib_ssr2obs_vrs_rtk
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/claslib/rnx2rtkp_vrs.conf
+        -ts 2019/08/27 16:00:00 -te 2019/08/27 16:59:59 -ti 1
+        -o ${CMAKE_BINARY_DIR}/out_ssr2obs_vrs_rtk.nmea
+        ${_CLSDATA}/0627239Q.obs
+        ${_CLSDATA}/sept_2019239.nav
+        ${CMAKE_BINARY_DIR}/out_ssr2obs_vrs2019239Q.obs
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_ssr2obs_vrs_rtk PROPERTIES
+    DEPENDS           claslib_ssr2obs
+    FIXTURES_REQUIRED claslib_data
+    TIMEOUT           300
+    LABELS            "regression;claslib;vrs"
+)
+
+add_test(NAME claslib_ssr2obs_vrs_rtk_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_NMEA}
+        ${_CLSDATA}/ref_VRS.nmea
+        ${CMAKE_BINARY_DIR}/out_ssr2obs_vrs_rtk.nmea
+        --tolerance 0.20
+        --skip-fixrate
+)
+set_tests_properties(claslib_ssr2obs_vrs_rtk_check PROPERTIES
+    DEPENDS           claslib_ssr2obs_vrs_rtk
     FIXTURES_REQUIRED claslib_data
     LABELS            "regression;claslib;vrs"
 )
