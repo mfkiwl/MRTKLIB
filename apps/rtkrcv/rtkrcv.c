@@ -1011,7 +1011,7 @@ static void prssr(vt_t *vt)
     rtksvrlock(&svr);
     time=svr.rtk.sol.time;
     for (i=0;i<MAXSAT;i++) {
-        ssr[i]=svr.nav.ssr[i];
+        ssr[i]=svr.nav.ssr_ch[0][i];
     }
     rtksvrunlock(&svr);
     

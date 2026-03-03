@@ -423,7 +423,9 @@ typedef struct {        /* navigation data type */
     sbssat_t sbssat;    /* SBAS satellite corrections */
     sbsion_t sbsion[MAXBAND+1]; /* SBAS ionosphere corrections */
     dgps_t dgps[MAXSAT]; /* DGPS corrections */
-    ssr_t ssr[MAXSAT];  /* SSR corrections */
+    ssr_t ssr_ch[SSR_CH_NUM][MAXSAT]; /* SSR corrections (per channel) */
+    int facility[SSR_CH_NUM]; /* L6 facility ID per channel */
+    int filreset;       /* filter reset flag (facility change) */
     pppiono_t *pppiono; /* PPP ionospheric corrections (MADOCA-PPP L6D) (heap) */
     void *clas_ctx;     /* CLAS CSSR correction context (NULL if unused) */
     stat_t stat;        /* stat corrections */

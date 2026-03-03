@@ -156,6 +156,7 @@ extern "C" {
 #define DTTOL       0.025               /* tolerance of time difference (s) */
 #endif
 #define MAXEXFILE   1024                /* max number of expanded files */
+#define SSR_CH_NUM  2                   /* number of SSR input channels */
 #define MAXBAND     10                  /* max SBAS band of IGP */
 #define MAXNIGP     201                 /* max number of IGP in SBAS band */
 #define MAXNGEO     4                   /* max number of GEO satellites */

@@ -307,7 +307,7 @@ static void update_ssr(rtksvr_t *svr, int index)
                 continue;
             }
         }
-        svr->nav.ssr[i]=svr->rtcm[index].ssr[i];
+        svr->nav.ssr_ch[0][i]=svr->rtcm[index].ssr[i];
     }
     svr->nmsg[index][7]++;
 }
@@ -462,14 +462,14 @@ static int decoderaw(rtksvr_t *svr, int index)
 /* decode download file ------------------------------------------------------*/
 static void decodefile(rtksvr_t *svr, int index)
 {
-    nav_t nav={0};
+    nav_t *nav;
     char file[1024];
     int nb;
-    
+
     tracet(NULL,4,"decodefile: index=%d\n",index);
-    
+
     rtksvrlock(svr);
-    
+
     /* check file path completed */
     if ((nb=svr->nb[index])<=2||
         svr->buff[index][nb-2]!='\r'||svr->buff[index][nb-1]!='\n') {
@@ -478,46 +478,55 @@ static void decodefile(rtksvr_t *svr, int index)
     }
     strncpy(file,(char *)svr->buff[index],nb-2); file[nb-2]='\0';
     svr->nb[index]=0;
-    
+
     rtksvrunlock(svr);
-    
+
+    /* heap-allocate nav_t (too large for thread stack with ssr_ch[2][MAXSAT]) */
+    if (!(nav=(nav_t *)calloc(1,sizeof(nav_t)))) {
+        tracet(NULL,1,"decodefile: nav_t alloc error\n");
+        return;
+    }
+
     if (svr->format[index]==STRFMT_SP3) { /* precise ephemeris */
-        
+
         /* read sp3 precise ephemeris */
-        readsp3(file,&nav,0);
-        if (nav.ne<=0) {
+        readsp3(file,nav,0);
+        if (nav->ne<=0) {
             tracet(NULL,1,"sp3 file read error: %s\n",file);
+            free(nav);
             return;
         }
         /* update precise ephemeris */
         rtksvrlock(svr);
-        
+
         if (svr->nav.peph) free(svr->nav.peph);
-        svr->nav.ne=svr->nav.nemax=nav.ne;
-        svr->nav.peph=nav.peph;
+        svr->nav.ne=svr->nav.nemax=nav->ne;
+        svr->nav.peph=nav->peph;
         svr->ftime[index]=utc2gpst(timeget());
         strcpy(svr->files[index],file);
-        
+
         rtksvrunlock(svr);
     }
     else if (svr->format[index]==STRFMT_RNXCLK) { /* precise clock */
-        
+
         /* read rinex clock */
-        if (readrnxc(file,&nav)<=0) {
+        if (readrnxc(file,nav)<=0) {
             tracet(NULL,1,"rinex clock file read error: %s\n",file);
+            free(nav);
             return;
         }
         /* update precise clock */
         rtksvrlock(svr);
-        
+
         if (svr->nav.pclk) free(svr->nav.pclk);
-        svr->nav.nc=svr->nav.ncmax=nav.nc;
-        svr->nav.pclk=nav.pclk;
+        svr->nav.nc=svr->nav.ncmax=nav->nc;
+        svr->nav.pclk=nav->pclk;
         svr->ftime[index]=utc2gpst(timeget());
         strcpy(svr->files[index],file);
-        
+
         rtksvrunlock(svr);
     }
+    free(nav);
 }
 
 /* periodic command ----------------------------------------------------------*/

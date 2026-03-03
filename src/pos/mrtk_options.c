@@ -231,7 +231,8 @@ opt_t sysopts[]={
     {"misc-maxobsloss", 0,  (void *)&prcopt_.maxobsloss_s, "s"  },
     {"misc-floatcnt",   0,  (void *)&prcopt_.floatcnt,   "epoch"},
     {"misc-rtcmopt",    2,  (void *)&prcopt_.rtcmopt,    ""     },
-    
+    {"misc-l6mrg",      0,  (void *)&prcopt_.l6mrg,      ""     },
+
     {"file-satantfile", 2,  (void *)&filopt_.satantp,    ""     },
     {"file-rcvantfile", 2,  (void *)&filopt_.rcvantp,    ""     },
     {"file-staposfile", 2,  (void *)&filopt_.stapos,     ""     },

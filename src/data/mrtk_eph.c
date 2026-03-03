@@ -613,6 +613,11 @@ static int satpos_sbas(gtime_t time, gtime_t teph, int sat, const nav_t *nav,
     *svh=-1;
     return 0;
 }
+/* SSR channel index for satpos_ssr (multi-L6E) -----------------------------*/
+static int _ssr_ch_idx = 0;
+extern void set_ssr_ch_idx(int ch) { _ssr_ch_idx = ch; }
+extern int  get_ssr_ch_idx(void)   { return _ssr_ch_idx; }
+
 /* satellite position and clock with ssr correction --------------------------*/
 static int satpos_ssr(gtime_t time, gtime_t teph, int sat, const nav_t *nav,
                       int opt, double *rs, double *dts, double *var, int *svh)
@@ -624,7 +629,7 @@ static int satpos_ssr(gtime_t time, gtime_t teph, int sat, const nav_t *nav,
 
     trace(NULL,4,"satpos_ssr: time=%s sat=%2d\n",time_str(time,3),sat);
 
-    ssr=nav->ssr+sat-1;
+    ssr=nav->ssr_ch[_ssr_ch_idx]+sat-1;
 
     if (!ssr->t0[0].time) {
         trace(NULL,2,"no ssr orbit correction: %s sat=%2d\n",time_str(time,0),sat);

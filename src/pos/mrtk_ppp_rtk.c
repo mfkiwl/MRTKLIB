@@ -32,6 +32,7 @@
 #include "mrtklib/mrtk_time.h"
 #include "mrtklib/mrtk_lambda.h"
 #include "mrtklib/mrtk_foundation.h"
+#include "mrtklib/mrtk_eph.h"
 
 #include <math.h>
 #include <string.h>
@@ -1812,7 +1813,7 @@ extern int ppp_rtk_na(const prcopt_t *opt)
  * @param[in,out] rtk  RTK control/result struct
  * @param[in]     obs  Observation data for epoch
  * @param[in]     n    Number of observations
- * @param[in,out] nav  Navigation data (includes SSR via nav->ssr[])
+ * @param[in,out] nav  Navigation data (includes SSR via nav->ssr_ch[][])
  */
 extern void ppp_rtk_pos(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav)
 {
@@ -1895,30 +1896,46 @@ extern void ppp_rtk_pos(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav)
         return;
     }
 
-    /* fetch corrections for detected network — always refresh using
-     * the L6 buffer time (which matches the bank data timing) */
-    if (grid->network > 0 && grid->network != corr->network) {
-        if (clas_bank_get_close(clas, clas->l6buf[0].time, grid->network, 0,
-                                &clas->current[0]) != 0) {
-            trace(NULL, 2, "ppp_rtk_pos: bank lookup failed for net=%d\n",
-                  grid->network);
-            free(azel); free(e); free(y); free(rs); free(dts); free(var);
-            rtk->sol.stat = SOLQ_SINGLE;
-            return;
+    /* fetch and apply corrections for all active channels */
+    {
+        int nch = opt->l6mrg ? SSR_CH_NUM : 1;
+        int ch;
+        for (ch = 0; ch < nch; ch++) {
+            if (grid->network > 0 && grid->network != clas->current[ch].network) {
+                if (clas_bank_get_close(clas, clas->l6buf[ch].time,
+                                        grid->network, ch,
+                                        &clas->current[ch]) != 0) {
+                    trace(NULL, 3, "ppp_rtk_pos: bank lookup failed ch=%d\n", ch);
+                    continue;
+                }
+                clas_check_grid_status(clas, &clas->current[ch], ch);
+            }
+            clas_update_global(nav, &clas->current[ch], ch);
+            clas_update_local(nav, &clas->current[ch], ch);
         }
-        clas_check_grid_status(clas, &clas->current[0], 0);
         corr = &clas->current[0];
-    }
 
-    /* apply global corrections to nav */
-    clas_update_global(nav, corr, 0);
-    /* apply local corrections to nav */
-    clas_update_local(nav, corr, 0);
+        /* dual-channel: merge freshest orbit/clock into ch=0 for satposs */
+        if (opt->l6mrg) {
+            int sat;
+            for (sat = 0; sat < MAXSAT; sat++) {
+                ssr_t *s0 = &nav->ssr_ch[0][sat];
+                ssr_t *s1 = &nav->ssr_ch[1][sat];
+                /* if ch1 has fresher clock correction, use it */
+                if (s1->t0[1].time &&
+                    (!s0->t0[1].time ||
+                     timediff(s1->t0[1], s0->t0[1]) > 0)) {
+                    *s0 = *s1;
+                }
+            }
+        }
+    }
 
     trace(NULL, 4, "x(0)=\n");
     tracemat(NULL, 4, rtk->x, 1, NR_RTK(opt), 13, 4);
 
-    /* satellite positions and clocks */
+    /* satellite positions and clocks (uses ssr_ch[0], merged if l6mrg) */
+    set_ssr_ch_idx(0);
     satposs(obs[0].time, obs, n, nav, rtk->opt.sateph, rs, dts, var, svh);
 
     xp = mat(rtk->nx, 1);
@@ -1999,12 +2016,12 @@ extern void ppp_rtk_pos(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav)
         }
     }
 
-    /* SSR age */
+    /* SSR age (check merged ch=0) */
     rtk->sol.age = 1e4;
     for (i = 0; i < n && i < MAXOBS; i++) {
         float age;
         sati = obs[i].sat;
-        age = (float)timediff(obs[i].time, nav->ssr[sati - 1].t0[1]);
+        age = (float)timediff(obs[i].time, nav->ssr_ch[0][sati - 1].t0[1]);
         if (rtk->sol.age > age) rtk->sol.age = age;
     }
 

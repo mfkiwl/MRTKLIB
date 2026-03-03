@@ -48,6 +48,7 @@ typedef struct {
     double L[NFREQ+NEXOBS]; /* observation data carrier-phase (cycle) */
     double P[NFREQ+NEXOBS]; /* observation data pseudorange (m) */
     float  D[NFREQ+NEXOBS]; /* observation data doppler frequency (Hz) */
+    int    facility;    /* L6 facility ID (for dual-channel VRS) */
 } obsd_t;
 
 /**

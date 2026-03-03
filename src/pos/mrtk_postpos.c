@@ -263,7 +263,7 @@ static void update_rtcm(gtime_t time)
             if (!rtcm.ssr[i].update||
                 rtcm.ssr[i].iod[0]!=rtcm.ssr[i].iod[1]||
                 timediff(time,rtcm.ssr[i].t0[0])<-1E-3) continue;
-            navs.ssr[i]=rtcm.ssr[i];
+            navs.ssr_ch[0][i]=rtcm.ssr[i];
             rtcm.ssr[i].update=0;
         }
         /* update iono/trop corrections */
@@ -305,7 +305,7 @@ static void update_qzssl6e(gtime_t time)
             if (!l6e.ssr[i].update ||
                 l6e.ssr[i].iod[0]!=l6e.ssr[i].iod[1]||
                 timediff(time,l6e.ssr[i].t0[0])<-1E-3) continue;
-            navs.ssr[i]=l6e.ssr[i];
+            navs.ssr_ch[0][i]=l6e.ssr[i];
             l6e.ssr[i].update=0;
         }
 

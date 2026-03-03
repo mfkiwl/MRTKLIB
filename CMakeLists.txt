@@ -629,14 +629,47 @@ set_tests_properties(claslib_ppp_rtk_bnx_check PROPERTIES
     LABELS            "regression;claslib;ppp-rtk"
 )
 
+# ── rnx2rtkp CLAS PPP-RTK regression (dual-channel L6) ────────────────────────
+# Data: 2025/06/06 20:00-21:00, 0627157U.bnx + 2025157U_ch1.l6 + ch2.l6
+# Reference: ref_L6_2CH.nmea (upstream claslib output with -l6msg 1)
+# Note: tolerance 0.20m due to wider accuracy gap on 2025 dataset (~15.6cm RMS)
+add_test(NAME claslib_ppp_rtk_2ch
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/claslib/rnx2rtkp.conf
+        -ts 2025/06/06 20:00:00 -te 2025/06/06 20:59:59 -ti 1
+        -l6msg 1
+        -o ${CMAKE_BINARY_DIR}/out_claslib_ppp_rtk_2ch.nmea
+        ${_CLSDATA}/0627157U.bnx
+        ${_CLSDATA}/0627157U.nav
+        ${_CLSDATA}/2025157U_ch1.l6
+        ${_CLSDATA}/2025157U_ch2.l6
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_ppp_rtk_2ch PROPERTIES
+    FIXTURES_REQUIRED claslib_data
+    TIMEOUT           300
+    LABELS            "regression;claslib;ppp-rtk"
+)
+
+add_test(NAME claslib_ppp_rtk_2ch_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_NMEA}
+        ${_CLSDATA}/ref_L6_2CH.nmea
+        ${CMAKE_BINARY_DIR}/out_claslib_ppp_rtk_2ch.nmea
+        --tolerance 0.20
+        --skip-fixrate
+)
+set_tests_properties(claslib_ppp_rtk_2ch_check PROPERTIES
+    DEPENDS           claslib_ppp_rtk_2ch
+    FIXTURES_REQUIRED claslib_data
+    LABELS            "regression;claslib;ppp-rtk"
+)
+
 # ── Not yet ported tests ─────────────────────────────────────────────────────
 # TODO: Add when BINEX SubType 12 support is verified:
 #   claslib_ppp_rtk_st12    — ref_ST12.nmea (needs 0627349AB.bnx + sept_2019349.nav)
 # TODO: Add when VRS mode is ported:
 #   claslib_ppp_rtk_vrs      — ref_VRS.nmea (needs VRS mode + vrs2019239Q.obs)
 #   claslib_ppp_rtk_st12_vrs — ref_ST12_VRS.nmea (needs VRS + vrs2019349B.obs)
-# TODO: Add when dual-channel L6 is ported:
-#   claslib_ppp_rtk_2ch      — ref_L6_2CH.nmea (needs -l6msg 1 + dual .l6)
 #   claslib_ppp_rtk_2ch_vrs  — ref_L6_2CH_VRS.nmea (needs VRS + dual .l6)
 # TODO: Add when L1C/L5 config is ported:
 #   claslib_ppp_rtk_l1cl5    — ref_L6_L1CL5.nmea (needs kinematic_L1CL5.conf)

@@ -225,6 +225,18 @@ void setseleph(int sys, int sel);
  */
 int getseleph(int sys);
 
+/**
+ * @brief Set SSR channel index for satpos_ssr() (multi-L6E).
+ * @param[in] ch  Channel index (0 or 1)
+ */
+void set_ssr_ch_idx(int ch);
+
+/**
+ * @brief Get current SSR channel index.
+ * @return Current channel index
+ */
+int get_ssr_ch_idx(void);
+
 #ifdef __cplusplus
 }
 #endif

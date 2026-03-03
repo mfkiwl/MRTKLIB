@@ -488,7 +488,7 @@ static int get_bias_save_point(clas_bias_bank_t *bias, int prn, int mode)
 /*============================================================================
  * Bank SET Functions — store decoded corrections into ring buffers
  *
- * Read from ctx->dec_ssr[] (intermediate decoder buffer) instead of nav->ssr[]
+ * Read from ctx->dec_ssr[] (intermediate decoder buffer) instead of nav->ssr_ch[][]
  *===========================================================================*/
 
 static void check_cssr_changed_facility(clas_bank_ctrl_t *bank, int facility)
@@ -1109,7 +1109,7 @@ extern void clas_update_global(nav_t *nav, const clas_corr_t *corr, int ch)
     int i, j, sat;
 
     for (sat = 1; sat <= MAXSAT; sat++) {
-        ssr = &nav->ssr[sat - 1];
+        ssr = &nav->ssr_ch[ch][sat - 1];
 
         /* bias corrections */
         if (corr->prn[sat - 1][4] != 0) {
@@ -1162,6 +1162,7 @@ extern void clas_update_global(nav_t *nav, const clas_corr_t *corr, int ch)
             memset(&ssr->t0[1], 0, sizeof(ssr->t0[1]));
         }
     }
+    nav->facility[ch] = corr->facility;
 }
 
 extern void clas_update_local(nav_t *nav, const clas_corr_t *corr, int ch)

@@ -21,7 +21,7 @@
  *   - Converts SSR compact corrections (orbit, clock, bias, STEC, ZWD) into
  *     per-satellite observation-space residuals (clas_osrd_t).
  *   - Static variables from upstream moved to clas_osr_ctx_t for thread safety.
- *   - nav->ssr_ch[ch][sat-1] replaced by nav->ssr[sat-1].
+ *   - Uses nav->ssr_ch[0][sat-1] (channel 0 by default).
  *   - nav->lam[sat-1] replaced by local lam[] computed from sat2freq().
  *   - Several upstream functions stubbed (ISB, SIS, IODE adjust, etc.).
  *----------------------------------------------------------------------------*/
@@ -529,17 +529,17 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
     for (i = 0; i < nf; i++) pbias[i] = cbias[i] = CLAS_CSSRINVALID;
 
     /* decode phase and code bias -- check ages */
-    t5 = timediff(obs->time, nav->ssr[sat - 1].t0[4]); /* cbias */
-    t6 = timediff(obs->time, nav->ssr[sat - 1].t0[5]); /* pbias */
+    t5 = timediff(obs->time, nav->ssr_ch[ch][sat - 1].t0[4]); /* cbias */
+    t6 = timediff(obs->time, nav->ssr_ch[ch][sat - 1].t0[5]); /* pbias */
 
     if (fabs(t5) > CLAS_MAXAGESSR_BIAS || fabs(t6) > CLAS_MAXAGESSR_BIAS) {
         trace(NULL, 2,
               "age of ssr bias error: time=%s sat=%2d tc,tp=%.0f,%.0f\n",
               time_str(obs->time, 0), sat, t5, t6);
-        memset(&nav->ssr[sat - 1].t0[4], 0x00,
-               sizeof(nav->ssr[sat - 1].t0[4]));
-        memset(&nav->ssr[sat - 1].t0[5], 0x00,
-               sizeof(nav->ssr[sat - 1].t0[5]));
+        memset(&nav->ssr_ch[ch][sat - 1].t0[4], 0x00,
+               sizeof(nav->ssr_ch[ch][sat - 1].t0[4]));
+        memset(&nav->ssr_ch[ch][sat - 1].t0[5], 0x00,
+               sizeof(nav->ssr_ch[ch][sat - 1].t0[5]));
         return 0;
     }
 
@@ -550,8 +550,8 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
             smode = corr->smode[sat - 1][j];
             if (smode == 0) continue;
             if (obs->code[i] == smode) {
-                pbias[i] = nav->ssr[sat - 1].pbias[smode - 1];
-                cbias[i] = nav->ssr[sat - 1].cbias[smode - 1];
+                pbias[i] = nav->ssr_ch[ch][sat - 1].pbias[smode - 1];
+                cbias[i] = nav->ssr_ch[ch][sat - 1].cbias[smode - 1];
                 break;
             }
         }
@@ -576,7 +576,7 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
     }
     if (flag == 1) {
         dt = timediff(corr->stec[grid->index[0]].data[i].time,
-                      nav->ssr[sat - 1].t0[5]);
+                      nav->ssr_ch[ch][sat - 1].t0[5]);
         /* store STEC time in t0[8] -- but ssr_t only has t0[6], skip */
         if (dt < 0.0 || dt >= 30.0) {
             trace(NULL, 2,
@@ -586,7 +586,7 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
             return 0;
         }
         dt = timediff(corr->stec[grid->index[0]].data[i].time,
-                      nav->ssr[sat - 1].t0[0]);
+                      nav->ssr_ch[ch][sat - 1].t0[0]);
         if (dt < -30.0 || dt > 30.0) {
             trace(NULL, 2,
                   "inconsist ssr correction (iono-orbit): time=%s sat=%2d "
@@ -597,11 +597,11 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
     }
 
     /* pbias-cbias consistency */
-    dt = timediff(nav->ssr[sat - 1].t0[5], nav->ssr[sat - 1].t0[4]);
+    dt = timediff(nav->ssr_ch[ch][sat - 1].t0[5], nav->ssr_ch[ch][sat - 1].t0[4]);
     trace(NULL, 5, "clas_osr_corrmeas: pbias_tow=%.1f, cbias_tow=%.1f, "
           "dt=%.1f\n",
-          time2gpst(nav->ssr[sat - 1].t0[5], NULL),
-          time2gpst(nav->ssr[sat - 1].t0[4], NULL), dt);
+          time2gpst(nav->ssr_ch[ch][sat - 1].t0[5], NULL),
+          time2gpst(nav->ssr_ch[ch][sat - 1].t0[4], NULL), dt);
     if ((!opt->posopt[4] && fabs(dt) > 0.0) ||
         (opt->posopt[4] && (dt > 0.0 || dt < -30.0))) {
         /* Note: upstream uses posopt[9]; MRTKLIB posopt only has 6 elements.
@@ -708,7 +708,7 @@ static void ocean_tide_clasgrid(gtime_t tut, const clas_oload_t *oload,
  *   - obs is const; a local copy is allocated.
  *   - cpc/pt0 come from osr_ctx->cpctmp/pt0tmp.
  *   - pbias_ofst comes from osr_ctx->pbias_ofst.
- *   - nav->ssr_ch[ch][sat-1] -> nav->ssr[sat-1].
+ *   - Uses nav->ssr_ch[0][sat-1] (channel 0 by default).
  *   - nav->lam[sat-1] -> local lam[] via sat_wavelengths().
  *   - Stubbed functions: getorbitclock, adjust_cpc/prc/r_dts, ISB, L2C.
  *
@@ -923,9 +923,9 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
             osr[i].clk = 0.0;
 
             /* cycle slip detection on phase bias update */
-            if (fabs(timediff(nav->ssr[sat - 1].t0[5],
+            if (fabs(timediff(nav->ssr_ch[ch][sat - 1].t0[5],
                               osr_ctx->pt0tmp[sat - 1])) > 0.0 &&
-                fabs(timediff(nav->ssr[sat - 1].t0[5],
+                fabs(timediff(nav->ssr_ch[ch][sat - 1].t0[5],
                               osr_ctx->pt0tmp[sat - 1])) < 120.0) {
                 dcpc = osr[i].orb - osr[i].clk + osr[i].CPC[j] -
                        osr_ctx->cpctmp[j * MAXSAT + sat - 1];
@@ -1016,7 +1016,7 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
         }
 
         /* store pbias time */
-        osr_ctx->pt0tmp[sat - 1] = nav->ssr[sat - 1].t0[5];
+        osr_ctx->pt0tmp[sat - 1] = nav->ssr_ch[ch][sat - 1].t0[5];
 
         /* GAL: clear L2 slots (non-VRS path) */
         if (sys == SYS_GAL) {

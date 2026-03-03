@@ -292,7 +292,7 @@ static void update_rtcm_ssr(const char *file, nav_t *nav, gtime_t time)
             if(!rtcm.ssr[i].update ||
                 rtcm.ssr[i].iod[0] != rtcm.ssr[i].iod[1] ||
                 timediff(time, rtcm.ssr[i].t0[0]) < -1E-3) continue;
-            nav->ssr[i] = rtcm.ssr[i];
+            nav->ssr_ch[0][i] = rtcm.ssr[i];
             rtcm.ssr[i].update = 0;
         }
     }
@@ -334,7 +334,7 @@ static void update_qzssl6e(const char *file, nav_t *nav, gtime_t gt)
             if(!rtcm.ssr[i].update ||
                 rtcm.ssr[i].iod[0] != rtcm.ssr[i].iod[1] ||
                 timediff(gt, rtcm.ssr[i].t0[0]) < -1E-3) continue;
-            nav->ssr[i] = rtcm.ssr[i];
+            nav->ssr_ch[0][i] = rtcm.ssr[i];
             rtcm.ssr[i].update = 0;
         }
         if(input_qzssl6ef(&rtcm, fp_qzssl6e) < -1) break;
@@ -350,11 +350,11 @@ static void udsatcb(gtime_t gt, nav_t *nav, osb_t *biaosb, int btype)
 
     /* check the vendor and apply specific settings */
     for(i = 0; i < MAXSAT; i++) {
-        if(nav->ssr[i].vendor == SSR_VENDOR_RTCM) {
+        if(nav->ssr_ch[0][i].vendor == SSR_VENDOR_RTCM) {
             vp = MAXAGESSRRTCM;
             break;
         }
-        else if(nav->ssr[i].vendor == SSR_VENDOR_L6) {
+        else if(nav->ssr_ch[0][i].vendor == SSR_VENDOR_L6) {
             break;
         }
     }
@@ -363,16 +363,16 @@ static void udsatcb(gtime_t gt, nav_t *nav, osb_t *biaosb, int btype)
     if(btype == BTYPE_L6 || btype == BTYPE_RTCM) {
         for(i = 0; i < MAXSAT; i++) {
             sys = satsys(i + 1, NULL);
-            if(timediff(gt, nav->ssr[i].t0[4]) > vp) continue;
+            if(timediff(gt, nav->ssr_ch[0][i].t0[4]) > vp) continue;
             for(j = 0; j < MAXCODE; j++) {
                 ssrcode = mcssr_sel_biascode(sys, j + 1);
                 if(ssrcode==CODE_NONE) continue;
                 nav->osb.vscb[i][j] = 1;
-                nav->osb.scb[i][j]  = nav->ssr[i].cbias[ssrcode-1];
+                nav->osb.scb[i][j]  = nav->ssr_ch[0][i].cbias[ssrcode-1];
                 udcnt++;
             }
             if(0 < udcnt) {
-                nav->osb.gt[0] = nav->ssr[i].t0[4];
+                nav->osb.gt[0] = nav->ssr_ch[0][i].t0[4];
             }
         }
     }

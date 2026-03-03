@@ -48,6 +48,7 @@ extern "C" {
 #define PMODE_PPP_STATIC 7          /* positioning mode: PPP-static */
 #define PMODE_PPP_FIXED  8          /* positioning mode: PPP-fixed */
 #define PMODE_PPP_RTK    9          /* positioning mode: PPP-RTK (CLAS) */
+#define PMODE_VRS_RTK   12          /* positioning mode: VRS-RTK (CLAS) */
 
 /*============================================================================
  * Solution Format / Quality Constants
@@ -237,6 +238,8 @@ typedef struct prcopt_t {        /* processing options type */
     double stats_prnpositv; /* process noise std pos v (m) */
     double stats_tconstiono; /* time constant of iono variation (s) */
     char   rectype[2][MAXANT]; /* receiver types {rover,ref} */
+    int    l6mrg;           /* L6 2-channel mode (0:single,1:dual-priority,2:dual-balanced) */
+    int    regularly;       /* filter reset cycle (s) (0:off) */
 } prcopt_t;
 
 /*============================================================================

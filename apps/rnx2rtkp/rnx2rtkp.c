@@ -206,6 +206,7 @@ int main(int argc, char **argv)
             pos2ecef(pos,prcopt.rb);
             matcpy(prcopt.ru,prcopt.rb,3,1);
         }
+        else if (!strcmp(argv[i],"-l6msg")&&i+1<argc) prcopt.l6mrg=atoi(argv[++i]);
         else if (!strcmp(argv[i],"-ign_chierr")) prcopt.ign_chierr = 1;
         else if (!strcmp(argv[i],"-sta")&&i+1<argc) strcpy(prcopt.staname,argv[++i]);
         else if (!strcmp(argv[i],"-y")&&i+1<argc) solopt.sstat=atoi(argv[++i]);

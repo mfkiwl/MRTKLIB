@@ -41,7 +41,19 @@ extern "C" {
  *===========================================================================*/
 
 /**
- * @brief Initialize MADOCA-PPP CSSR control struct.
+ * @brief Set MADOCA-PPP CSSR channel index for multi-L6E.
+ * @param[in] ch  Channel index (0 or 1)
+ */
+void set_mcssr_ch(int ch);
+
+/**
+ * @brief Get current MADOCA-PPP CSSR channel index.
+ * @return Current channel index
+ */
+int get_mcssr_ch(void);
+
+/**
+ * @brief Initialize MADOCA-PPP CSSR control struct for current channel.
  * @param[in] gt  GPST for week number determination
  */
 void init_mcssr(const gtime_t gt);
