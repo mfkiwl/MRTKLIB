@@ -512,17 +512,15 @@ set_tests_properties(madocalib_pppar_ion_check PROPERTIES
 # Source: upstream/claslib/data
 # Test data archive: tests/data/claslib/claslib_testdata.tar.gz
 #
-# Tests:
+# Tests (8/8 upstream claslib coverage):
 #   claslib_ppp_rtk         PPP-RTK with L6 (RINEX obs, 2019/239)
 #   claslib_ppp_rtk_bnx     PPP-RTK with L6 (BINEX obs, 2019/239)
 #   claslib_ppp_rtk_2ch     PPP-RTK with 2-channel L6 (2025/157)
-#   claslib_vrs_rtk         VRS-RTK (2019/239)
 #   claslib_ppp_rtk_st12    PPP-RTK with SubType 12 (BINEX obs, 2019/349)
 #   claslib_ppp_rtk_l1cl5   PPP-RTK with L1C+L5 frequency (2025/022)
-#
-# Not yet ported:
-#   claslib_ppp_rtk_st12_vrs   VRS-RTK + SubType 12
-#   claslib_ppp_rtk_2ch_vrs    2-channel VRS-RTK
+#   claslib_vrs_rtk         VRS-RTK (2019/239)
+#   claslib_vrs_rtk_st12    VRS-RTK with SubType 12 (2019/349)
+#   claslib_vrs_rtk_2ch     VRS-RTK with 2-channel (2025/157)
 set(_CLSDATA  ${CMAKE_SOURCE_DIR}/tests/data/claslib)
 set(_COMPARE_NMEA ${CMAKE_SOURCE_DIR}/scripts/tests/compare_nmea.py)
 
@@ -757,7 +755,67 @@ set_tests_properties(claslib_ppp_rtk_l1cl5_check PROPERTIES
     LABELS            "regression;claslib;ppp-rtk"
 )
 
-# ── Not yet ported tests ─────────────────────────────────────────────────────
-# TODO: Add when more VRS tests are ready:
-#   claslib_ppp_rtk_st12_vrs — ref_ST12_VRS.nmea (needs VRS + vrs2019349B.obs)
-#   claslib_ppp_rtk_2ch_vrs  — ref_L6_2CH_VRS.nmea (needs VRS + dual .l6)
+# ── rnx2rtkp CLAS VRS-RTK regression (SubType 12 BINEX) ─────────────────────
+# Data: 2019/12/15 01:00-02:00, 0627349AB.bnx + sept_2019349.nav + vrs2019349B.obs
+# Reference: ref_ST12_VRS.nmea (upstream claslib output)
+add_test(NAME claslib_vrs_rtk_st12
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/claslib/rnx2rtkp_vrs.conf
+        -ts 2019/12/15 01:00:00 -te 2019/12/15 01:59:59 -ti 1
+        -o ${CMAKE_BINARY_DIR}/out_claslib_vrs_rtk_st12.nmea
+        ${_CLSDATA}/0627349AB.bnx
+        ${_CLSDATA}/sept_2019349.nav
+        ${_CLSDATA}/vrs2019349B.obs
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_vrs_rtk_st12 PROPERTIES
+    FIXTURES_REQUIRED claslib_data
+    TIMEOUT           300
+    LABELS            "regression;claslib;vrs"
+)
+
+add_test(NAME claslib_vrs_rtk_st12_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_NMEA}
+        ${_CLSDATA}/ref_ST12_VRS.nmea
+        ${CMAKE_BINARY_DIR}/out_claslib_vrs_rtk_st12.nmea
+        --tolerance 0.10
+)
+set_tests_properties(claslib_vrs_rtk_st12_check PROPERTIES
+    DEPENDS           claslib_vrs_rtk_st12
+    FIXTURES_REQUIRED claslib_data
+    LABELS            "regression;claslib;vrs"
+)
+
+# ── rnx2rtkp CLAS VRS-RTK regression (dual-channel) ─────────────────────────
+# Data: 2025/06/06 20:00-21:00, 0627157U.bnx + ch1.obs + ch2.obs (VRS)
+# Reference: ref_L6_2CH_VRS.nmea (upstream claslib output)
+# Note: No separate .nav — nav embedded in BINEX; no .l6 — VRS obs replace L6
+add_test(NAME claslib_vrs_rtk_2ch
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/claslib/rnx2rtkp_vrs.conf
+        -ts 2025/06/06 20:00:00 -te 2025/06/06 20:59:59 -ti 1
+        -l6msg 1
+        -o ${CMAKE_BINARY_DIR}/out_claslib_vrs_rtk_2ch.nmea
+        ${_CLSDATA}/0627157U.bnx
+        ${_CLSDATA}/2025157U_ch1.obs
+        ${_CLSDATA}/2025157U_ch2.obs
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_vrs_rtk_2ch PROPERTIES
+    FIXTURES_REQUIRED claslib_data
+    TIMEOUT           300
+    LABELS            "regression;claslib;vrs"
+)
+
+add_test(NAME claslib_vrs_rtk_2ch_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_NMEA}
+        ${_CLSDATA}/ref_L6_2CH_VRS.nmea
+        ${CMAKE_BINARY_DIR}/out_claslib_vrs_rtk_2ch.nmea
+        --tolerance 0.20
+        --skip-fixrate
+)
+set_tests_properties(claslib_vrs_rtk_2ch_check PROPERTIES
+    DEPENDS           claslib_vrs_rtk_2ch
+    FIXTURES_REQUIRED claslib_data
+    LABELS            "regression;claslib;vrs"
+)
