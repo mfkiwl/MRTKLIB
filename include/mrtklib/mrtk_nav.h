@@ -426,6 +426,7 @@ typedef struct {        /* navigation data type */
     ssr_t ssr_ch[SSR_CH_NUM][MAXSAT]; /* SSR corrections (per channel) */
     int facility[SSR_CH_NUM]; /* L6 facility ID per channel */
     int filreset;       /* filter reset flag (facility change) */
+    int invtrop;        /* inverse troposphere flag (0:estimate, 1:SSR trop valid) */
     pppiono_t *pppiono; /* PPP ionospheric corrections (MADOCA-PPP L6D) (heap) */
     void *clas_ctx;     /* CLAS CSSR correction context (NULL if unused) */
     stat_t stat;        /* stat corrections */

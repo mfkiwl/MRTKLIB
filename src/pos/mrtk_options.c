@@ -40,7 +40,7 @@ static char snrmask_[NFREQ][1024];
 
 /* system options table ------------------------------------------------------*/
 #define SWTOPT  "0:off,1:on"
-#define MODOPT  "0:single,1:dgps,2:kinematic,3:static,4:movingbase,5:fixed,6:ppp-kine,7:ppp-static,8:ppp-fixed,9:ppp-rtk"
+#define MODOPT  "0:single,1:dgps,2:kinematic,3:static,4:movingbase,5:fixed,6:ppp-kine,7:ppp-static,8:ppp-fixed,9:ppp-rtk,10:ssr2osr,11:ssr2osr-fixed,12:vrs-rtk"
 #define FRQOPT  "1:l1,2:l1+2,3:l1+2+3,4:l1+2+3+4,5:l1+2+3+4+5"
 #define TYPOPT  "0:forward,1:backward,2:combined"
 #define IONOPT  "0:off,1:brdc,2:sbas,3:dual-freq,4:est-stec,5:ionex-tec,6:qzs-brdc,9:est-adaptive"
@@ -232,6 +232,7 @@ opt_t sysopts[]={
     {"misc-floatcnt",   0,  (void *)&prcopt_.floatcnt,   "epoch"},
     {"misc-rtcmopt",    2,  (void *)&prcopt_.rtcmopt,    ""     },
     {"misc-l6mrg",      0,  (void *)&prcopt_.l6mrg,      ""     },
+    {"misc-regularly",  0,  (void *)&prcopt_.regularly,  ""     },
 
     {"file-satantfile", 2,  (void *)&filopt_.satantp,    ""     },
     {"file-rcvantfile", 2,  (void *)&filopt_.rcvantp,    ""     },

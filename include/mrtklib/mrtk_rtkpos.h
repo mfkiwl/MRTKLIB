@@ -53,6 +53,7 @@ typedef struct {        /* RTK control/result type */
     double *Q;          /* process noise covariance (adaptive filter) */
     double *xa,*Pa;     /* fixed states and their covariance */
     int nfix;           /* number of continuous fixes of ambiguity */
+    double com_bias;    /* common bias offset for phase-bias initialization */
     ambc_t ambc[MAXSAT]; /* ambibuity control */
     ssat_t ssat[MAXSAT]; /* satellite status */
     int neb;            /* bytes in error message buffer */

@@ -14,6 +14,7 @@
 #include "mrtklib/mrtk_rtkpos.h"
 #include "mrtklib/mrtk_ppp.h"
 #include "mrtklib/mrtk_ppp_rtk.h"
+#include "mrtklib/mrtk_vrs.h"
 #include "mrtklib/mrtk_mat.h"
 #include "mrtklib/mrtk_lambda.h"
 #include "mrtklib/mrtk_sys.h"
@@ -88,7 +89,7 @@ extern int miono_get_corr(const double *rr, nav_t *nav);
 /* number of parameters (pos,ionos,tropos,hw-bias,phase-bias,real,estimated) */
 #define NF(opt)     ((opt)->ionoopt==IONOOPT_IFLC?1:(opt)->nf)
 #define NP(opt)     ((opt)->dynamics==0?3:9)
-#define NI(opt)     ((opt)->ionoopt!=IONOOPT_EST?0:MAXSAT)
+#define NI(opt)     (((opt)->ionoopt!=IONOOPT_EST&&(opt)->ionoopt!=IONOOPT_EST_ADPT)?0:MAXSAT)
 #define NT(opt)     ((opt)->tropopt<TROPOPT_EST?0:((opt)->tropopt<TROPOPT_ESTG?2:6))
 #define NL(opt)     ((opt)->glomodear!=2?0:NFREQGLO)
 #define NB(opt)     ((opt)->mode<=PMODE_DGPS?0:MAXSAT*NF(opt))
@@ -1684,7 +1685,7 @@ extern void rtkinit(rtk_t *rtk, const prcopt_t *opt)
     if (opt->mode==PMODE_PPP_RTK) {
         rtk->nx=ppp_rtk_nx(opt);
         rtk->na=ppp_rtk_na(opt);
-    } else if (opt->mode<=PMODE_FIXED) {
+    } else if (opt->mode<=PMODE_FIXED||opt->mode==PMODE_VRS_RTK) {
         rtk->nx=NX(opt);
         rtk->na=NR(opt);
     } else {
@@ -2092,19 +2093,22 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
     prcopt_t *opt=&rtk->opt;
     sol_t solb={{0}};
     gtime_t time;
-    int i,nu,nr;
+    int i,nu,nr[2]={0};
     char msg[128]="";
     
     trace(ctx,3,"rtkpos  : time=%s n=%d\n",time_str(obs[0].time,3),n);
-        
+
     /* set base station position */
     if (opt->refpos<=POSOPT_RINEX&&opt->mode!=PMODE_SINGLE&&
         opt->mode!=PMODE_MOVEB) {
         for (i=0;i<6;i++) rtk->rb[i]=i<3?opt->rb[i]:0.0;
     }
     /* count rover/base station observations */
-    for (nu=0;nu   <n&&obs[nu   ].rcv==1;nu++) ;
-    for (nr=0;nu+nr<n&&obs[nu+nr].rcv==2;nr++) ;
+    for (nu=0;nu      <n&&obs[nu      ].rcv==1;nu++) ;
+    for (nr[0]=0;nu+nr[0]<n&&obs[nu+nr[0]].rcv==2;nr[0]++) ;
+    if (opt->l6mrg) {
+        for (nr[1]=0;nu+nr[0]+nr[1]<n&&obs[nu+nr[0]+nr[1]].rcv==3;nr[1]++) ;
+    }
     
     time=rtk->sol.time; /* previous epoch */
     
@@ -2114,8 +2118,9 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
     /* rover position by single point positioning */
     {
         prcopt_t sppopt=rtk->opt;
-        /* PPP-RTK: force broadcast ephemeris for SPP initial position */
-        if (sppopt.mode==PMODE_PPP_RTK) sppopt.sateph=EPHOPT_BRDC;
+        /* PPP-RTK/VRS: force broadcast ephemeris for SPP initial position */
+        if (sppopt.mode==PMODE_PPP_RTK||sppopt.mode==PMODE_VRS_RTK)
+            sppopt.sateph=EPHOPT_BRDC;
         if (!pntpos(ctx,obs,nu,nav,&sppopt,&rtk->sol,NULL,rtk->ssat,msg)) {
             errmsg(rtk,"point pos error (%s)\n",msg);
 
@@ -2145,6 +2150,24 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
         outsolstat(rtk);
         return 1;
     }
+    /* VRS-RTK positioning (CLAS) */
+    if (opt->mode==PMODE_VRS_RTK) {
+        static int floatcnt=0;
+        trace(ctx,4,"obs=\n"); traceobs(ctx,4,obs,n);
+        relposvrs(rtk,obs,nu,nr,nav);
+        if (opt->floatcnt>0&&rtk->sol.stat==SOLQ_FLOAT) {
+            if (++floatcnt>opt->floatcnt) {
+                trace(ctx,1,"float status continued than %d epoch: filter reset.\n",
+                      opt->floatcnt);
+                nav->filreset=1;
+                floatcnt=0;
+            }
+        } else {
+            floatcnt=0;
+        }
+        outsolstat(rtk);
+        return 1;
+    }
     /* precise point positioning */
     if (opt->mode>=PMODE_PPP_KINEMA) {
         miono_get_corr(rtk->sol.rr,nav);
@@ -2155,15 +2178,15 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
     }
     trace(ctx,4,"obs=\n"); traceobs(ctx,4,obs,n);
     /* check number of data of base station and age of differential */
-    if (nr==0) {
+    if (nr[0]==0) {
         errmsg(rtk,"no base station observation data for rtk\n");
         outsolstat(rtk);
         return 1;
     }
     if (opt->mode==PMODE_MOVEB) { /*  moving baseline */
-        
+
         /* estimate position/velocity of base station */
-        if (!pntpos(ctx,obs+nu,nr,nav,&rtk->opt,&solb,NULL,NULL,msg)) {
+        if (!pntpos(ctx,obs+nu,nr[0],nav,&rtk->opt,&solb,NULL,NULL,msg)) {
             errmsg(rtk,"base station position error (%s)\n",msg);
             return 0;
         }
@@ -2188,7 +2211,7 @@ extern int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, nav_t *
         }
     }
     /* relative positioning */
-    relpos(rtk,obs,nu,nr,nav);
+    relpos(rtk,obs,nu,nr[0],nav);
     outsolstat(rtk);
     
     return 1;

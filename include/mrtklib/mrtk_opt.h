@@ -133,6 +133,18 @@ extern "C" {
 #define POSOPT_RTCM   4             /* pos option: rtcm/raw station pos */
 
 /*============================================================================
+ * Extended Receiver Error Model Type
+ *===========================================================================*/
+
+typedef struct {        /* extended receiver error model */
+    int ena[4];         /* model enabled */
+    double cerr[4][NFREQ*2]; /* code errors (m) */
+    double perr[4][NFREQ*2]; /* carrier-phase errors (m) */
+    double gpsglob[NFREQ]; /* gps-glonass h/w bias (m) */
+    double gloicb [NFREQ]; /* glonass interchannel bias (m/fn) */
+} exterr_t;
+
+/*============================================================================
  * Processing Options Type
  *===========================================================================*/
 
@@ -204,6 +216,7 @@ typedef struct prcopt_t {        /* processing options type */
     int  posopt[11];    /* positioning options */
     int  syncsol;       /* solution sync mode (0:off,1:on) */
     double odisp[2][6*11]; /* ocean tide loading parameters {rov,base} */
+    exterr_t exterr;    /* extended receiver error model */
     int  freqopt;       /* disable L2-AR */
     int16_t elmaskopt[360]; /* elevation mask pattern */
     char pppopt[256];   /* ppp option */
@@ -240,6 +253,12 @@ typedef struct prcopt_t {        /* processing options type */
     char   rectype[2][MAXANT]; /* receiver types {rover,ref} */
     int    l6mrg;           /* L6 2-channel mode (0:single,1:dual-priority,2:dual-balanced) */
     int    regularly;       /* filter reset cycle (s) (0:off) */
+
+    /* VRS-RTK specific options */
+    double maxpdopar;       /* maximum PDOP for AR (0:no limit) */
+    double maxpdophold;     /* maximum PDOP to hold ambiguity (0:no limit) */
+    int    refdop;          /* reference DOP (0:conventional, 1:single-diff) */
+    double beta;            /* ionosphere time constant for Gauss-Markov (s) */
 } prcopt_t;
 
 /*============================================================================

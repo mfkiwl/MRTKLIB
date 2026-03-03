@@ -89,6 +89,7 @@ add_library(mrtklib STATIC
     src/pos/mrtk_ppp_ar.c
     src/pos/mrtk_ppp.c
     src/pos/mrtk_ppp_rtk.c
+    src/pos/mrtk_vrs.c
     src/pos/mrtk_ppp_iono.c
     src/pos/mrtk_lambda.c
     src/pos/mrtk_postpos.c
@@ -664,11 +665,41 @@ set_tests_properties(claslib_ppp_rtk_2ch_check PROPERTIES
     LABELS            "regression;claslib;ppp-rtk"
 )
 
+# ── rnx2rtkp CLAS VRS-RTK regression ──────────────────────────────────────────
+# Data: 2019/08/27 16:00-17:00, 0627239Q.obs + sept_2019239.nav + vrs2019239Q.obs
+# Reference: ref_VRS.nmea (upstream claslib output)
+add_test(NAME claslib_vrs_rtk
+    COMMAND $<TARGET_FILE:rnx2rtkp>
+        -k ${CMAKE_SOURCE_DIR}/conf/claslib/rnx2rtkp_vrs.conf
+        -ts 2019/08/27 16:00:00 -te 2019/08/27 16:59:59 -ti 1
+        -o ${CMAKE_BINARY_DIR}/out_claslib_vrs_rtk.nmea
+        ${_CLSDATA}/0627239Q.obs
+        ${_CLSDATA}/sept_2019239.nav
+        ${_CLSDATA}/vrs2019239Q.obs
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_vrs_rtk PROPERTIES
+    FIXTURES_REQUIRED claslib_data
+    TIMEOUT           300
+    LABELS            "regression;claslib;vrs"
+)
+
+add_test(NAME claslib_vrs_rtk_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_NMEA}
+        ${_CLSDATA}/ref_VRS.nmea
+        ${CMAKE_BINARY_DIR}/out_claslib_vrs_rtk.nmea
+        --tolerance 0.10
+)
+set_tests_properties(claslib_vrs_rtk_check PROPERTIES
+    DEPENDS           claslib_vrs_rtk
+    FIXTURES_REQUIRED claslib_data
+    LABELS            "regression;claslib;vrs"
+)
+
 # ── Not yet ported tests ─────────────────────────────────────────────────────
 # TODO: Add when BINEX SubType 12 support is verified:
 #   claslib_ppp_rtk_st12    — ref_ST12.nmea (needs 0627349AB.bnx + sept_2019349.nav)
-# TODO: Add when VRS mode is ported:
-#   claslib_ppp_rtk_vrs      — ref_VRS.nmea (needs VRS mode + vrs2019239Q.obs)
+# TODO: Add when more VRS tests are ready:
 #   claslib_ppp_rtk_st12_vrs — ref_ST12_VRS.nmea (needs VRS + vrs2019349B.obs)
 #   claslib_ppp_rtk_2ch_vrs  — ref_L6_2CH_VRS.nmea (needs VRS + dual .l6)
 # TODO: Add when L1C/L5 config is ported:
