@@ -6,10 +6,16 @@
  * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
- * Copyright (C) 2015- by Mitsubishi Electric Corporation, All rights reserved.
- * Copyright (C) 2010- by T.TAKASU, All rights reserved.
+ * Copyright (C) 2015- Mitsubishi Electric Corp.
+ * Copyright (C) 2014 Geospatial Information Authority of Japan
+ * Copyright (C) 2014 T.SUZUKI
+ * Copyright (C) 2007-2023 T.TAKASU
  *
  * SPDX-License-Identifier: BSD-2-Clause
+ *----------------------------------------------------------------------------*/
+/**
+ * @file mrtk_clas_osr.c
+ * @brief CLAS SSR-to-OSR (Observation Space Representation) conversion.
  *
  * References:
  *   [1] claslib cssr2osr.c -- upstream SSR->OSR implementation
@@ -24,7 +30,7 @@
  *   - Uses nav->ssr_ch[0][sat-1] (channel 0 by default).
  *   - nav->lam[sat-1] replaced by local lam[] computed from sat2freq().
  *   - Several upstream functions stubbed (ISB, L2C, etc.).
- *----------------------------------------------------------------------------*/
+ */
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>

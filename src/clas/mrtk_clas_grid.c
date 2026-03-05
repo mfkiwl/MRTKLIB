@@ -6,20 +6,26 @@
  * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
+ * Copyright (C) 2015- Mitsubishi Electric Corp.
+ * Copyright (C) 2014 Geospatial Information Authority of Japan
  * Copyright (C) 2014 T.SUZUKI
  * Copyright (C) 2007-2023 T.TAKASU
  *
  * SPDX-License-Identifier: BSD-2-Clause
- *
- * references:
- *     [1] IS-QZSS-L6-006, QZSS L6 Signal CLAS IF Specification
- *
- * history:
- *     2026/03/02  1.0  ported from claslib grid.c / stec.c / rtkcmn.c
- *                      - singleton globals replaced by clas_ctx_t context
- *                      - nav_t dependency replaced by clas_corr_t
- *                      - MOPS standard atmosphere helpers embedded as static
  *----------------------------------------------------------------------------*/
+/**
+ * @file mrtk_clas_grid.c
+ * @brief CLAS grid interpolation for troposphere and STEC.
+ *
+ * References:
+ *   [1] IS-QZSS-L6-006, QZSS L6 Signal CLAS IF Specification
+ *
+ * History:
+ *   2026/03/02  1.0  ported from claslib grid.c / stec.c / rtkcmn.c
+ *                    - singleton globals replaced by clas_ctx_t context
+ *                    - nav_t dependency replaced by clas_corr_t
+ *                    - MOPS standard atmosphere helpers embedded as static
+ */
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>

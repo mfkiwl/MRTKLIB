@@ -6,10 +6,16 @@
  * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
  * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
  * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
+ * Copyright (C) 2015- Mitsubishi Electric Corp.
+ * Copyright (C) 2014 Geospatial Information Authority of Japan
  * Copyright (C) 2014 T.SUZUKI
  * Copyright (C) 2007-2023 T.TAKASU
  *
  * SPDX-License-Identifier: BSD-2-Clause
+ *----------------------------------------------------------------------------*/
+/**
+ * @file mrtk_clas.c
+ * @brief QZSS CLAS (L6D) CSSR decoder and bank management.
  *
  * References:
  *   [1] claslib (https://github.com/mf-arai/claslib) — upstream implementation
@@ -20,7 +26,7 @@
  *   - All output_cssr_* / CSV debug functions are omitted (not needed in core).
  *   - Decoders write to ctx->dec_ssr[] (clas_dec_ssr_t) as intermediate buffer,
  *     NOT to nav_t.ssr[] directly, to isolate from MRTKLIB ssr_t differences.
- *----------------------------------------------------------------------------*/
+ */
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>

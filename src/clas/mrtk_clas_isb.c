@@ -2,10 +2,19 @@
  * mrtk_clas_isb.c : ISB (inter-system bias) and L2C phase shift corrections
  *
  * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
+ * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
+ * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
+ * Copyright (C) 2015- Mitsubishi Electric Corp.
  * Copyright (C) 2014 Geospatial Information Authority of Japan
  * Copyright (C) 2007-2013 T.TAKASU
  *
  * SPDX-License-Identifier: BSD-2-Clause
+ *----------------------------------------------------------------------------*/
+/**
+ * @file mrtk_clas_isb.c
+ * @brief ISB (inter-system bias) and L2C phase shift corrections.
  *
  * References:
  *   [1] claslib (https://github.com/mf-arai/claslib) — upstream isb.c
@@ -14,7 +23,7 @@
  *   - Ported from upstream claslib isb.c with minimal changes.
  *   - ISB corrects inter-system receiver biases between GPS/GLO/GAL/QZS.
  *   - L2C corrects 1/4 cycle phase shift on certain GPS L2C satellites.
- *----------------------------------------------------------------------------*/
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
