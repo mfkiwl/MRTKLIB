@@ -171,12 +171,16 @@ def _match_epochs(
 def compute_metrics(
     pairs: list[tuple[tuple, tuple]],
     skip_epochs: int = 0,
+    threshold_2d: float = float("nan"),
 ) -> dict | None:
     """Compute positioning error statistics from matched epoch pairs.
 
     Args:
         pairs: Matched ``(ref_row, nmea_row)`` pairs from ``_match_epochs()``.
         skip_epochs: Number of initial epochs to discard (convergence exclusion).
+        threshold_2d: Horizontal error threshold in metres for threshold-based
+            fix rate and convergence time (e.g. 0.30 for PPP modes where Q=4
+            is never set).  When ``nan``, only Q=4-based metrics are computed.
 
     Returns:
         Dict of statistics, or ``None`` if no usable pairs remain.
@@ -213,7 +217,7 @@ def compute_metrics(
     fix_mask = np.array([q == 4 for q in q_list])
     n_fix = int(fix_mask.sum())
 
-    # Fix-only subset
+    # Fix-only subset (Q=4)
     if n_fix > 0:
         h_fix = horiz[fix_mask]
         e_fix = e3d[fix_mask]
@@ -224,7 +228,7 @@ def compute_metrics(
     else:
         rms_2d_fix = rms_3d_fix = p68_2d_fix = p95_2d_fix = math.nan
 
-    # Convergence time: first run of ≥30 consecutive Q=4 epochs
+    # Q=4-based convergence: first run of ≥30 consecutive Q=4 epochs
     conv_time_s = math.nan
     run = 0
     run_start_idx = 0
@@ -238,6 +242,27 @@ def compute_metrics(
                 break
         else:
             run = 0
+
+    # Threshold-based metrics (for PPP modes where Q=4 is not produced)
+    thr_rate = math.nan
+    conv_thr_s = math.nan
+    if not math.isnan(threshold_2d):
+        thr_mask = horiz < threshold_2d
+        n_thr = int(thr_mask.sum())
+        thr_rate = n_thr / n * 100.0
+        # TTFF: first run of ≥30 consecutive epochs below threshold
+        run = 0
+        run_start_idx = 0
+        for i, below in enumerate(thr_mask):
+            if below:
+                if run == 0:
+                    run_start_idx = i
+                run += 1
+                if run >= 30:
+                    conv_thr_s = abs_tows[run_start_idx] - abs_tows[0]
+                    break
+            else:
+                run = 0
 
     return {
         "n_matched": n,
@@ -260,8 +285,12 @@ def compute_metrics(
         "rms_3d_fix": rms_3d_fix,
         "p68_2d_fix": p68_2d_fix,
         "p95_2d_fix": p95_2d_fix,
-        # Convergence
+        # Q=4 convergence
         "conv_time_s": conv_time_s,
+        # Threshold-based (for PPP modes)
+        "threshold_2d": threshold_2d,
+        "thr_rate": thr_rate,
+        "conv_thr_s": conv_thr_s,
     }
 
 

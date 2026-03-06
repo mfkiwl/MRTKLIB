@@ -120,6 +120,11 @@ def _run_rnx2rtkp(
     Returns:
         True if rnx2rtkp exited with code 0.
     """
+    # Resolve all file paths to absolute so they work regardless of cwd.
+    output = output.resolve()
+    obs = obs.resolve()
+    nav = nav.resolve()
+    l6_files = [f.resolve() for f in l6_files]
     output.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         rnx2rtkp,
@@ -146,16 +151,15 @@ def _run_rnx2rtkp(
 # Summary table
 # ---------------------------------------------------------------------------
 _HDR = (
-    f"{'Case':<20} {'Mode':<7} {'N':>6} {'Fix%':>6} "
-    f"{'RMS_2D(all)':>12} {'RMS_3D(all)':>12} "
-    f"{'RMS_2D(fix)':>12} {'Conv_s':>8}"
+    f"{'Case':<20} {'Mode':<7} {'N':>6} {'Rate%':>7} "
+    f"{'RMS_2D':>10} {'1σ':>10} {'95%':>10} {'TTFF_s':>8}"
 )
 _SEP = "-" * len(_HDR)
 
 
 def _fmt_m(v: float) -> str:
-    """Format metres with 2 decimal places, or 'nan'."""
-    return "nan" if math.isnan(v) else f"{v:.3f} m"
+    """Format metres with 3 decimal places, or 'nan'."""
+    return "nan" if math.isnan(v) else f"{v:.3f}m"
 
 
 def _fmt_s(v: float) -> str:
@@ -166,21 +170,35 @@ def _fmt_s(v: float) -> str:
 def print_summary(rows: list[dict]) -> None:
     """Print a fixed-width summary table.
 
+    Rate% column meaning:
+      - clas / rtk : Q=4 fix rate
+      - madoca     : fraction of epochs with 2D error < 30 cm
+
     Args:
         rows: List of result dicts from the benchmark loop.
     """
     print()
     print(_SEP)
     print(_HDR)
+    print("  (Rate%: Q=4 fix rate for clas/rtk; <30cm rate for madoca)")
     print(_SEP)
     for r in rows:
         m = r["metrics"]
         n = m["n_matched"] if m else 0
-        fix_pct = f"{m['fix_rate']:.1f}%" if m else "--"
-        rms2_all = _fmt_m(m["rms_2d_all"]) if m else "--"
-        rms3_all = _fmt_m(m["rms_3d_all"]) if m else "--"
-        rms2_fix = _fmt_m(m["rms_2d_fix"]) if m else "--"
-        conv = _fmt_s(m["conv_time_s"]) if m else "--"
+        if m:
+            use_threshold = not math.isnan(m.get("threshold_2d", float("nan")))
+            if use_threshold:
+                rate = f"{m['thr_rate']:.1f}%"
+                conv = _fmt_s(m["conv_thr_s"])
+            else:
+                rate = f"{m['fix_rate']:.1f}%"
+                conv = _fmt_s(m["conv_time_s"])
+            rms2 = _fmt_m(m["rms_2d_all"])
+            p68 = _fmt_m(m["p68_2d_all"])
+            p95 = _fmt_m(m["p95_2d_all"])
+        else:
+            rate = rms2 = p68 = p95 = conv = "--"
+
         if r["status"] == "skip":
             status_tag = " [skipped]"
         elif r["status"] == "fail":
@@ -188,8 +206,8 @@ def print_summary(rows: list[dict]) -> None:
         else:
             status_tag = ""
         print(
-            f"{r['case_id']:<20} {r['mode']:<7} {n:>6} {fix_pct:>6} "
-            f"{rms2_all:>12} {rms3_all:>12} {rms2_fix:>12} {conv:>8}"
+            f"{r['case_id']:<20} {r['mode']:<7} {n:>6} {rate:>7} "
+            f"{rms2:>10} {p68:>10} {p95:>10} {conv:>8}"
             f"{status_tag}"
         )
     print(_SEP)
@@ -242,45 +260,69 @@ def run_benchmark(args: argparse.Namespace) -> int:
                 "  See docs/benchmark.md for instructions."
             )
 
-    modes = ["clas", "madoca"] if args.mode == "both" else [args.mode]
+    # Expand mode aliases
+    if args.mode == "all":
+        modes = ["clas", "madoca", "rtk"]
+    elif args.mode == "both":
+        modes = ["clas", "madoca"]
+    else:
+        modes = [args.mode]
+
+    # PPP modes use a 2D error threshold instead of Q=4 for fix/convergence
+    _PPP_THRESHOLD = 0.30  # metres
+
     results = []
 
     for case in cases:
         city, run = case["city"], case["run"]
         obs = dataset_dir / city / run / "rover.obs"
         nav = dataset_dir / city / run / "base.nav"
+        base_obs = dataset_dir / city / run / "base.obs"
         ref = dataset_dir / city / run / "reference.csv"
 
-        # Download L6 files
-        if not args.skip_download:
-            print(f"Downloading L6 for {case['id']} ...")
-            l6_paths = ensure_case_l6(case, l6_dir, args.mode)
-        else:
-            # Build expected paths without downloading
-            from cases import l6_sessions
-            from download_l6 import _MADOCA_PRNS
+        # Download L6 files (only needed for clas/madoca)
+        l6_modes = [m for m in modes if m in ("clas", "madoca")]
+        l6_paths: dict[str, list[Path]] = {"clas": [], "madoca": []}
+        if l6_modes:
+            l6_mode_arg = "both" if set(l6_modes) == {"clas", "madoca"} else l6_modes[0]
+            if not args.skip_download:
+                print(f"Downloading L6 for {case['id']} ...")
+                l6_paths = ensure_case_l6(case, l6_dir, l6_mode_arg)
+            else:
+                # Build expected paths without downloading
+                from cases import l6_sessions
+                from download_l6 import _MADOCA_PRNS
 
-            sessions = l6_sessions(case["gps_week"], case["tow_start"], case["tow_end"])
-            l6_paths: dict[str, list[Path]] = {"clas": [], "madoca": []}
-            for year, doy, session in sessions:
-                l6d = l6_dir / f"{year}{doy:03d}{session}.l6"
-                if l6d.exists():
-                    l6_paths["clas"].append(l6d)
-                for prn in _MADOCA_PRNS:
-                    l6e = l6_dir / f"{year}{doy:03d}{session}.{prn}.l6"
-                    if l6e.exists():
-                        l6_paths["madoca"].append(l6e)
-                        break
+                sessions = l6_sessions(case["gps_week"], case["tow_start"], case["tow_end"])
+                for year, doy, session in sessions:
+                    l6d = l6_dir / f"{year}{doy:03d}{session}.l6"
+                    if l6d.exists():
+                        l6_paths["clas"].append(l6d)
+                    for prn in _MADOCA_PRNS:
+                        l6e = l6_dir / f"{year}{doy:03d}{session}.{prn}.l6"
+                        if l6e.exists():
+                            l6_paths["madoca"].append(l6e)
+                            break
 
         for mode in modes:
             conf = str(conf_dir / f"{mode}.conf")
             out = out_dir / f"{case['id']}_{mode}.nmea"
-            l6_files = l6_paths.get(mode, [])
+
+            # Determine extra input files and convergence threshold
+            if mode == "rtk":
+                extra_files = [base_obs]
+                threshold = math.nan  # RTK uses Q=4
+            elif mode == "madoca":
+                extra_files = l6_paths.get("madoca", [])
+                threshold = _PPP_THRESHOLD  # PPP: use <30cm threshold
+            else:  # clas
+                extra_files = l6_paths.get("clas", [])
+                threshold = math.nan  # PPP-RTK uses Q=4
 
             print(f"\n[{case['id']}  /  {mode.upper()}]")
 
-            if not l6_files:
-                print(f"  WARNING: no L6 files found for {mode}; skipping.")
+            if not extra_files:
+                print(f"  WARNING: no input files found for {mode}; skipping.")
                 results.append({"case_id": case["id"], "mode": mode,
                                  "metrics": None, "status": "skip"})
                 continue
@@ -290,7 +332,7 @@ def run_benchmark(args: argparse.Namespace) -> int:
                 newest_in = max(
                     obs.stat().st_mtime,
                     nav.stat().st_mtime,
-                    max(f.stat().st_mtime for f in l6_files),
+                    max(f.stat().st_mtime for f in extra_files),
                 )
                 if out.stat().st_mtime > newest_in:
                     print(f"  [cached]  {out.name}")
@@ -306,7 +348,7 @@ def run_benchmark(args: argparse.Namespace) -> int:
                     rnx2rtkp, conf,
                     case["gps_week"],
                     case["tow_start"] - 60, case["tow_end"] + 60,
-                    out, obs, nav, l6_files,
+                    out, obs, nav, extra_files,
                     cwd=str(root),
                     verbose=args.verbose,
                 )
@@ -328,7 +370,7 @@ def run_benchmark(args: argparse.Namespace) -> int:
             ref_rows = parse_reference(str(ref))
             nmea_rows = parse_nmea(str(out))
             pairs = _match_epochs(ref_rows, nmea_rows)
-            m = compute_metrics(pairs, args.skip_epochs)
+            m = compute_metrics(pairs, args.skip_epochs, threshold_2d=threshold)
 
             if m is None:
                 print("  FAIL: no matching epochs")
@@ -336,11 +378,19 @@ def run_benchmark(args: argparse.Namespace) -> int:
                                  "metrics": None, "status": "fail"})
                 continue
 
+            # Progress line: show appropriate rate / convergence for the mode
+            if not math.isnan(threshold):
+                rate_str = f"<{threshold*100:.0f}cm={m['thr_rate']:.1f}%"
+                conv_str = _fmt_s(m["conv_thr_s"])
+            else:
+                rate_str = f"Fix={m['fix_rate']:.1f}%"
+                conv_str = _fmt_s(m["conv_time_s"])
             print(
-                f"  N={m['n_matched']}  Fix={m['fix_rate']:.1f}%  "
+                f"  N={m['n_matched']}  {rate_str}  "
                 f"RMS_2D={m['rms_2d_all']:.3f}m  "
-                f"RMS_2D(fix)={_fmt_m(m['rms_2d_fix'])}  "
-                f"Conv={_fmt_s(m['conv_time_s'])}s"
+                f"1σ={_fmt_m(m['p68_2d_all'])}  "
+                f"95%={_fmt_m(m['p95_2d_all'])}  "
+                f"TTFF={conv_str}s"
             )
             results.append({"case_id": case["id"], "mode": mode,
                              "metrics": m, "status": "ok"})
@@ -367,8 +417,9 @@ def main() -> int:
                    help="L6 file cache directory (default: data/benchmark/l6)")
     p.add_argument("--out-dir", default="data/benchmark/results",
                    help="Output directory for NMEA results (default: data/benchmark/results)")
-    p.add_argument("--mode", choices=["clas", "madoca", "both"], default="both",
-                   help="Positioning mode to run (default: both)")
+    p.add_argument("--mode", choices=["clas", "madoca", "rtk", "both", "all"],
+                   default="all",
+                   help="Positioning mode (default: all = clas+madoca+rtk)")
     p.add_argument("--case", default="",
                    help="Comma-separated case IDs (default: all)")
     p.add_argument("--rnx2rtkp", default="",
