@@ -10,89 +10,19 @@ Usage:
     python compare_nmea.py ref.nmea test.nmea --tolerance 0.10 --skip-epochs 60 --plot
 """
 import argparse
-import math
 import sys
 
 import numpy as np
-
-
-# WGS84 constants
-_WGS84_A = 6378137.0            # semi-major axis [m]
-_WGS84_F = 1.0 / 298.257223563  # flattening
-_WGS84_E2 = _WGS84_F * (2.0 - _WGS84_F)  # first eccentricity squared
-
-
-def blh2xyz(lat_deg, lon_deg, h):
-    """Convert geodetic (lat, lon, height) to ECEF (X, Y, Z)."""
-    lat = math.radians(lat_deg)
-    lon = math.radians(lon_deg)
-    sinlat = math.sin(lat)
-    coslat = math.cos(lat)
-    sinlon = math.sin(lon)
-    coslon = math.cos(lon)
-
-    N = _WGS84_A / math.sqrt(1.0 - _WGS84_E2 * sinlat * sinlat)
-    x = (N + h) * coslat * coslon
-    y = (N + h) * coslat * sinlon
-    z = (N * (1.0 - _WGS84_E2) + h) * sinlat
-    return np.array([x, y, z])
-
-
-def xyz2enu(dx, lat_deg, lon_deg):
-    """Convert ECEF difference vector to local ENU at a reference point."""
-    lat = math.radians(lat_deg)
-    lon = math.radians(lon_deg)
-    sinlat = math.sin(lat)
-    coslat = math.cos(lat)
-    sinlon = math.sin(lon)
-    coslon = math.cos(lon)
-
-    e = -sinlon * dx[0] + coslon * dx[1]
-    n = -sinlat * coslon * dx[0] - sinlat * sinlon * dx[1] + coslat * dx[2]
-    u = coslat * coslon * dx[0] + coslat * sinlon * dx[1] + sinlat * dx[2]
-    return np.array([e, n, u])
-
-
-def _nmea_to_deg(val_str, hemi):
-    """Convert NMEA DDmm.mmmm / DDDmm.mmmm to decimal degrees.
-
-    Parameters
-    ----------
-    val_str : str
-        NMEA coordinate string (e.g., "3606.2180069" for lat, "14005.1791604" for lon).
-    hemi : str
-        Hemisphere indicator ('N', 'S', 'E', 'W').
-
-    Returns
-    -------
-    float
-        Decimal degrees (negative for S/W).
-    """
-    val = float(val_str)
-    # Determine number of degree digits: 2 for lat, 3 for lon
-    if hemi in ('N', 'S'):
-        deg = int(val / 100)
-        minutes = val - deg * 100
-    else:
-        deg = int(val / 100)
-        minutes = val - deg * 100
-    result = deg + minutes / 60.0
-    if hemi in ('S', 'W'):
-        result = -result
-    return result
+from _geo import blh2xyz, nmea_to_deg, xyz2enu  # noqa: E402
 
 
 def parse_nmea(filepath):
     """Parse NMEA file, extracting position data from GGA sentences.
 
-    Parameters
-    ----------
-    filepath : str
-        Path to the NMEA file.
+    Args:
+        filepath: Path to the NMEA file.
 
-    Returns
-    -------
-    dict
+    Returns:
         Mapping from time key (HHMMSS.ss string) to (lat_deg, lon_deg, alt, quality).
     """
     data = {}
@@ -124,8 +54,8 @@ def parse_nmea(filepath):
                     if quality == 0 or not lat_str or not lon_str:
                         continue
 
-                    lat_deg = _nmea_to_deg(lat_str, lat_hemi)
-                    lon_deg = _nmea_to_deg(lon_str, lon_hemi)
+                    lat_deg = nmea_to_deg(lat_str, lat_hemi)
+                    lon_deg = nmea_to_deg(lon_str, lon_hemi)
 
                     data[time_str] = (lat_deg, lon_deg, alt, quality)
                 except (ValueError, IndexError):
@@ -137,17 +67,14 @@ def parse_nmea(filepath):
 def compute_metrics(ref_data, test_data, skip_epochs=0):
     """Compute ENU error metrics between matched epochs.
 
-    Parameters
-    ----------
-    ref_data, test_data : dict
-        Parsed NMEA data from parse_nmea().
-    skip_epochs : int
-        Number of initial epochs to skip (for convergence transient).
+    Args:
+        ref_data: Parsed NMEA data from parse_nmea() for the reference file.
+        test_data: Parsed NMEA data from parse_nmea() for the test file.
+        skip_epochs: Number of initial epochs to skip (convergence transient).
 
-    Returns
-    -------
-    dict or None
-        Metrics including ENU errors, 3D errors, RMS, fix rates, etc.
+    Returns:
+        Dict of metrics (ENU errors, 3D RMS, fix rates, etc.), or None if
+        there are no common epochs.
     """
     common_keys = sorted(set(ref_data.keys()) & set(test_data.keys()))
     if skip_epochs > 0:
