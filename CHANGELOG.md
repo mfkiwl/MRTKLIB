@@ -5,6 +5,68 @@ All notable changes to MRTKLIB are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.2] - 2026-03-06
+
+Patch release — three-tier test methodology with absolute accuracy and position
+scatter checks. No functional changes to the library.
+
+### Added
+
+- **Three-tier test methodology** ([docs/test-accuracy-methodology.md](docs/test-accuracy-methodology.md))
+  — Formalises Tier 1 (relative porting correctness), Tier 2 (absolute geodetic
+  accuracy vs SINEX / GSI F5), and Tier 3 (position scatter / precision) layers.
+- **Tier 2 absolute accuracy tests** (2 new CTest entries):
+  - `madocalib_pppar_abs_check` — MADOCA PPP-AR vs IGS SINEX MIZU (GPS week 2383), 2D horizontal ≤ 0.100 m
+  - `claslib_ppp_rtk_2ch_abs_check` — CLAS 2CH vs GSI F5 TSUKUBA3 2025/06/06, 2D horizontal ≤ 0.300 m
+- **Tier 3 position scatter tests** (2 new CTest entries):
+  - `madocalib_ppp_scatter` — MADOCA-PPP 2D scatter ≤ 0.150 m (1σ=7.4 cm, 95%=11.2 cm, skip=30)
+  - `claslib_ppp_rtk_2ch_scatter` — CLAS 2CH scatter ≤ 0.400 m (1σ=5.8 cm, 95%=25.2 cm, skip=20)
+- **New comparison scripts**: `compare_pos_abs.py`, `compare_nmea_abs.py` (Tier 2);
+  `check_pos_scatter.py` (Tier 3).
+- **`scripts/tests/_geo.py`** — Shared geodetic utilities (`blh2xyz`, `xyz2blh`,
+  `xyz2enu`, `nmea_to_deg`) replacing 4× inline duplication across test scripts.
+- **`ruff.toml`** at project root — Ruff linting for all Python scripts
+  (`E`, `F`, `W`, `I`, `D` rules, Google docstring convention).
+- **`.vscode/settings.json`** — Ruff format-on-save and `scripts/.venv` interpreter.
+
+### Changed
+
+- `scripts/pyproject.toml` — Reduced to package metadata only; ruff config moved
+  to root `ruff.toml`.
+- Three debug plot scripts moved from `scripts/tests/` to `scripts/plotting/`
+  (`plot_gloeph.py`, `plot_igp.py`, `plot_peph.py`).
+
+### Removed
+
+- `scripts/fix_trace_fwd_decls.py`, `scripts/migrate_trace_ctx.py` — One-time
+  migration tools no longer needed.
+- `scripts/plotting/plot_lex_{eph,ion,ure}.py` — LEX service retired 2020.
+
+### Fixed
+
+- **NMEA ellipsoidal height** — `compare_nmea_abs.py` now correctly computes
+  `h_ell = MSL + geoid_separation` from GGA fields [9] and [11]; previously
+  field[11] was not summed, causing ~40 m Up errors.
+- **Absolute check 2D mode** — `--use-2d` flag in `compare_pos_abs.py` now
+  consistently governs both the reported metric and the pass/fail criterion.
+
+### Test Results
+
+All 57 tests pass (53 carried from v0.3.1 + 4 new):
+
+| Test Suite | Tests |
+|------------|-------|
+| Unit tests | 12 |
+| SPP / receiver bias / rtkrcv | 5 |
+| MADOCA PPP / PPP-AR / PPP-AR+iono | 10 |
+| CLAS PPP-RTK + VRS-RTK | 19 |
+| ssr2obs / ssr2osr / BINEX | 4 |
+| Tier 2 absolute accuracy | 2 ← new |
+| Tier 3 position scatter | 2 ← new |
+| Fixtures | 3 |
+
+---
+
 ## [v0.3.1] - 2026-03-06
 
 Patch release — MADOCALIB PPP-AR regression test quality improvement.
@@ -249,6 +311,7 @@ Initial release — MALIB structural migration complete.
 - **MALIB integration** — Structural base from JAXA MALIB feature/1.2.0
   (directory layout, threading, stream I/O).
 
+[v0.3.2]: https://github.com/h-shiono/MRTKLIB/compare/v0.3.1...v0.3.2
 [v0.3.1]: https://github.com/h-shiono/MRTKLIB/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://github.com/h-shiono/MRTKLIB/compare/v0.2.0...v0.3.0
 [v0.2.0]: https://github.com/h-shiono/MRTKLIB/compare/v0.1.0...v0.2.0
