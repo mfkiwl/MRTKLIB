@@ -92,6 +92,7 @@ def _find_rnx2rtkp(hint: str = "") -> str:
 def _run_rnx2rtkp(
     rnx2rtkp: str,
     conf: str,
+    city_conf: str,
     week: int,
     tow_start: float,
     tow_end: float,
@@ -106,7 +107,8 @@ def _run_rnx2rtkp(
 
     Args:
         rnx2rtkp: Path to rnx2rtkp binary.
-        conf: Path to configuration file.
+        conf: Path to mode configuration file.
+        city_conf: Path to city override configuration file (applied after conf).
         week: GPS week (for -ts/-te flags).
         tow_start: Run start TOW with margin already subtracted.
         tow_end: Run end TOW with margin already added.
@@ -129,6 +131,7 @@ def _run_rnx2rtkp(
     cmd = [
         rnx2rtkp,
         "-k", conf,
+        "-k", city_conf,
         "-ts", str(week), f"{tow_start:.3f}",
         "-te", str(week), f"{tow_end:.3f}",
         "-o", str(output),
@@ -391,8 +394,9 @@ def run_benchmark(args: argparse.Namespace) -> int:
 
             if not skip_run:
                 t0 = time.monotonic()
+                city_conf = str(conf_dir / f"{case['city']}.conf")
                 ok = _run_rnx2rtkp(
-                    rnx2rtkp, conf,
+                    rnx2rtkp, conf, city_conf,
                     case["gps_week"],
                     case["tow_start"] - 60, case["tow_end"] + 60,
                     out, obs, nav, extra_files,
