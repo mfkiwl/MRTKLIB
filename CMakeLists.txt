@@ -229,7 +229,10 @@ endforeach()
 
 # ── Python-based comparison tool ─────────────────────────────────────────────
 find_package(Python3 COMPONENTS Interpreter)
-set(_COMPARE_POS ${CMAKE_SOURCE_DIR}/scripts/tests/compare_pos.py)
+set(_COMPARE_POS      ${CMAKE_SOURCE_DIR}/scripts/tests/compare_pos.py)
+set(_COMPARE_POS_ABS  ${CMAKE_SOURCE_DIR}/scripts/tests/compare_pos_abs.py)
+set(_COMPARE_NMEA_ABS ${CMAKE_SOURCE_DIR}/scripts/tests/compare_nmea_abs.py)
+set(_CHECK_SCATTER    ${CMAKE_SOURCE_DIR}/scripts/tests/check_pos_scatter.py)
 
 # ── Regression test data ─────────────────────────────────────────────────────
 set(_TESTDATA  ${CMAKE_SOURCE_DIR}/tests/data/malib)
@@ -523,6 +526,30 @@ set_tests_properties(madocalib_pppar_ion_check PROPERTIES
     LABELS            "regression;madocalib;pppar"
 )
 
+# ── Absolute accuracy check: PPP-AR vs SINEX MIZU true coordinate ─────────────
+# Reference: IGS weekly SINEX (GPS week 2383, 2025/09/08-09/14) for MIZU station.
+# Evaluation: 2D horizontal 1σ and 95th-percentile against ITRF true coordinate.
+#   --use-2d: PPP vertical accuracy is troposphere-model-limited (~20 cm typical);
+#             2D horizontal (~4 cm) is the meaningful absolute accuracy metric.
+# Pass: metric < tolerance  OR  metric < SINEX formal precision (0.54 mm).
+# Convergence: skip first 60 epochs (30 min, 30-s interval) to discard transient.
+set(_SINEX_MIZU ${_MDLDATA}/IGS0OPSSNX_20252500000_07D_07D_SOL.SNX.gz)
+add_test(NAME madocalib_pppar_abs_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS_ABS}
+        --sinex ${_SINEX_MIZU}
+        --station MIZU
+        --tolerance 0.100
+        --skip-epochs 60
+        --use-2d
+        ${CMAKE_BINARY_DIR}/out_madocalib_pppar.pos
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_pppar_abs_check PROPERTIES
+    DEPENDS           madocalib_pppar
+    FIXTURES_REQUIRED madocalib_data
+    LABELS            "absolute;madocalib;pppar"
+)
+
 # ── cssr2ssr regression (not yet ported) ─────────────────────────────────────
 # TODO: cssr2ssr binary is not yet integrated into MRTKLIB.
 #       When ported, add:
@@ -690,6 +717,27 @@ set_tests_properties(claslib_ppp_rtk_2ch_check PROPERTIES
     DEPENDS           claslib_ppp_rtk_2ch
     FIXTURES_REQUIRED claslib_data
     LABELS            "regression;claslib;ppp-rtk"
+)
+
+# ── Absolute accuracy check: CLAS PPP-RTK 2CH vs GSI F5 TSUKUBA3 ─────────────
+# Reference: GSI F5 station 960627 (TSUKUBA3/0627), 15-day median centred on
+# 2025/06/06 (DOY 157).  Pass/fail on 2D horizontal accuracy (1σ, 95%).
+# Tolerance 0.300 m: MRTKLIB 2CH achieves 88% fix rate (float epochs present),
+# making the 95th percentile ~26 cm.  Tier-1 test already guards convergence;
+# this Tier-2 test confirms geodetic plausibility at a generous threshold.
+set(_F5_0627 ${_CLSDATA}/960627.25.pos)
+add_test(NAME claslib_ppp_rtk_2ch_abs_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_NMEA_ABS}
+        --f5 ${_F5_0627}
+        --date 2025/06/06
+        --tolerance 0.300
+        ${CMAKE_BINARY_DIR}/out_claslib_ppp_rtk_2ch.nmea
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_ppp_rtk_2ch_abs_check PROPERTIES
+    DEPENDS           claslib_ppp_rtk_2ch
+    FIXTURES_REQUIRED claslib_data
+    LABELS            "absolute;claslib;ppp-rtk"
 )
 
 # ── rnx2rtkp CLAS VRS-RTK regression ──────────────────────────────────────────
@@ -932,4 +980,61 @@ set_tests_properties(claslib_ssr2osr_check PROPERTIES
     DEPENDS           claslib_ssr2osr
     FIXTURES_REQUIRED claslib_data
     LABELS            "regression;claslib"
+)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Tier 3 tests — position scatter (precision)
+# ═══════════════════════════════════════════════════════════════════════════════
+# No external reference is required.  The session centroid is computed from
+# the solutions themselves, and 1σ (68th pctile) and 95% horizontal scatter
+# must stay within the tolerance.  These catch gross regressions that leave
+# the engine producing scattered or single-point solutions.
+#
+# Scatter checks are applied to the outputs already produced by Tier-1 runs:
+#
+#   madocalib_ppp_scatter
+#       MIZU RINEX obs + MADOCA L6E (DOY 091 / 2025-04-01)  → MADOCA-PPP
+#       Actual:  1σ=7.4 cm  95%=11.2 cm  (skip-epochs=30, fix-only)
+#       Tolerance: 0.150 m  (≈2× actual)
+#
+#   claslib_ppp_rtk_2ch_scatter
+#       0627 BINEX obs + dual-channel CLAS L6D (DOY 157 / 2025-06-06) → CLAS PPP-RTK
+#       Actual:  1σ=5.8 cm  95%=25.2 cm  (skip-epochs=20, fix-only)
+#       Tolerance: 0.400 m  (≈2× actual 95th; 2CH has ~88% fix rate)
+#
+# NOTE: Original cross-engine design (0627 obs → MADOCA-PPP; MIZU obs → CLAS
+# PPP-RTK) required correction data from the same date as the observations.
+# The prepared L6 files (2025157U.l6, 2025091A.{204,206}.l6) use a newer
+# QZSS L6 encoding (MADOCA-PPPv2 / port-indexed format) that MRTKLIB does not
+# yet decode.  Providing L6 data in the same format as 2025157U_ch{1,2}.l6
+# (satellite-PRN-indexed, type-byte 0xA9/0xA3) would unblock those tests.
+
+# ── madocalib_ppp_scatter ─────────────────────────────────────────────────────
+add_test(NAME madocalib_ppp_scatter
+    COMMAND ${Python3_EXECUTABLE} ${_CHECK_SCATTER}
+        --tolerance 0.150
+        --skip-epochs 30
+        --fix-only
+        ${CMAKE_BINARY_DIR}/out_madocalib_ppp.pos
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_ppp_scatter PROPERTIES
+    DEPENDS           madocalib_ppp
+    FIXTURES_REQUIRED madocalib_data
+    LABELS            "tier3;scatter;madocalib"
+)
+
+# ── claslib_ppp_rtk_2ch_scatter ───────────────────────────────────────────────
+add_test(NAME claslib_ppp_rtk_2ch_scatter
+    COMMAND ${Python3_EXECUTABLE} ${_CHECK_SCATTER}
+        --tolerance 0.400
+        --skip-epochs 20
+        --fix-only
+        ${CMAKE_BINARY_DIR}/out_claslib_ppp_rtk_2ch.nmea
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_ppp_rtk_2ch_scatter PROPERTIES
+    DEPENDS           claslib_ppp_rtk_2ch
+    FIXTURES_REQUIRED claslib_data
+    LABELS            "tier3;scatter;claslib"
 )
