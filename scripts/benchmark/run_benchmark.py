@@ -99,6 +99,7 @@ def _run_rnx2rtkp(
     obs: Path,
     nav: Path,
     l6_files: list[Path],
+    cwd: str = "",
     verbose: bool = False,
 ) -> bool:
     """Run rnx2rtkp for one case/mode combination.
@@ -113,6 +114,7 @@ def _run_rnx2rtkp(
         obs: rover.obs path.
         nav: base.nav path.
         l6_files: List of L6 file paths.
+        cwd: Working directory for subprocess (conf relative paths resolve here).
         verbose: Pass stdout/stderr through; otherwise suppress.
 
     Returns:
@@ -133,6 +135,7 @@ def _run_rnx2rtkp(
         print("  $", " ".join(cmd))
     result = subprocess.run(
         cmd,
+        cwd=cwd or None,
         stdout=None if verbose else subprocess.DEVNULL,
         stderr=None if verbose else subprocess.DEVNULL,
     )
@@ -304,6 +307,7 @@ def run_benchmark(args: argparse.Namespace) -> int:
                     case["gps_week"],
                     case["tow_start"] - 60, case["tow_end"] + 60,
                     out, obs, nav, l6_files,
+                    cwd=str(root),
                     verbose=args.verbose,
                 )
                 elapsed = time.monotonic() - t0
