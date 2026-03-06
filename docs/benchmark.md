@@ -167,7 +167,7 @@ MADOCA-PPP never produces an integer fix and is reported as a single **PPP** tie
 | Tier | Modes | GGA quality | Description |
 |------|-------|-------------|-------------|
 | **FIX** | CLAS, RTK | Q=4 | Integer ambiguity fix epochs only |
-| **FF** | CLAS, RTK | Q=3, 4, 5 | Fix + float; excludes SPP fallback (Q=1) |
+| **FF** | CLAS, RTK | Q=4, 5 | Fix + float; excludes SPP fallback (Q=1) |
 | **ALL** | CLAS, RTK | any | Every matched epoch including SPP |
 | **PPP** | MADOCA | Q=3 | All valid PPP-float epochs (Q=0 already filtered) |
 

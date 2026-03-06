@@ -251,7 +251,7 @@ def print_summary(rows: list[dict]) -> None:
                        first=False))
 
     print(_SEP)
-    print("  CLAS/RTK tiers: FIX=Q=4 | FF=Q=3+4+5 (excl SPP) | ALL=every epoch")
+    print("  CLAS/RTK tiers: FIX=Q=4 | FF=Q=4+5 (excl SPP) | ALL=every epoch")
     print("  MADOCA tier:    PPP=all valid PPP-float epochs (Q=3); Rate%=<30cm fraction")
 
 
