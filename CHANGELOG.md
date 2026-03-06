@@ -5,6 +5,45 @@ All notable changes to MRTKLIB are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.3] - 2026-03-06
+
+Minor release — kinematic positioning benchmark for urban driving evaluation.
+No functional changes to the library.
+
+### Added
+
+- **Kinematic benchmark infrastructure** (`scripts/benchmark/`) — End-to-end
+  pipeline for evaluating PPP-RTK (CLAS) and PPP (MADOCA) against the
+  PPC-Dataset urban driving data:
+  - `cases.py` — Metadata for 6 PPC-Dataset runs (GPS week/TOW, city/run IDs)
+  - `download_l6.py` — Auto-download QZSS L6D (CLAS) and L6E (MADOCA) archive
+    files; MADOCA PRN auto-probed from candidates `[209, 193, 194, 195, 196, 199]`
+  - `compare_ppc.py` — NMEA vs `reference.csv` comparison; computes 2D/3D RMS,
+    fix rate, convergence time, per-epoch ENU errors; optional PNG plots
+  - `run_benchmark.py` — Orchestrator with result caching and summary table
+- **Benchmark configurations** (`conf/benchmark/`) — `clas.conf` and
+  `madoca.conf` tuned for Septentrio mosaic-X5 (`ant1-anttype=*`,
+  `pos2-isb=off`; kinematic dynamics for MADOCA).
+- **Benchmark documentation** ([docs/benchmark.md](docs/benchmark.md)) —
+  Dataset download instructions, L6 auto-download, execution walkthrough,
+  metric definitions, and known limitations.
+
+### Changed
+
+- `.gitignore` — Added `data/benchmark/` exclusion (large L6/NMEA files).
+- `ruff.toml` — Added `scripts/benchmark/*.py` to `D103` per-file-ignores.
+
+### Dataset
+
+The benchmark uses the **PPC-Dataset** released by Prof. Taro Suzuki
+(Chiba Institute of Technology):
+<https://github.com/taroz/PPC-Dataset>
+
+Six urban vehicle runs (Nagoya × 3, Tokyo × 3) with 5 Hz triple-frequency
+multi-GNSS, 100 Hz IMU, and sub-centimetre Applanix POS LV 220 ground truth.
+
+---
+
 ## [v0.3.2] - 2026-03-06
 
 Patch release — three-tier test methodology with absolute accuracy and position
@@ -311,6 +350,7 @@ Initial release — MALIB structural migration complete.
 - **MALIB integration** — Structural base from JAXA MALIB feature/1.2.0
   (directory layout, threading, stream I/O).
 
+[v0.3.3]: https://github.com/h-shiono/MRTKLIB/compare/v0.3.2...v0.3.3
 [v0.3.2]: https://github.com/h-shiono/MRTKLIB/compare/v0.3.1...v0.3.2
 [v0.3.1]: https://github.com/h-shiono/MRTKLIB/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://github.com/h-shiono/MRTKLIB/compare/v0.2.0...v0.3.0

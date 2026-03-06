@@ -230,6 +230,20 @@ Key differences from the standard test configurations:
 
 ---
 
+## Acknowledgements
+
+The PPC-Dataset is kindly provided as open data by:
+
+> **Taro Suzuki**, Chiba Institute of Technology
+> *PPC-Dataset — GNSS/IMU driving data for precise positioning research*
+> <https://github.com/taroz/PPC-Dataset>
+
+We gratefully acknowledge Prof. Suzuki for making this dataset publicly
+available.  Please cite the PPC2024 materials when publishing results derived
+from this dataset.
+
+---
+
 ## References
 
 - [PPC2024 overview (Japanese)][ppc-pdf]
