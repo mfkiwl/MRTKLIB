@@ -229,7 +229,9 @@ endforeach()
 
 # ── Python-based comparison tool ─────────────────────────────────────────────
 find_package(Python3 COMPONENTS Interpreter)
-set(_COMPARE_POS ${CMAKE_SOURCE_DIR}/scripts/tests/compare_pos.py)
+set(_COMPARE_POS     ${CMAKE_SOURCE_DIR}/scripts/tests/compare_pos.py)
+set(_COMPARE_POS_ABS ${CMAKE_SOURCE_DIR}/scripts/tests/compare_pos_abs.py)
+set(_COMPARE_NMEA_ABS ${CMAKE_SOURCE_DIR}/scripts/tests/compare_nmea_abs.py)
 
 # ── Regression test data ─────────────────────────────────────────────────────
 set(_TESTDATA  ${CMAKE_SOURCE_DIR}/tests/data/malib)
@@ -523,6 +525,27 @@ set_tests_properties(madocalib_pppar_ion_check PROPERTIES
     LABELS            "regression;madocalib;pppar"
 )
 
+# ── Absolute accuracy check: PPP-AR vs SINEX MIZU true coordinate ─────────────
+# Reference: IGS weekly SINEX (GPS week 2383, 2025/09/08-09/14) for MIZU station.
+# Evaluation: 3D 1σ and 95th-percentile against ITRF true coordinate.
+# Pass: metric < tolerance  OR  metric < SINEX formal precision (0.54 mm).
+# Convergence: skip first 60 epochs (30 min, 30-s interval) to discard transient.
+set(_SINEX_MIZU ${_MDLDATA}/IGS0OPSSNX_20252500000_07D_07D_SOL.SNX.gz)
+add_test(NAME madocalib_pppar_abs_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_POS_ABS}
+        --sinex ${_SINEX_MIZU}
+        --station MIZU
+        --tolerance 0.050
+        --skip-epochs 60
+        ${CMAKE_BINARY_DIR}/out_madocalib_pppar.pos
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(madocalib_pppar_abs_check PROPERTIES
+    DEPENDS           madocalib_pppar
+    FIXTURES_REQUIRED madocalib_data
+    LABELS            "absolute;madocalib;pppar"
+)
+
 # ── cssr2ssr regression (not yet ported) ─────────────────────────────────────
 # TODO: cssr2ssr binary is not yet integrated into MRTKLIB.
 #       When ported, add:
@@ -690,6 +713,25 @@ set_tests_properties(claslib_ppp_rtk_2ch_check PROPERTIES
     DEPENDS           claslib_ppp_rtk_2ch
     FIXTURES_REQUIRED claslib_data
     LABELS            "regression;claslib;ppp-rtk"
+)
+
+# ── Absolute accuracy check: CLAS PPP-RTK 2CH vs GSI F5 TSUKUBA3 ─────────────
+# Reference: GSI F5 station 960627 (TSUKUBA3/0627), 15-day median centred on
+# 2025/06/06 (DOY 157).  Pass/fail on 2D horizontal accuracy (1σ, 95%).
+# Upstream claslib reference NMEA achieves 5.2 cm 1σ / 6.5 cm 95% (2D).
+set(_F5_0627 ${_CLSDATA}/960627.25.pos)
+add_test(NAME claslib_ppp_rtk_2ch_abs_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_NMEA_ABS}
+        --f5 ${_F5_0627}
+        --date 2025/06/06
+        --tolerance 0.100
+        ${CMAKE_BINARY_DIR}/out_claslib_ppp_rtk_2ch.nmea
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_ppp_rtk_2ch_abs_check PROPERTIES
+    DEPENDS           claslib_ppp_rtk_2ch
+    FIXTURES_REQUIRED claslib_data
+    LABELS            "absolute;claslib;ppp-rtk"
 )
 
 # ── rnx2rtkp CLAS VRS-RTK regression ──────────────────────────────────────────

@@ -2,14 +2,16 @@
 
 ## Overview
 
-MRTKLIB regression tests measure **porting correctness** — how closely the
-MRTKLIB implementation reproduces the numerical output of the upstream reference
-implementations (MADOCALIB, claslib). They are **not** absolute accuracy tests
-against a surveyed ground truth.
+MRTKLIB has two complementary test tiers:
+
+| Tier | What is measured | Pass criterion |
+|------|-----------------|----------------|
+| **Tier 1** — Relative (porting correctness) | MRTKLIB output vs upstream output (same input) | 3D RMS < tolerance; fix-rate delta ≥ threshold |
+| **Tier 2** — Absolute (geodetic accuracy) | MRTKLIB output vs surveyed ground truth (SINEX / GSI F5) | 1σ and 95% < tolerance or < ref precision |
 
 ```
-What is measured:   MRTKLIB output  vs  upstream output   (same input data)
-What is NOT measured: MRTKLIB output  vs  true receiver position
+Tier 1: MRTKLIB output  vs  upstream output       (porting correctness)
+Tier 2: MRTKLIB output  vs  known station coord   (geodetic accuracy)
 ```
 
 ---
@@ -116,6 +118,8 @@ near `_PPPAR_TOL`.
 
 ## Comparison Scripts
 
+### Tier 1 — Relative scripts
+
 | Script | Input format | Used for |
 |--------|-------------|---------|
 | `scripts/tests/compare_pos.py` | RTKLIB `.pos` (lat/lon/h/Q per epoch) | PPP, PPP-AR |
@@ -125,17 +129,130 @@ Both scripts implement the same algorithm (time-key matching → ENU error →
 3D RMS + fix-rate delta) and share the same pass/fail logic. The only
 difference is the input parser.
 
+### Tier 2 — Absolute scripts
+
+| Script | Input format | Used for |
+|--------|-------------|---------|
+| `scripts/tests/compare_pos_abs.py` | RTKLIB `.pos` vs SINEX or GSI F5 | PPP-AR absolute check |
+| `scripts/tests/compare_nmea_abs.py` | NMEA GGA vs SINEX or GSI F5 | PPP-RTK absolute check |
+
+Both scripts share the same reference-parsing helpers and pass/fail logic
+(imported from `compare_pos_abs`).
+
+---
+
+## Tier 2 — Absolute Accuracy Tests
+
+### Reference coordinate sources
+
+| Source | Format | Precision | When to use |
+|--------|--------|-----------|-------------|
+| **IGS SINEX** | `.SNX` or `.SNX.gz` | ~0.5–2 mm formal σ | IGS network stations (e.g., MIZU) |
+| **GSI F5** | Daily ECEF + geodetic | ~5–10 mm scatter | GEONET stations in Japan |
+
+#### IGS SINEX
+
+Parsed from the `+SOLUTION/ESTIMATE` block:
+- `STAX / STAY / STAZ` — position in metres at reference epoch
+- `VELX / VELY / VELZ` — velocity in m/yr (if present; used for propagation)
+- Reference epoch encoded as `YY:DOY:SOD`
+
+Formal reference precision = σ₃D = √(σ_X² + σ_Y² + σ_Z²).
+
+**Epoch propagation** (optional `--epoch YYYY/MM/DD`):
+```
+pos(t) = pos(t₀) + vel · (t − t₀)      [t in years]
+```
+
+#### GSI F5
+
+Daily coordinate file in ITRF2014/GRS80 with noon UTC positions.
+
+**15-day median** for evaluation date `d`:
+```
+window = rows with |date − d| ≤ 7 days   (up to 15 rows)
+true_X = median(window_X)
+true_Y = median(window_Y)
+true_Z = median(window_Z)
+```
+
+Reference precision = 68th-percentile of the daily 3D scatter within the
+window relative to the median.
+
+### Algorithm
+
+#### Step 1 — Parse reference coordinate
+
+```
+true_xyz = SINEX(station, epoch)   or   F5_median(date ± 7 days)
+```
+
+#### Step 2 — Per-epoch absolute error
+
+The test file is parsed epoch-by-epoch.  For each epoch:
+
+```
+test_xyz = blh2xyz(test_lat, test_lon, test_h)   # WGS84 → ECEF
+dx       = test_xyz − true_xyz
+enu      = xyz2enu(dx, true_lat, true_lon)        # → local ENU [m]
+```
+
+Unlike Tier 1, the ENU origin is **fixed** at the single true coordinate.
+
+#### Step 3 — Error distribution
+
+```
+2D horizontal error = sqrt(E² + N²)   per epoch
+3D error            = sqrt(E² + N² + U²)
+
+1σ  (68th percentile)
+95% (95th percentile)
+RMS, mean, max
+```
+
+#### Step 4 — Pass/Fail
+
+Each metric is evaluated independently:
+
+```
+PASS if: metric < tolerance   OR   metric < ref_precision
+```
+
+A test passes when **both** 1σ and 95% criteria pass.
+
+### NMEA height caveat
+
+NMEA GGA altitude is **orthometric** (above geoid), while SINEX/F5 give
+**ellipsoidal** height.  The Up error therefore includes the geoid undulation
+at the test site (≈ 30–50 m in Japan), making 3D accuracy unreliable for
+absolute comparison.
+
+**Default**: pass/fail is evaluated on **2D horizontal** error only.
+Use `--use-3d` to force 3D evaluation.  3D statistics are always printed for
+reference.
+
+### Tier 2 CTest entries
+
+| Test | Reference | Tolerance | Metric | Notes |
+|------|-----------|-----------|--------|-------|
+| `madocalib_pppar_abs_check` | IGS SINEX MIZU (week 2383) | 0.050 m | 3D | skip-epochs=60 |
+| `claslib_ppp_rtk_2ch_abs_check` | GSI F5 TSUKUBA3 2025/06/06 | 0.100 m | 2D horiz | ±7-day median |
+
+Reference data files:
+- `tests/data/madocalib/IGS0OPSSNX_20252500000_07D_07D_SOL.SNX.gz`
+- `tests/data/claslib/960627.25.pos`
+
 ---
 
 ## What This Does NOT Measure
 
 | Aspect | Status | How to measure instead |
 |--------|--------|------------------------|
-| Absolute position accuracy vs surveyed truth | **Not tested** | Compare output against known station coordinates (e.g., IGS SINEX) |
+| Absolute position accuracy vs surveyed truth | **Tier 2** (partial) | `madocalib_pppar_abs_check`, `claslib_ppp_rtk_2ch_abs_check` |
 | Real-time latency and throughput | Not tested | `rtkrcv_rt` checks line count only |
 | Receiver hardware diversity | Not tested | Run against data from different receiver types |
 | Long-term stability (days/weeks) | Not tested | Extend test data time span |
 
-The current framework validates **algorithmic equivalence to upstream** as a
-proxy for correctness. Absolute accuracy assessment requires independent
-ground-truth coordinates for each test site.
+Tier 1 validates **algorithmic equivalence to upstream** as a proxy for
+correctness. Tier 2 validates **geodetic accuracy** against independent
+ground-truth coordinates for selected test sites.
