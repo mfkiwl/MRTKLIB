@@ -2,16 +2,18 @@
 
 ## Overview
 
-MRTKLIB has two complementary test tiers:
+MRTKLIB has three complementary test tiers:
 
 | Tier | What is measured | Pass criterion |
 |------|-----------------|----------------|
 | **Tier 1** — Relative (porting correctness) | MRTKLIB output vs upstream output (same input) | 3D RMS < tolerance; fix-rate delta ≥ threshold |
 | **Tier 2** — Absolute (geodetic accuracy) | MRTKLIB output vs surveyed ground truth (SINEX / GSI F5) | 1σ and 95% < tolerance or < ref precision |
+| **Tier 3** — Precision (position scatter) | Spread of solutions around the session centroid | 1σ and 95% < tolerance (no external reference) |
 
 ```
 Tier 1: MRTKLIB output  vs  upstream output       (porting correctness)
 Tier 2: MRTKLIB output  vs  known station coord   (geodetic accuracy)
+Tier 3: MRTKLIB output  vs  session centroid      (precision / scatter)
 ```
 
 ---
@@ -241,12 +243,68 @@ case.  Use `--use-3d` to evaluate pass/fail on 3D error (default: 2D horizontal)
 
 | Test | Reference | Tolerance | Metric | Notes |
 |------|-----------|-----------|--------|-------|
-| `madocalib_pppar_abs_check` | IGS SINEX MIZU (week 2383) | 0.050 m | 3D | skip-epochs=60 |
-| `claslib_ppp_rtk_2ch_abs_check` | GSI F5 TSUKUBA3 2025/06/06 | 0.100 m | 2D horiz | ±7-day median |
+| `madocalib_pppar_abs_check` | IGS SINEX MIZU (week 2383) | 0.100 m | 2D horiz | skip-epochs=60, --use-2d |
+| `claslib_ppp_rtk_2ch_abs_check` | GSI F5 TSUKUBA3 2025/06/06 | 0.300 m | 2D horiz | ±7-day median; 88% fix rate |
 
 Reference data files:
 - `tests/data/madocalib/IGS0OPSSNX_20252500000_07D_07D_SOL.SNX.gz`
 - `tests/data/claslib/960627.25.pos`
+
+---
+
+## Tier 3 — Precision (Position Scatter)
+
+### Algorithm
+
+No external reference coordinate is required.  The session centroid
+is computed from all accepted epochs, and each epoch's deviation from
+the centroid is projected into local ENU.
+
+#### Step 1 — Parse and filter
+
+```
+rows = parse_pos(file) | parse_nmea(file)
+rows = rows[skip_epochs:]          # discard convergence transient
+if fix_only:
+    rows = [r for r in rows if r.Q in valid_fix_qs]
+```
+
+#### Step 2 — ECEF centroid and ENU deviations
+
+```
+ecef      = [blh2xyz(lat, lon, h) for each row]
+centroid  = mean(ecef)
+enu_devs  = [xyz2enu(e − centroid, c_lat, c_lon) for each e]
+```
+
+#### Step 3 — Scatter statistics
+
+```
+horiz = sqrt(E² + N²)    per epoch
+1σ    = 68th percentile of horiz
+95%   = 95th percentile of horiz
+```
+
+#### Step 4 — Pass/Fail
+
+```
+PASS if: 1σ < tolerance  AND  95% < tolerance
+```
+
+### Tier 3 CTest entries
+
+| Test | Input | Tolerance | skip-epochs | Notes |
+|------|-------|-----------|-------------|-------|
+| `madocalib_ppp_scatter` | `out_madocalib_ppp.pos` | 0.150 m | 30 | MIZU, MADOCA-PPP; 1σ=7.4 cm 95%=11.2 cm |
+| `claslib_ppp_rtk_2ch_scatter` | `out_claslib_ppp_rtk_2ch.nmea` | 0.400 m | 20 | 0627, CLAS 2CH; 1σ=5.8 cm 95%=25.2 cm |
+
+The `claslib_ppp_rtk_2ch_scatter` tolerance is generous because the 2CH dataset
+achieves ~88% fix rate; the remaining float epochs produce ~25 cm 95th-percentile
+scatter even after filtering with `--fix-only`.
+
+Script: `scripts/tests/check_pos_scatter.py`
+
+Supported formats: `.pos` (RTKLIB, Q=1/6 for fix-only) and `.nmea` (GGA, Q=1/4 for fix-only).
 
 ---
 
@@ -261,4 +319,6 @@ Reference data files:
 
 Tier 1 validates **algorithmic equivalence to upstream** as a proxy for
 correctness. Tier 2 validates **geodetic accuracy** against independent
-ground-truth coordinates for selected test sites.
+ground-truth coordinates for selected test sites. Tier 3 validates
+**precision (repeatability)** by measuring solution scatter around the
+session centroid, without requiring any external reference.
