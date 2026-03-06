@@ -19,14 +19,10 @@ from _geo import blh2xyz, nmea_to_deg, xyz2enu  # noqa: E402
 def parse_nmea(filepath):
     """Parse NMEA file, extracting position data from GGA sentences.
 
-    Parameters
-    ----------
-    filepath : str
-        Path to the NMEA file.
+    Args:
+        filepath: Path to the NMEA file.
 
     Returns:
-    -------
-    dict
         Mapping from time key (HHMMSS.ss string) to (lat_deg, lon_deg, alt, quality).
     """
     data = {}
@@ -71,17 +67,14 @@ def parse_nmea(filepath):
 def compute_metrics(ref_data, test_data, skip_epochs=0):
     """Compute ENU error metrics between matched epochs.
 
-    Parameters
-    ----------
-    ref_data, test_data : dict
-        Parsed NMEA data from parse_nmea().
-    skip_epochs : int
-        Number of initial epochs to skip (for convergence transient).
+    Args:
+        ref_data: Parsed NMEA data from parse_nmea() for the reference file.
+        test_data: Parsed NMEA data from parse_nmea() for the test file.
+        skip_epochs: Number of initial epochs to skip (convergence transient).
 
     Returns:
-    -------
-    dict or None
-        Metrics including ENU errors, 3D errors, RMS, fix rates, etc.
+        Dict of metrics (ENU errors, 3D RMS, fix rates, etc.), or None if
+        there are no common epochs.
     """
     common_keys = sorted(set(ref_data.keys()) & set(test_data.keys()))
     if skip_epochs > 0:

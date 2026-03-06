@@ -36,14 +36,10 @@ def _parse_gpst_key(fields):
 def parse_pos(filepath):
     """Parse an RTKLIB .pos file.
 
-    Parameters
-    ----------
-    filepath : str
-        Path to the .pos file.
+    Args:
+        filepath: Path to the .pos file.
 
     Returns:
-    -------
-    dict
         Mapping from time-key string to (lat, lon, height, Q) tuple.
     """
     data = {}
@@ -79,18 +75,14 @@ def parse_pos(filepath):
 def compute_metrics(ref_data, test_data, skip_epochs=0):
     """Compute ENU error metrics between matched epochs.
 
-    Parameters
-    ----------
-    ref_data, test_data : dict
-        Parsed .pos data from parse_pos().
-    skip_epochs : int
-        Number of initial epochs to skip (for convergence transient).
+    Args:
+        ref_data: Parsed .pos data from parse_pos() for the reference file.
+        test_data: Parsed .pos data from parse_pos() for the test file.
+        skip_epochs: Number of initial epochs to skip (convergence transient).
 
     Returns:
-    -------
-    dict
-        Metrics including ENU errors, 3D errors, RMS, fix rates, etc.
-        Returns None if no common epochs found.
+        Dict of metrics (ENU errors, 3D RMS, fix rates, etc.), or None if
+        there are no common epochs.
     """
     common_keys = sorted(set(ref_data.keys()) & set(test_data.keys()))
     if skip_epochs > 0:
