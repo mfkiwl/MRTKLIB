@@ -543,9 +543,13 @@ static void udpos(rtk_t *rtk, double tt)
     for (i=0;i<6;i++) {
         F[i+(i+3)*nx]=tt;
     }
-    for (i=0;i<3;i++) {
-        F[i+(i+6)*nx]=SQR(tt)/2.0;
+    /* include accel coupling only when position variance is low (converged) */
+    if (var<rtk->opt.thresar[1]) {
+        for (i=0;i<3;i++) {
+            F[i+(i+6)*nx]=(tt>=0.0?1.0:-1.0)*SQR(tt)/2.0;
+        }
     }
+    else trace(NULL,3,"pos var too high for accel term: var=%.4f\n",var);
     for (i=0;i<nx;i++) {
         x[i]=rtk->x[ix[i]];
         for (j=0;j<nx;j++) {
@@ -1856,7 +1860,10 @@ static int relpos(rtk_t *rtk, const obsd_t *obs, int nu, int nr,
             rtk->sol.ns=0;
             for (i=0;i<ns;i++) for (f=0;f<nf;f++) {
                 if (!rtk->ssat[sat[i]-1].vsat[f]) continue;
-                rtk->ssat[sat[i]-1].lock[f]++;
+                /* increment lock during countdown OR when sat has been in a fix */
+                if (rtk->ssat[sat[i]-1].lock[f]<0||
+                    (rtk->nfix>0&&rtk->ssat[sat[i]-1].fix[f]>=2))
+                    rtk->ssat[sat[i]-1].lock[f]++;
                 rtk->ssat[sat[i]-1].outc[f]=0;
                 if (f==0) rtk->sol.ns++; /* valid satellite count by L1 */
             }
