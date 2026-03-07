@@ -248,6 +248,7 @@ MADOCA-PPP never produces an integer fix and is reported as a single **PPP** tie
   runs achieve sub-metre FIX RMS (e.g. nagoya_run3: 0.31 m, tokyo_run3: 0.29 m).
   tokyo_run2 FIX RMS remains elevated (18 m) despite tiny 1σ/95% values, indicating
   a small number of wrongly-fixed epochs that dominate the RMS at this ~27 km baseline.
+  This false-fix issue is resolved in v0.4.0 (see below).
 - **MADOCA PPP N**: outputs Q=3 (PPP float) or Q=0 (no solution); Q=0 is
   filtered, so N reflects epochs where the filter produced a solution.  In
   nagoya_run1, only 27% of rover epochs have a valid solution (heavy urban
@@ -257,6 +258,65 @@ MADOCA-PPP never produces an integer fix and is reported as a single **PPP** tie
   was already in a sustained fix run.
 - RTK baselines range from ~13 km (Nagoya) to ~27 km (Tokyo), which is long for
   kinematic RTK; float solutions dominate accordingly.
+
+---
+
+## v0.4.0 RTK Benchmark Results (demo5 Integration)
+
+MRTKLIB v0.4.0 (`feat/demo5-integration`) integrates several RTK algorithm
+improvements from [rtklibexplorer's demo5 fork][demo5].
+The **CLAS** and **MADOCA** engines are unaffected by these changes.
+
+### Algorithm changes
+
+| Phase | Change |
+|-------|--------|
+| 1A | Partial Ambiguity Resolution (PAR) — LAMBDA tries reduced satellite subsets to raise fix ratio |
+| 1B | AR-filter — exclude newly-locked satellites that degrade the fix ratio; retry LAMBDA without them |
+| 2A | Doppler-based cycle-slip detection (`pos2-thresdop`) |
+| 2B | Minimum-fix-satellite guard (`pos2-arminfixsats`) — reject fixes with too few satellite pairs |
+| 3A | `seliflc()` — Galileo triple-freq IFLC now uses L1+L5 (not L1+L2) |
+| 3A | SNR-weighted observation variance (`err[6]` term in `varerr()`) |
+| 3B | Adaptive 10× outlier threshold for newly-initialised phase biases |
+| 3B | `rejc<2` guard — phase-bias reset requires ≥2 successive rejections, not just one |
+
+### RTK configuration changes
+
+Three new parameters are enabled in `conf/benchmark/rtk.conf`:
+
+```ini
+pos2-arminfixsats  = 4    # min satellite pairs for a valid PAR fix
+pos2-arfilter      = on   # exclude newly-locked sats that degrade ratio
+pos2-thresdop      = 1.0  # Doppler slip threshold (cyc/s, 0=off)
+```
+
+### RTK comparison: v0.3.3 → v0.4.0
+
+`--skip-epochs 60`, FIX tier (Q=4) only.
+
+| Case | Fix% (v0.3.3) | Fix% (v0.4.0) | RMS_2D fix (v0.3.3) | RMS_2D fix (v0.4.0) | TTFF (v0.4.0) |
+|------|:-------------:|:-------------:|--------------------:|--------------------:|--------------:|
+| nagoya_run1 | 29.7% | 29.1% | 1.536 m | **0.418 m** | 796 s |
+| nagoya_run2 | 16.1% | **28.0%** | 1.081 m | **0.596 m** | 0 s |
+| nagoya_run3 |  8.2% | **10.1%** | 0.307 m | 0.837 m | 78 s |
+| tokyo_run1  |  3.4% |  3.1% | 0.711 m | **0.342 m** | 1840 s |
+| tokyo_run2  | 18.3% | **25.9%** | ~~17.993 m~~ | **0.095 m** | 802 s |
+| tokyo_run3  | 25.1% | **27.7%** | 0.293 m | **0.219 m** | 658 s |
+
+### Key findings
+
+- **tokyo_run2 false-fix elimination**: v0.3.3 had RMS_2D(fix) = 17.993 m despite
+  tiny 1σ/95% values — a small cluster of wrongly-fixed epochs dominated the RMS at
+  this ~27 km baseline.  The `rejc<2` guard (Phase 3B) prevents premature phase-bias
+  reset on a single transient outlier.  Combined with `arminfixsats=4`, the false fix
+  is eliminated and RMS_2D(fix) drops to **0.095 m** — a 189× improvement.
+- **nagoya_run2 fix rate**: +12 pp (16.1% → 28.0%); PAR finds valid partial subsets
+  on a run with fewer simultaneously-clean satellite pairs.
+- **5/6 runs** show improved RMS_2D(fix); **4/6 runs** show improved Fix%.
+- **nagoya_run3 RMS_2D(fix)** increases (0.307 → 0.837 m) while Fix% rises slightly,
+  suggesting the fix window now includes noisier epochs that were previously rejected.
+
+[demo5]: https://github.com/rtklibexplorer/RTKLIB
 
 ---
 
