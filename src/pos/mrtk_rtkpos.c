@@ -620,6 +620,26 @@ static void udrcvbias(rtk_t *rtk, double tt)
     }
 }
 /* detect cycle slip by LLI --------------------------------------------------*/
+/* detect cycle slip by observation code change (e.g. C1C→C1S switch) --------*/
+static void detslp_code(rtk_t *rtk, const obsd_t *obs, int i, int rcv)
+{
+    int f,sat=obs[i].sat,nf=rtk->opt.nf<NFREQ?rtk->opt.nf:NFREQ;
+    for (f=0;f<nf;f++) {
+        uint8_t code=obs[i].code[f];
+        if (code==CODE_NONE) continue;
+        uint8_t ccode=rtk->ssat[sat-1].codeprev[f][rcv-1];
+        if (code!=ccode) {
+            rtk->ssat[sat-1].codeprev[f][rcv-1]=code;
+            /* if previously tracked, flag as cycle slip */
+            if (ccode!=CODE_NONE) {
+                rtk->ssat[sat-1].slip[f]|=1;
+                errmsg(rtk,"slip detected code change (sat=%2d rcv=%d F=%d "
+                       "%s->%s)\n",sat,rcv,f+1,code2obs(ccode),code2obs(code));
+            }
+        }
+    }
+}
+/* detect cycle slip by LLI --------------------------------------------------*/
 static void detslp_ll(rtk_t *rtk, const obsd_t *obs, int i, int rcv)
 {
     uint32_t slip,LLI;
@@ -763,6 +783,10 @@ static void udbias(rtk_t *rtk, double tt, const obsd_t *obs, const int *sat,
     detslp_dop(rtk,obs,ir,ns,2,nav);
 
     for (i=0;i<ns;i++) {
+
+        /* detect cycle slip by observation code change */
+        detslp_code(rtk,obs,iu[i],1);
+        detslp_code(rtk,obs,ir[i],2);
 
         /* detect cycle slip by LLI */
         detslp_ll(rtk,obs,iu[i],1);
