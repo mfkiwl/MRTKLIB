@@ -127,6 +127,7 @@ opt_t sysopts[]={
     {"pos2-maxage",     1,  (void *)&prcopt_.maxtdiff,   "s"    },
     {"pos2-syncsol",    3,  (void *)&prcopt_.syncsol,    SWTOPT },
     {"pos2-slipthres",  1,  (void *)&prcopt_.thresslip,  "m"    },
+    {"pos2-thresdop",   1,  (void *)&prcopt_.thresdop,   "cyc/s"},
     {"pos2-rejionno",   1,  (void *)&prcopt_.maxinno,    "m"    },
     {"pos2-rejgdop",    1,  (void *)&prcopt_.maxgdop,    ""     },
     {"pos2-niter",      0,  (void *)&prcopt_.niter,      ""     },

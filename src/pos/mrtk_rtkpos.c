@@ -691,37 +691,58 @@ static void detslp_gf(rtk_t *rtk, const obsd_t *obs, int i, int j,
     }
 }
 /* detect cycle slip by doppler and phase difference -------------------------*/
-static void detslp_dop(rtk_t *rtk, const obsd_t *obs, int i, int rcv,
-                       const nav_t *nav)
+/* detect cycle slip by doppler-phase difference with mean clock-jump removal --
+*  Mean of all-sat doppler differences removes common receiver clock jump,
+*  allowing per-satellite slip detection without false positives.
+*  Controlled by opt.thresdop (cycle/s); set to 0 to disable.          */
+static void detslp_dop(rtk_t *rtk, const obsd_t *obs, const int *ix, int ns,
+                       int rcv, const nav_t *nav)
 {
-#if 0 /* detection with doppler disabled because of clock-jump issue (v.2.3.0) */
-    int f,sat=obs[i].sat;
-    double tt,dph,dpt,lam,thres;
-    
-    trace(NULL,3,"detslp_dop: i=%d rcv=%d\n",i,rcv);
-    
-    for (f=0;f<rtk->opt.nf;f++) {
-        if (obs[i].L[f]==0.0||obs[i].D[f]==0.0||rtk->ph[rcv-1][sat-1][f]==0.0) {
-            continue;
+    (void)nav;
+    int i,ii,f,sat,ndop=0,nf=rtk->opt.nf;
+    double dph,dpt,mean_dop=0.0;
+    double dopdif[MAXSAT][NFREQ],tt[MAXSAT][NFREQ];
+
+    trace(NULL,4,"detslp_dop: rcv=%d\n",rcv);
+
+    if (rtk->opt.thresdop<=0.0) return; /* disabled */
+
+    /* compute per-sat doppler-phase difference rate (cycle/s) */
+    for (i=0;i<ns;i++) {
+        ii=ix[i];
+        sat=obs[ii].sat;
+        for (f=0;f<nf;f++) {
+            dopdif[i][f]=0.0; tt[i][f]=0.0;
+            if (obs[ii].L[f]==0.0||obs[ii].D[f]==0.0||
+                rtk->ssat[sat-1].ph[rcv-1][f]==0.0) continue;
+            if (fabs(tt[i][f]=timediff(obs[ii].time,
+                rtk->ssat[sat-1].pt[rcv-1][f]))<DTTOL) continue;
+            dph=(obs[ii].L[f]-rtk->ssat[sat-1].ph[rcv-1][f])/tt[i][f];
+            dpt=-obs[ii].D[f];
+            dopdif[i][f]=dph-dpt;
+            /* include in mean only if not an extreme outlier (3× threshold) */
+            if (fabs(dopdif[i][f])<3.0*rtk->opt.thresdop) {
+                mean_dop+=dopdif[i][f];
+                ndop++;
+            }
         }
-        if (fabs(tt=timediff(obs[i].time,rtk->pt[rcv-1][sat-1][f]))<DTTOL) continue;
-        if ((lam=nav->lam[sat-1][f])<=0.0) continue;
-        
-        /* cycle slip threshold (cycle) */
-        thres=MAXACC*tt*tt/2.0/lam+rtk->opt.err[4]*fabs(tt)*4.0;
-        
-        /* phase difference and doppler x time (cycle) */
-        dph=obs[i].L[f]-rtk->ph[rcv-1][sat-1][f];
-        dpt=-obs[i].D[f]*tt;
-        
-        if (fabs(dph-dpt)<=thres) continue;
-        
-        rtk->slip[sat-1][f]|=1;
-        
-        errmsg(rtk,"slip detected (sat=%2d rcv=%d L%d=%.3f %.3f thres=%.3f)\n",
-               sat,rcv,f+1,dph,dpt,thres);
     }
-#endif
+    if (ndop==0) return; /* no valid obs — likely large clock error */
+    mean_dop/=ndop;      /* mean ≈ common clock-jump component */
+
+    /* flag slip if mean-removed difference exceeds threshold */
+    for (i=0;i<ns;i++) {
+        sat=obs[ix[i]].sat;
+        for (f=0;f<nf;f++) {
+            if (dopdif[i][f]==0.0) continue;
+            if (fabs(dopdif[i][f]-mean_dop)>rtk->opt.thresdop) {
+                rtk->ssat[sat-1].slip[f]|=1;
+                errmsg(rtk,"slip detected doppler (sat=%2d rcv=%d dL%d=%.3f "
+                       "off=%.3f tt=%.2f)\n",
+                       sat,rcv,f+1,dopdif[i][f]-mean_dop,mean_dop,tt[i][f]);
+            }
+        }
+    }
 }
 /* temporal update of phase biases -------------------------------------------*/
 static void udbias(rtk_t *rtk, double tt, const obsd_t *obs, const int *sat,
@@ -732,20 +753,24 @@ static void udbias(rtk_t *rtk, double tt, const obsd_t *obs, const int *sat,
     
     trace(NULL,3,"udbias  : tt=%.3f ns=%d\n",tt,ns);
     
+    /* clear cycle-slip flags for all common sats */
     for (i=0;i<ns;i++) {
-        
-        /* detect cycle slip by LLI */
         for (k=0;k<rtk->opt.nf;k++) rtk->ssat[sat[i]-1].slip[k]&=0xFC;
+    }
+    /* detect cycle slip by doppler-phase difference (processes all sats at once
+       to remove common clock-jump via mean subtraction) */
+    detslp_dop(rtk,obs,iu,ns,1,nav);
+    detslp_dop(rtk,obs,ir,ns,2,nav);
+
+    for (i=0;i<ns;i++) {
+
+        /* detect cycle slip by LLI */
         detslp_ll(rtk,obs,iu[i],1);
         detslp_ll(rtk,obs,ir[i],2);
-        
+
         /* detect cycle slip by geometry-free phase jump */
         detslp_gf(rtk,obs,iu[i],ir[i],nav);
-        
-        /* detect cycle slip by doppler and phase difference */
-        detslp_dop(rtk,obs,iu[i],1,nav);
-        detslp_dop(rtk,obs,ir[i],2,nav);
-        
+
         /* update half-cycle valid flag */
         for (k=0;k<nf;k++) {
             rtk->ssat[sat[i]-1].half[k]=
