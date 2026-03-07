@@ -13,6 +13,7 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  *----------------------------------------------------------------------------*/
+#include "mrtklib/mrtk_const.h"
 #include "mrtklib/mrtk_rtkpos.h"
 #include "mrtklib/mrtk_ppp.h"
 #include "mrtklib/mrtk_ppp_rtk.h"
@@ -415,26 +416,41 @@ static double varerr(int sat, int sys, double el, double snr_rover,
                      double snr_base, double bl, double dt, int f,
                      const prcopt_t *opt)
 {
-    double a,b,c=opt->err[3]*bl/1E4,d=CLIGHT*opt->sclkstab*dt,fact=1.0;
+    double a,b,c=opt->err[3]*bl/1E4,d=CLIGHT*opt->sclkstab*dt,fact;
     double sinel=sin(el),var;
-    int nf=NF(opt);
+    int nf=NF(opt),frq,code;
 
-    if (f>=nf) fact=opt->eratio[f-nf];
+    frq=f%nf; code=(f<nf)?0:1;
+    /* code uses eratio[frq] directly; phase scaled relative to eratio[0] */
+    if (code) fact=opt->eratio[frq];
+    else      fact=opt->eratio[frq]/opt->eratio[0];
     if (fact<=0.0) fact=opt->eratio[0];
-    fact*=sys==SYS_GLO?EFACT_GLO:(sys==SYS_SBS?EFACT_SBS:EFACT_GPS);
+
+    /* per-constellation error factor */
+    switch (sys) {
+        case SYS_GPS: fact*=EFACT_GPS; break;
+        case SYS_GLO: fact*=EFACT_GLO; break;
+        case SYS_GAL: fact*=EFACT_GAL; break;
+        case SYS_SBS: fact*=EFACT_SBS; break;
+        case SYS_QZS: fact*=EFACT_QZS; break;
+        case SYS_CMP: fact*=EFACT_CMP; break;
+        case SYS_IRN: fact*=EFACT_IRN; break;
+        default:      fact*=EFACT_GPS; break;
+    }
     a=fact*opt->err[1];
     b=fact*opt->err[2];
 
-    var=2.0*(opt->ionoopt==IONOOPT_IFLC?3.0:1.0)*(a*a+b*b/sinel/sinel+c*c)+d*d;
+    var=2.0*(a*a+b*b/sinel/sinel+c*c)+d*d;
 
     if (opt->err[6]>0.0) { /* add SNR term */
         double e=fact*opt->err[6];
         double snr_max=opt->err[5];
         double dr=snr_max-snr_rover, db=snr_max-snr_base;
-        var+=2.0*(opt->ionoopt==IONOOPT_IFLC?3.0:1.0)*e*e*
-             (pow(10.0,0.1*(dr>0.0?dr:0.0))+
-              pow(10.0,0.1*(db>0.0?db:0.0)));
+        var+=e*e*(pow(10.0,0.1*(dr>0.0?dr:0.0))+
+                  pow(10.0,0.1*(db>0.0?db:0.0)));
     }
+    /* IFLC noise amplification applied to entire variance (SQR(3)=9×) */
+    var*=(opt->ionoopt==IONOOPT_IFLC)?SQR(3.0):1.0;
     return var;
 }
 /* baseline length -----------------------------------------------------------*/
@@ -1269,21 +1285,24 @@ static int ddres(rtk_t *rtk, const nav_t *nav, const obsd_t *obs, double dt,
             }
             /* SD (single-differenced) measurement error variances */
             {
-                int frq=f%nf;
+                int frq=f%nf,code=(f<nf)?0:1;
                 Ri[nv]=varerr(sat[i],sysi,azel[1+iu[i]*2],
                               obs[iu[i]].SNR[frq]*SNR_UNIT,
                               obs[ir[i]].SNR[frq]*SNR_UNIT,bl,dt,f,opt);
                 Rj[nv]=varerr(sat[j],sysj,azel[1+iu[j]*2],
                               obs[iu[j]].SNR[frq]*SNR_UNIT,
                               obs[ir[j]].SNR[frq]*SNR_UNIT,bl,dt,f,opt);
-            }
-            
-            /* set valid data flags */
-            if (opt->mode>PMODE_DGPS) {
-                if (f>=nf) rtk->ssat[sat[i]-1].vsat[f-nf]=rtk->ssat[sat[j]-1].vsat[f-nf]=1;
-            }
-            else {
-                rtk->ssat[sat[i]-1].vsat[f-nf]=rtk->ssat[sat[j]-1].vsat[f-nf]=1;
+                /* inflate variance for half-cycle uncertain phase observations */
+                if (!code&&(obs[iu[i]].LLI[frq]&LLI_HALFC)) Ri[nv]+=0.01;
+                if (!code&&(obs[iu[j]].LLI[frq]&LLI_HALFC)) Rj[nv]+=0.01;
+
+                /* set valid data flags: RTK uses phase DD, DGPS uses all */
+                if (opt->mode>PMODE_DGPS) {
+                    if (!code) rtk->ssat[sat[i]-1].vsat[frq]=rtk->ssat[sat[j]-1].vsat[frq]=1;
+                }
+                else {
+                    rtk->ssat[sat[i]-1].vsat[frq]=rtk->ssat[sat[j]-1].vsat[frq]=1;
+                }
             }
             trace(NULL,4,"sat=%3d-%3d %s%d v=%13.3f R=%8.6f %8.6f\n",sat[i],
                   sat[j],f<nf?"L":"P",f%nf+1,v[nv],Ri[nv],Rj[nv]);
