@@ -14,6 +14,10 @@ dataset collected for the contest organised by the Institute of Navigation Japan
 > **Note:** This benchmark is intentionally excluded from the regular CTest
 > suite because it requires large external datasets.  Run it on demand.
 
+> **Disclaimer:** The configuration parameters used here have not been tuned or
+> optimised for maximum accuracy.  Results are provided for reference only and
+> should not be taken as representative of the best achievable performance.
+
 ---
 
 ## Dataset
@@ -188,23 +192,23 @@ MADOCA-PPP never produces an integer fix and is reported as a single **PPP** tie
 |             |        | FF  |  1 828 |  7.2 | 24.3% |   2.870 m | 0.441 m |  8.409 m |   — |
 |             |        | ALL |  7 525 |  9.0 |     — |  42.784 m | 4.089 m | 53.212 m |   — |
 | nagoya_run1 | MADOCA | PPP |  1 968 | 15.0 |  0.0% |  17.428 m | 2.108 m |  4.684 m |   — |
-| nagoya_run1 | RTK    | FIX |    581 | 12.4 |  8.1% |  10.729 m | 2.240 m |  8.094 m | 561 |
-|             |        | FF  |  7 158 | 16.8 |100.0% |  11.125 m | 1.539 m |  5.247 m |   — |
-|             |        | ALL |  7 158 | 16.8 |     — |  11.125 m | 1.539 m |  5.247 m |   — |
+| nagoya_run1 | RTK    | FIX |  2 140 | 18.8 | 29.7% |   1.536 m | 0.112 m |  0.151 m | 799 |
+|             |        | FF  |  7 216 | 16.8 |100.0% |   5.953 m | 0.398 m |  4.809 m |   — |
+|             |        | ALL |  7 216 | 16.8 |     — |   5.953 m | 0.398 m |  4.809 m |   — |
 | nagoya_run2 | CLAS   | FIX |  2 522 |  6.5 | 26.9% |   1.088 m | 0.717 m |  0.826 m |   0 |
 |             |        | FF  |  6 002 |  5.6 | 63.9% |  15.903 m | 1.455 m | 36.589 m |   — |
 |             |        | ALL |  9 390 |  4.7 |     — | 305.610 m | 8.323 m | 73.892 m |   — |
 | nagoya_run2 | MADOCA | PPP |  7 494 | 11.9 |  0.2% |  39.299 m | 2.967 m | 19.443 m |   — |
-| nagoya_run2 | RTK    | FIX |    988 |  9.6 | 10.7% |   6.783 m | 5.079 m |  8.959 m | 352 |
-|             |        | FF  |  9 251 | 15.1 |100.0% |   4.541 m | 3.635 m |  8.928 m |   — |
-|             |        | ALL |  9 251 | 15.1 |     — |   4.541 m | 3.635 m |  8.928 m |   — |
+| nagoya_run2 | RTK    | FIX |  1 489 | 20.7 | 16.1% |   1.081 m | 0.154 m |  0.196 m |   0 |
+|             |        | FF  |  9 274 | 15.3 |100.0% |   6.588 m | 1.026 m | 11.809 m |   — |
+|             |        | ALL |  9 274 | 15.3 |     — |   6.588 m | 1.026 m | 11.809 m |   — |
 | nagoya_run3 | CLAS   | FIX |    325 |  6.9 |  6.3% |   0.318 m | 0.339 m |  0.397 m |   9 |
 |             |        | FF  |  1 973 |  5.7 | 38.4% |  12.026 m | 2.530 m | 38.241 m |   — |
 |             |        | ALL |  5 141 |  6.0 |     — |  12.746 m | 6.606 m | 27.890 m |   — |
 | nagoya_run3 | MADOCA | PPP |  2 753 | 10.8 |  2.1% |   2.649 m | 2.246 m |  4.285 m |   — |
-| nagoya_run3 | RTK    | FIX |  1 166 | 11.8 | 22.9% |   4.976 m | 3.829 m |  7.892 m | 379 |
-|             |        | FF  |  5 087 | 13.1 |100.0% |   5.580 m | 5.135 m | 11.597 m |   — |
-|             |        | ALL |  5 087 | 13.1 |     — |   5.580 m | 5.135 m | 11.597 m |   — |
+| nagoya_run3 | RTK    | FIX |    416 | 18.7 |  8.2% |   0.307 m | 0.128 m |  0.150 m |  72 |
+|             |        | FF  |  5 095 | 13.2 |100.0% |   3.832 m | 3.462 m |  8.016 m |   — |
+|             |        | ALL |  5 095 | 13.2 |     — |   3.832 m | 3.462 m |  8.016 m |   — |
 
 ### Tokyo
 
@@ -214,23 +218,23 @@ MADOCA-PPP never produces an integer fix and is reported as a single **PPP** tie
 |            |        | FF  |  9 235 |  6.4 | 77.8% | 119.243 m |  3.462 m | 25.545 m |   — |
 |            |        | ALL | 11 867 |  5.9 |     — | 627.063 m |  7.914 m |277.340 m |   — |
 | tokyo_run1 | MADOCA | PPP |  3 084 | 12.9 | 16.6% |   1.825 m |  0.979 m |  1.957 m |   0 |
-| tokyo_run1 | RTK    | FIX |  1 873 | 10.9 | 16.4% |   9.461 m |  6.346 m | 12.491 m | 693 |
-|            |        | FF  | 11 437 | 15.2 |100.0% |  18.123 m |  9.639 m | 40.548 m |   — |
-|            |        | ALL | 11 437 | 15.2 |     — |  18.123 m |  9.639 m | 40.548 m |   — |
+| tokyo_run1 | RTK    | FIX |    380 | 15.7 |  3.4% |   0.711 m |  0.027 m |  0.643 m |1840 |
+|            |        | FF  | 11 271 | 16.0 |100.0% |   8.272 m |  7.033 m | 19.674 m |   — |
+|            |        | ALL | 11 271 | 16.0 |     — |   8.272 m |  7.033 m | 19.674 m |   — |
 | tokyo_run2 | CLAS   | FIX |  1 972 |  7.2 | 21.7% |   0.590 m |  0.117 m |  1.041 m | 368 |
 |            |        | FF  |  6 841 |  6.3 | 75.3% |  22.988 m |  1.194 m | 14.921 m |   — |
 |            |        | ALL |  9 091 |  5.7 |     — |  33.433 m |  2.389 m | 33.465 m |   — |
 | tokyo_run2 | MADOCA | PPP |  8 159 | 13.7 |  6.7% |   2.894 m |  1.181 m |  4.580 m | 464 |
-| tokyo_run2 | RTK    | FIX |    492 |  9.6 |  5.7% |  28.476 m |  9.823 m | 62.918 m | 926 |
-|            |        | FF  |  8 625 | 18.7 |100.0% |  34.145 m | 16.659 m | 70.552 m |   — |
-|            |        | ALL |  8 625 | 18.7 |     — |  34.145 m | 16.659 m | 70.552 m |   — |
+| tokyo_run2 | RTK    | FIX |  1 517 | 24.3 | 18.3% |  17.993 m |  0.010 m |  0.059 m | 806 |
+|            |        | FF  |  8 304 | 19.2 |100.0% |  33.845 m |  4.521 m | 50.604 m |   — |
+|            |        | ALL |  8 304 | 19.2 |     — |  33.845 m |  4.521 m | 50.604 m |   — |
 | tokyo_run3 | CLAS   | FIX |  1 129 |  8.1 |  7.4% |   0.801 m |  0.075 m |  1.831 m |  28 |
 |            |        | FF  |  2 629 |  7.3 | 17.2% |   3.764 m |  0.628 m |  2.427 m |   — |
 |            |        | ALL | 15 241 | 11.4 |     — |  41.464 m |  3.737 m | 29.607 m |   — |
 | tokyo_run3 | MADOCA | PPP |  2 795 | 14.3 |  3.4% |   0.724 m |  0.750 m |  1.062 m |  26 |
-| tokyo_run3 | RTK    | FIX |    447 | 12.6 |  3.0% |  25.575 m | 22.877 m | 88.233 m |1331 |
-|            |        | FF  | 14 757 | 20.8 |100.0% |  24.849 m |  6.090 m | 69.754 m |   — |
-|            |        | ALL | 14 757 | 20.8 |     — |  24.849 m |  6.090 m | 69.754 m |   — |
+| tokyo_run3 | RTK    | FIX |  3 669 | 25.0 | 25.1% |   0.293 m |  0.013 m |  0.051 m | 335 |
+|            |        | FF  | 14 639 | 21.7 |100.0% |   4.178 m |  1.374 m | 10.761 m |   — |
+|            |        | ALL | 14 639 | 21.7 |     — |   4.178 m |  1.374 m | 10.761 m |   — |
 
 ### Notes
 
@@ -240,9 +244,10 @@ MADOCA-PPP never produces an integer fix and is reported as a single **PPP** tie
   epochs (Q=1) that dominate in dense canyons.  FF tier (24–78%) excludes these.
 - **RTK FF = ALL**: RTK outputs Q=4 (fix) or Q=5 (float) only — no SPP fallback
   — so FF always equals ALL.
-- **RTK FIX quality**: large FIX RMS in some runs (e.g. tokyo_run2: 28.5 m)
-  indicates wrongly-fixed integer solutions at 13–27 km baselines.  Long-baseline
-  RTK integer AR is unreliable without ionospheric modelling.
+- **RTK FIX quality**: with triple-frequency AR (`l1+2+3`, `ionoopt=off`), most
+  runs achieve sub-metre FIX RMS (e.g. nagoya_run3: 0.31 m, tokyo_run3: 0.29 m).
+  tokyo_run2 FIX RMS remains elevated (18 m) despite tiny 1σ/95% values, indicating
+  a small number of wrongly-fixed epochs that dominate the RMS at this ~27 km baseline.
 - **MADOCA PPP N**: outputs Q=3 (PPP float) or Q=0 (no solution); Q=0 is
   filtered, so N reflects epochs where the filter produced a solution.  In
   nagoya_run1, only 27% of rover epochs have a valid solution (heavy urban
@@ -298,7 +303,10 @@ Key differences from the standard test configurations:
 | `ant2-anttype` (Nagoya) | `TRM115000.00 NONE` | base antenna per equipment manifest |
 | `ant2-anttype` (Tokyo) | `TRM55971.00 NONE` | base antenna (RINEX header has wrong model) |
 | `pos2-isb` | `off` | no ISB calibration for Septentrio mosaic-X5 |
-| `pos1-dynamics` | `on` | kinematic mode (MADOCA) |
+| `pos1-dynamics` | `on` | kinematic mode (MADOCA, RTK) |
+| `pos1-frequency` (RTK) | `l1+2+3` | triple-frequency AR |
+| `pos1-ionoopt` (RTK) | `off` | raw observations on all 3 freq (DD cancels iono) |
+| `pos1-snrmask_r` (RTK) | `on` | SNR mask (≥30 dBHz above 25°) |
 | `out-solformat` | `nmea` | GGA parsed by `compare_ppc.py` |
 
 ---
