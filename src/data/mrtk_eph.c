@@ -378,7 +378,7 @@ extern double seph2clk(gtime_t time, const seph_t *seph)
     t=ts=timediff(time,seph->t0);
 
     for (i=0;i<2;i++) {
-        t=ts-seph->af0+seph->af1*t;
+        t=ts-(seph->af0+seph->af1*t); /* parentheses required: iterate clock bias */
     }
     return seph->af0+seph->af1*t;
 }

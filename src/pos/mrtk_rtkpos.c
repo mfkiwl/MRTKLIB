@@ -711,9 +711,14 @@ static void detslp_gf(rtk_t *rtk, const obsd_t *obs, int i, int j,
     double g0,g1;
     
     trace(NULL,3,"detslp_gf: i=%d j=%d\n",i,j);
-    
+
+    /* skip if disabled or slip already detected on any frequency */
+    if (rtk->opt.thresslip==0.0) return;
+    for (k=0;k<rtk->opt.nf;k++)
+        if (rtk->ssat[sat-1].slip[k]&1) return;
+
     for (k=1;k<rtk->opt.nf;k++) {
-        if ((g1=gfobs(obs,i,j,k,nav))==0.0) return;
+        if ((g1=gfobs(obs,i,j,k,nav))==0.0) continue; /* try next freq, not abort */
          
         g0=rtk->ssat[sat-1].gf[k-1];
         rtk->ssat[sat-1].gf[k-1]=g1;
@@ -1801,8 +1806,8 @@ static int relpos(rtk_t *rtk, const obsd_t *obs, int nu, int nr,
         }
         /* DD (double-differenced) residuals and partial derivatives */
         if ((nv=ddres(rtk,nav,obs,dt,xp,Pp,sat,y,e,azel,freq,iu,ir,ns,v,H,R,
-                      vflg))<1) {
-            errmsg(rtk,"no double-differenced residual\n");
+                      vflg))<4) {
+            errmsg(rtk,"insufficient double-differenced residuals (%d)\n",nv);
             stat=SOLQ_NONE;
             break;
         }
@@ -1837,7 +1842,7 @@ static int relpos(rtk_t *rtk, const obsd_t *obs, int nu, int nr,
                 if (f==0) rtk->sol.ns++; /* valid satellite count by L1 */
             }
             /* lack of valid satellites */
-            if (rtk->sol.ns<4) stat=SOLQ_NONE;
+            if (rtk->sol.ns<4) stat=SOLQ_DGPS; /* degrade, not invalidate */
         }
         else stat=SOLQ_NONE;
     }
@@ -1913,7 +1918,8 @@ static int relpos(rtk_t *rtk, const obsd_t *obs, int nu, int nr,
         rtk->ssat[sat[i]-1].snr[j]=obs[iu[i]].SNR[j];
     }
     for (i=0;i<MAXSAT;i++) for (j=0;j<nf;j++) {
-        if (rtk->ssat[i].fix[j]==2&&stat!=SOLQ_FIX) rtk->ssat[i].fix[j]=1;
+        /* retain fix[j]=2 across epochs to preserve AR candidates (demo5) */
+        /* if (rtk->ssat[i].fix[j]==2&&stat!=SOLQ_FIX) rtk->ssat[i].fix[j]=1; */
         if (rtk->ssat[i].slip[j]&1) rtk->ssat[i].slipc[j]++;
     }
     free(rs); free(dts); free(var); free(y); free(e); free(azel); free(freq);
