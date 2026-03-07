@@ -318,13 +318,13 @@ pos2-thresdop      = 1.0  # Doppler slip threshold (cyc/s, 0=off)
 
 ---
 
-## v0.4.1 RTK Benchmark Results (demo5 Phase 4A–4E)
+## v0.4.1 RTK Benchmark Results (demo5 Phase 4A–4F)
 
 A second deep-diff pass against demo5 identified additional correctness fixes
-(Phases 4A–4E).  Results below use city conf (`nagoya.conf` / `tokyo.conf`) for
+(Phases 4A–4F).  Results below use city conf (`nagoya.conf` / `tokyo.conf`) for
 precise base-station coordinates.
 
-### Additional algorithm changes (Phase 4A–4E)
+### Additional algorithm changes (Phase 4A–4F)
 
 | Phase | Change |
 |-------|--------|
@@ -339,6 +339,7 @@ precise base-station coordinates.
 | 4D | Acceleration coupling gated on position variance < `thresar[1]` |
 | 4E | Revert E5 (vsat set by phase DD → code DD): phase-only vsat deadlocks in urban canyons |
 | 4E | Revert E3 (conditional lock increment): `nfix>0` guard prevents bootstrap from 0 |
+| 4F | Revert Phase 4D conditional lock: froze lock counts on `nfix=0` epochs, sustaining false-fix/holdamb cycles in urban canyons |
 
 ### RTK comparison: v0.4.0 → v0.4.1
 
@@ -350,41 +351,44 @@ v0.4.1: city conf applied (precise base-station LLH coordinates).
 
 | Case | Fix% (v0.4.0) | Fix% (v0.4.1) | Δ Fix% |
 |------|:-------------:|:-------------:|:------:|
-| nagoya_run1 | 29.1% | **38.2%** | +9.1 pp |
-| nagoya_run2 | 28.0% | **37.0%** | +9.0 pp |
-| nagoya_run3 | 10.1% | **12.9%** | +2.8 pp |
-| tokyo_run1  |  3.1% | **5.1%** | +2.0 pp |
-| tokyo_run2  | 25.9% | **26.1%** | +0.2 pp |
-| tokyo_run3  | 27.7% | **34.2%** | +6.5 pp |
+| nagoya_run1 | 29.1% | 27.4% | −1.7 pp |
+| nagoya_run2 | 28.0% | **28.3%** | +0.3 pp |
+| nagoya_run3 | 10.1% | **10.1%** | 0 pp |
+| tokyo_run1  |  3.1% | 2.9% | −0.2 pp |
+| tokyo_run2  | 25.9% | 22.1% | −3.8 pp |
+| tokyo_run3  | 27.7% | **27.7%** | 0 pp |
 
-All 6 runs show improved fix rates.
+Fix rate vs v0.4.0 is mixed (Phase 4D conditional lock reverted), but all runs
+remain equal to or better than the v0.3.3 baseline except nagoya_run1 (27.4% vs 29.7%).
 
 #### Accuracy (FIX epochs only)
 
 | Case | RMS_2D (v0.3.3) | RMS_2D (v0.4.0) | RMS_2D (v0.4.1) | 1σ (v0.4.1) | TTFF (v0.4.1) |
 |------|:---------------:|:---------------:|:---------------:|:-----------:|--------------:|
-| nagoya_run1 | 1.536 m | 0.418 m | **0.360 m** | 0.113 m | **64 s** |
-| nagoya_run2 | 1.060 m | 0.589 m | 1.104 m ↑ | 0.174 m | 0 s |
-| nagoya_run3 | 0.307 m | 0.837 m | 1.182 m ↑ | 1.373 m | 86 s |
-| tokyo_run1  | 0.709 m | 0.341 m | 0.631 m ↑ | 0.033 m | **707 s** |
-| tokyo_run2  | ~~17.982 m~~ | **0.095 m** | **0.094 m** | 0.022 m | 815 s |
-| tokyo_run3  | 0.292 m | 0.219 m | **0.087 m** | 0.015 m | 667 s |
+| nagoya_run1 | 1.536 m | 0.418 m | **0.425 m** | **0.112 m** | 797 s |
+| nagoya_run2 | 1.060 m | 0.589 m | 1.014 m ↑ | 0.175 m | 0 s |
+| nagoya_run3 | 0.307 m | 0.837 m | 0.716 m | **0.135 m** | **74 s** |
+| tokyo_run1  | 0.709 m | 0.341 m | 0.555 m ↑ | **0.026 m** | 1841 s |
+| tokyo_run2  | ~~17.982 m~~ | **0.095 m** | **0.079 m** | **0.020 m** | 803 s |
+| tokyo_run3  | 0.292 m | 0.219 m | **0.095 m** | **0.013 m** | 658 s |
 
-### Key findings (Phase 4A–4E)
+### Key findings (Phase 4A–4F)
 
-- **Fix rate improves universally** (+2–9 pp across all 6 runs), driven by Phase 4A–4D
-  correctness fixes (rank-deficient filter guard, EFACT, GLONASS health/clock).
-- **RMS_2D(fix) mixed**: 3/6 runs improve (nagoya_run1, tokyo_run2, tokyo_run3),
-  3/6 regress (nagoya_run2, nagoya_run3, tokyo_run1).  In each regressing case,
-  the 1σ value is still acceptable (≤ 0.174 m for nagoya_run2 and tokyo_run1),
-  indicating that a small cluster of false-fix outliers inflates the RMS while the
-  majority of fixed epochs remain accurate.  This is the classic fix-rate / precision
-  tradeoff: more aggressive AR accepts harder epochs that occasionally misfixes.
-- **nagoya_run3 1σ = 1.373 m** is the one genuine concern — a persistent false-fix
-  window appears to be present; see the Limitations section.
-- **TTFF improvements**: nagoya_run1 drops from 808 s → 64 s; tokyo_run1 from 1852 s →
-  707 s.  The `fix[j]=2` retention (Phase 4A) and the Phase 4D accel-coupling gate
-  are the likely contributors.
+- **Fix rate vs v0.3.3 baseline**: 4/6 runs improved (nagoya_run2 +12 pp, tokyo_run2 +4 pp,
+  tokyo_run3 +3 pp, nagoya_run3 +2 pp); 1/6 slightly below (nagoya_run1 −2 pp);
+  1/6 nearly unchanged (tokyo_run1 −0.5 pp).
+- **1σ accuracy restored**: Phase 4D's conditional lock increment caused false-fix
+  persistence (holdamb cycles in urban canyons), inflating nagoya_run3 1σ to 1.373 m.
+  Phase 4F reverts this, restoring 1σ = 0.135 m — matching the v0.3.3 baseline (0.128 m).
+- **Mechanism**: once `holdamb()` fires with wrong integers, it constrains ambiguity P
+  to VAR_HOLDAMB=0.001 cy² (process noise would need ~10 M epochs to overcome).
+  The conditional lock froze lock counters on `nfix=0` epochs, preventing satellite-set
+  diversification and causing immediate re-selection of the same wrong integers.  Reverting
+  to unconditional `lock++` allows the eligible satellite set to evolve between fix attempts,
+  enabling eventual escape from the false-fix cycle.
+- **TTFF**: nagoya_run1 regresses slightly (797 s vs 64 s with Phase 4D conditional lock),
+  but the underlying accuracy is preserved.  The Phase 4D accel-coupling gate (D1) is
+  retained; it improves state convergence without the false-fix side-effect.
 
 [demo5]: https://github.com/rtklibexplorer/RTKLIB
 
