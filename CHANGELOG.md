@@ -5,7 +5,7 @@ All notable changes to MRTKLIB are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v0.3.3] - 2026-03-06
+## [v0.3.3] - 2026-03-07
 
 Minor release — kinematic positioning benchmark for urban driving evaluation.
 No functional changes to the library.
@@ -13,30 +13,55 @@ No functional changes to the library.
 ### Added
 
 - **Kinematic benchmark infrastructure** (`scripts/benchmark/`) — End-to-end
-  pipeline for evaluating PPP-RTK (CLAS) and PPP (MADOCA) against the
+  pipeline evaluating CLAS PPP-RTK, MADOCA PPP, and kinematic RTK against the
   PPC-Dataset urban driving data:
   - `cases.py` — Metadata for 6 PPC-Dataset runs (GPS week/TOW, city/run IDs)
   - `download_l6.py` — Auto-download QZSS L6D (CLAS) and L6E (MADOCA) archive
     files; MADOCA PRN auto-probed from candidates `[209, 193, 194, 195, 196, 199]`
-  - `compare_ppc.py` — NMEA vs `reference.csv` comparison; computes 2D/3D RMS,
-    fix rate, convergence time, per-epoch ENU errors; optional PNG plots
-  - `run_benchmark.py` — Orchestrator with result caching and summary table
-- **Benchmark configurations** (`conf/benchmark/`) — `clas.conf` and
-  `madoca.conf` tuned for Septentrio mosaic-X5 (`ant1-anttype=*`,
-  `pos2-isb=off`; kinematic dynamics for MADOCA).
+  - `compare_ppc.py` — NMEA vs `reference.csv` comparison; three-tier accuracy
+    breakdown (FIX/FF/ALL for CLAS & RTK; PPP for MADOCA); computes 2D/3D RMS,
+    1σ, 95%, TTFF, mean satellite count; optional PNG plots
+  - `run_benchmark.py` — Orchestrator with result caching, layered `-k` conf
+    support, and summary table; `--mode clas|madoca|rtk|both`
+- **Benchmark configurations** (`conf/benchmark/`):
+  - `clas.conf` — CLAS PPP-RTK: `ant1-anttype=*`, `pos2-isb=off`, NMEA output
+  - `madoca.conf` — MADOCA PPP: `pos1-dynamics=on`, `ant1-postype=single`, NMEA
+  - `rtk.conf` — Kinematic RTK: `pos1-frequency=l1+2+3`, `pos1-ionoopt=off`,
+    `pos1-snrmask_r=on` (enables genuine triple-frequency AR)
+  - `nagoya.conf` — City overrides: precise base LLH, antenna types, `ant2-antdelu`
+  - `tokyo.conf` — City overrides: precise base LLH, antenna types, `ant2-antdelu`
 - **Benchmark documentation** ([docs/benchmark.md](docs/benchmark.md)) —
-  Dataset download instructions, L6 auto-download, execution walkthrough,
-  metric definitions, and known limitations.
+  Dataset download instructions, L6 auto-download, three-mode execution walkthrough,
+  three-tier metric definitions, result tables, and known limitations.
 
 ### Changed
 
 - `.gitignore` — Added `data/benchmark/` exclusion (large L6/NMEA files).
 - `ruff.toml` — Added `scripts/benchmark/*.py` to `D103` per-file-ignores.
+- **PPC-Dataset attribution** — Corrected to credit the contest organiser:
+  Precise Positioning Challenge 2024 (高精度測位チャレンジ2024) by the
+  Institute of Navigation Japan (測位航法学会); data published by Prof. Taro
+  Suzuki (Chiba Institute of Technology).
+- **Benchmark disclaimer** — Added note that parameters are not tuned and
+  results are for reference only.
+
+### Fixed
+
+- **`rnx2rtkp` multi-`-k` conf loading** — `resetsysopts()` was called inside
+  the `-k` processing loop, resetting values already loaded by earlier conf files.
+  Moved to before the loop so layered city overrides (`nagoya.conf`, `tokyo.conf`)
+  take effect correctly.
+- **`loadopts()` leading whitespace** — Values after the `=` separator now have
+  leading whitespace stripped, preventing key lookup failures for entries like
+  `ant1-anttype       = *`.
+- **MADOCA `misc-timeinterp`** — Was inadvertently `off` in the benchmark conf;
+  restored to `on`, matching upstream MADOCALIB behaviour.
 
 ### Dataset
 
-The benchmark uses the **PPC-Dataset** released by Prof. Taro Suzuki
-(Chiba Institute of Technology):
+The benchmark uses the **PPC-Dataset** from the Precise Positioning Challenge 2024
+(高精度測位チャレンジ2024), organised by the Institute of Navigation Japan
+(測位航法学会). Data published by Prof. Taro Suzuki (Chiba Institute of Technology):
 <https://github.com/taroz/PPC-Dataset>
 
 Six urban vehicle runs (Nagoya × 3, Tokyo × 3) with 5 Hz triple-frequency
