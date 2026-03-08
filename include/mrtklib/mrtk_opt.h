@@ -191,8 +191,8 @@ typedef struct prcopt_t {        /* processing options type */
                         /* [0]:reserved */
                         /* [1-3]:error factor a/b/c of phase (m) */
                         /* [4]:doppler frequency (hz) */
-                        /* [5]:iono variance factor (m) */
-                        /* [6]:trop variance factor (m) */
+                        /* [5]:max SNR (dBHz) for SNR-based variance (0=disabled) */
+                        /* [6]:SNR variance scale factor (0=disabled) */
                         /* [7]:reserved */
     double std[3];      /* initial-state std [0]bias,[1]iono [2]trop */
     double prn[7];      /* process-noise std [0]bias,[1]iono [2]trop [3]acch [4]accv [5]pos [6]ifb */
@@ -271,8 +271,8 @@ typedef struct prcopt_t {        /* processing options type */
     double beta;            /* ionosphere time constant for Gauss-Markov (s) */
 
     /* Partial AR and AR filter options (demo5) */
-    int    minfixsats;      /* min sat pairs for valid AR fix (0=no minimum) */
-    int    mindropsats;     /* min sat pairs before excluding weakest for PAR (0=off) */
+    int    minfixsats;      /* min sats for valid AR fix; nb >= minfixsats-1 DD pairs required (0=no minimum) */
+    int    mindropsats;     /* min sats before excluding weakest for PAR; nb >= mindropsats required (0=off) */
     int    minholdsats;     /* min DD pairs for fix-and-hold (0=no minimum) */
     int    arfilter;        /* AR filter: exclude newly-locked sats degrading ratio (0:off,1:on) */
     int    gpsmodear;       /* GPS AR mode for GLO fix-and-hold second pass (0:off,1:on) */

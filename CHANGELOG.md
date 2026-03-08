@@ -13,13 +13,14 @@ defect that caused 1σ accuracy to degrade to 1.4 m in urban-canyon scenarios.
 
 ### Added
 
-- **`pos2-arminfixsats`** — Minimum valid satellite pairs required for AR; guards
-  against rank-deficient LAMBDA decompositions (default: 4).
+- **`pos2-arminfixsats`** — Minimum satellites required for AR (`nb >= minfixsats-1`
+  DD pairs); guards against rank-deficient LAMBDA decompositions (library default: 0 = disabled;
+  benchmark conf: 4).
 - **`pos2-arfilter`** — AR candidate filter: newly-locked satellites that degrade
   the ambiguity ratio are temporarily excluded and re-introduced epoch by epoch
-  (default: on).
+  (library default: off; benchmark conf: on).
 - **`pos2-thresdop`** — Doppler-based cycle-slip threshold in cycles/s; 0 = disabled
-  (default: 1.0).
+  (library default: 0; benchmark conf: 1.0).
 - **`stats-eratio3`** — Phase/code variance ratio for L5 frequency, completing
   independent eratio configuration for triple-frequency processing.
 - **Partial AR (`manage_amb_LAMBDA`)** — Multi-attempt LAMBDA with PAR satellite

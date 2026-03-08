@@ -760,7 +760,7 @@ static void detslp_dop(rtk_t *rtk, const obsd_t *obs, const int *ix, int ns,
                        int rcv, const nav_t *nav)
 {
     (void)nav;
-    int i,ii,f,sat,ndop=0,nf=rtk->opt.nf;
+    int i,ii,f,sat,ndop=0,nf=MIN(rtk->opt.nf,NFREQ); /* clamp to array bounds */
     double dph,dpt,mean_dop=0.0;
     double dopdif[MAXSAT][NFREQ],tt[MAXSAT][NFREQ];
 
@@ -1281,7 +1281,9 @@ static int ddres(rtk_t *rtk, const nav_t *nav, const obsd_t *obs, double dt,
                         P[jj+rtk->nx*jj]==SQR(opt->std[0])) threshadj=10.0;
                 }
                 if (fabs(v[nv])>opt->maxinno*threshadj) {
-                    rtk->ssat[sat[j]-1].rejc[f<nf?f:f-nf]++;
+                    /* only count phase outliers: rejc[] drives phase-bias resets
+                       in udbias(); code outliers must not trigger phase resets */
+                    if (f<nf) rtk->ssat[sat[j]-1].rejc[f]++;
                     errmsg(rtk,"outlier rejected (sat=%3d-%3d %s%d v=%.3f)\n",
                            sat[i],sat[j],f<nf?"L":"P",f%nf+1,v[nv]);
                     continue;
@@ -1677,7 +1679,7 @@ static int manage_amb_LAMBDA(rtk_t *rtk, double *bias, double *xa,
     gps1=1;
     glo1=(rtk->opt.navsys&SYS_GLO)?
          ((rtk->opt.glomodear==GLO_ARMODE_FIXHOLD&&!rtk->holdamb)?0:1):0;
-    sbas1=(rtk->opt.navsys&SYS_GLO)?glo1:((rtk->opt.navsys&SYS_SBS)?1:0);
+    sbas1=(rtk->opt.navsys&SYS_SBS)?1:0; /* independent of GLO state */
     nb=resamb_LAMBDA(rtk,bias,xa,gps1,glo1,sbas1);
     ratio1=rtk->sol.ratio;
 
