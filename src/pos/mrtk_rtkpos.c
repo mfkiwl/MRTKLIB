@@ -9,6 +9,7 @@
  * Copyright (C) 2015- Mitsubishi Electric Corp.
  * Copyright (C) 2014 Geospatial Information Authority of Japan
  * Copyright (C) 2014 T.SUZUKI
+ * Copyright (C) 2013- Tim Everett (rtklibexplorer) [demo5 RTK enhancements]
  * Copyright (C) 2007-2023 T.TAKASU
  *
  * SPDX-License-Identifier: BSD-2-Clause
