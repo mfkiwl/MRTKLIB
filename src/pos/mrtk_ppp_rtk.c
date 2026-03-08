@@ -291,7 +291,9 @@ static double varerr(int sat, int sys, double el, int type,
     else {
         /* normal error model */
         if (type == 1) fact *= opt->eratio[0];
-        fact *= sys == SYS_GLO ? EFACT_GLO : (sys == SYS_SBS ? EFACT_SBS : EFACT_GPS);
+        fact *= sys==SYS_GLO?EFACT_GLO:(sys==SYS_GAL?EFACT_GAL:
+                (sys==SYS_QZS?EFACT_QZS:(sys==SYS_CMP?EFACT_CMP:
+                (sys==SYS_IRN?EFACT_IRN:(sys==SYS_SBS?EFACT_SBS:EFACT_GPS)))));
         if (opt->ionoopt == IONOOPT_IFLC) fact *= 3.0;
         a = fact * opt->err[1];
         b = fact * opt->err[2];
@@ -1040,8 +1042,14 @@ static int residual_test(rtk_t *rtk, const int *vflg, const double *v,
         (void)stype;
 
         /* validate individual residuals */
+        /* D2: inflate threshold 10x for newly-initialized phase bias (demo5) */
+        double inno0_eff = inno0;
+        if (type == 0 && rtk->opt.std[0] > 0.0) {
+            int ib = IB_RTK(sat2, freq, &rtk->opt);
+            if (rtk->P[ib + ib * rtk->nx] == SQR(rtk->opt.std[0])) inno0_eff *= 10.0;
+        }
         if (!Q[i + i * m] || inno0 == 0 ||
-            (v[i] * v[i] < Q[i + i * m] * inno0 * inno0)) {
+            (v[i] * v[i] < Q[i + i * m] * inno0_eff * inno0_eff)) {
             if (type == 0) {
                 if (!rtk->ssat[sat2 - 1].vsat[freq]) continue;
                 vv += v[i] * v[i] / Q[i + i * m];

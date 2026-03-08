@@ -432,7 +432,9 @@ static double varerr(int sat, int sys, double el, int idx, int type,
     double fact=1.0,sinel=sin(el);
 
     if (type==1) fact*=opt->eratio[idx==0?0:1];
-    fact*=sys==SYS_GLO?EFACT_GLO:(sys==SYS_SBS?EFACT_SBS:EFACT_GPS);
+    fact*=sys==SYS_GLO?EFACT_GLO:(sys==SYS_GAL?EFACT_GAL:
+          (sys==SYS_QZS?EFACT_QZS:(sys==SYS_CMP?EFACT_CMP:
+          (sys==SYS_IRN?EFACT_IRN:(sys==SYS_SBS?EFACT_SBS:EFACT_GPS)))));
     if (opt->ionoopt==IONOOPT_IFLC) fact*=3.0;
     return SQR(fact*opt->err[1])+SQR(fact*opt->err[2]/sinel);
 }
@@ -1334,7 +1336,13 @@ static int ppp_res(int post, const obsd_t *obs, int n, const double *rs,
                 cdtr,C,dion,dion_std,dtrp,dtrp_std,bias,bias_std,ifb,ifb_std,rtk->ssat[sat-1].fix[j/2]);
 
             /* reject satellite by pre-fit residuals */
-            if (!post&&opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno) {
+            /* D2: inflate threshold 10x for newly-initialized phase bias (demo5) */
+            double maxinno_eff=opt->maxinno;
+            if (!post&&j%2==0&&opt->std[0]>0.0) {
+                int ib=IB(sat,j/2,opt);
+                if (cov[ib+ib*rtk->nx]==VAR_BIAS) maxinno_eff*=10.0;
+            }
+            if (!post&&opt->maxinno>0.0&&fabs(v[nv])>maxinno_eff) {
                 trace(NULL,2,"outlier (%d) rejected %s %s sat=%2d %s%s res=%9.4f el=%4.1f\n",
                       post,str,satstr,sat,j%2?"C":"L",code2obs(obs[i].code[j/2]),v[nv],azel[1+i*2]*R2D);
                 exc[i]=1; rtk->ssat[sat-1].rejc[j%2]++;
