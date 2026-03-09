@@ -1,8 +1,9 @@
 # Real-Time CLAS PPP-RTK via rtkrcv
 
-MRTKLIB supports real-time CLAS PPP-RTK positioning using `rtkrcv` with
-file-stream replay.  This document describes the setup, usage, and
-performance characteristics.
+MRTKLIB supports real-time CLAS PPP-RTK positioning using `rtkrcv`.
+Input streams can be any RTKLIB-supported type — serial, TCP client/server,
+NTRIP, or file replay.  This document describes the setup, usage, and
+performance characteristics, with file-stream replay as the primary example.
 
 ---
 
