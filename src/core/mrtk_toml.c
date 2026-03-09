@@ -265,6 +265,46 @@ static const toml_map_t toml_mapping[] = {
     {"server", "rtcm_option",        "misc-rtcmopt"},
     {"server", "l6_margin",          "misc-l6mrg"},
     {"server", "regularly",          "misc-regularly"},
+    {"server", "start_cmd",          "misc-startcmd"},
+    {"server", "stop_cmd",           "misc-stopcmd"},
+
+    /* ── streams (rtkrcv rcvopts) ──────────────────────────────────────────── */
+    {"streams.input.rover",      "type",      "inpstr1-type"},
+    {"streams.input.rover",      "path",      "inpstr1-path"},
+    {"streams.input.rover",      "format",    "inpstr1-format"},
+    {"streams.input.base",       "type",      "inpstr2-type"},
+    {"streams.input.base",       "path",      "inpstr2-path"},
+    {"streams.input.base",       "format",    "inpstr2-format"},
+    {"streams.input.base",       "nmeareq",   "inpstr2-nmeareq"},
+    {"streams.input.base",       "nmealat",   "inpstr2-nmealat"},
+    {"streams.input.base",       "nmealon",   "inpstr2-nmealon"},
+    {"streams.input.base",       "nmeahgt",   "inpstr2-nmeahgt"},
+    {"streams.input.correction", "type",      "inpstr3-type"},
+    {"streams.input.correction", "path",      "inpstr3-path"},
+    {"streams.input.correction", "format",    "inpstr3-format"},
+    {"streams.output.stream1",   "type",      "outstr1-type"},
+    {"streams.output.stream1",   "path",      "outstr1-path"},
+    {"streams.output.stream1",   "format",    "outstr1-format"},
+    {"streams.output.stream2",   "type",      "outstr2-type"},
+    {"streams.output.stream2",   "path",      "outstr2-path"},
+    {"streams.output.stream2",   "format",    "outstr2-format"},
+    {"streams.log.stream1",      "type",      "logstr1-type"},
+    {"streams.log.stream1",      "path",      "logstr1-path"},
+    {"streams.log.stream2",      "type",      "logstr2-type"},
+    {"streams.log.stream2",      "path",      "logstr2-path"},
+    {"streams.log.stream3",      "type",      "logstr3-type"},
+    {"streams.log.stream3",      "path",      "logstr3-path"},
+
+    /* ── console (rtkrcv rcvopts) ──────────────────────────────────────────── */
+    {"console", "passwd",   "console-passwd"},
+    {"console", "timetype", "console-timetype"},
+    {"console", "soltype",  "console-soltype"},
+    {"console", "solflag",  "console-solflag"},
+
+    /* ── files (rtkrcv rcvopts) ────────────────────────────────────────────── */
+    {"files", "cmd_file_1", "file-cmdfile1"},
+    {"files", "cmd_file_2", "file-cmdfile2"},
+    {"files", "cmd_file_3", "file-cmdfile3"},
 
     {NULL, NULL, NULL}  /* terminator */
 };

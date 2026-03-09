@@ -271,6 +271,13 @@ MAPPING: list[tuple[str, str, str, str]] = [
     ("misc-rtcmopt",     "server", "rtcm_option",       "str"),
     ("misc-l6mrg",       "server", "l6_margin",         "int"),
     ("misc-regularly",   "server", "regularly",         "int"),
+    ("misc-startcmd",   "server", "start_cmd",         "str"),
+    ("misc-stopcmd",    "server", "stop_cmd",          "str"),
+
+    # ── files (rtkrcv-specific) ──────────────────────────────────────────────
+    ("file-cmdfile1",   "files", "cmd_file_1",        "str"),
+    ("file-cmdfile2",   "files", "cmd_file_2",        "str"),
+    ("file-cmdfile3",   "files", "cmd_file_3",        "str"),
 ]
 
 # Build lookup dict: legacy_key → (section, key, type)
@@ -281,7 +288,7 @@ for _lk, _sec, _tk, _vt in MAPPING:
 # ── rtkrcv stream keys (not in sysopts[], parsed separately) ─────────────────
 
 STREAM_KEY_RE = re.compile(
-    r"^(inpstr|outstr|logstr)(\d+)-(type|path|format|nmeareq|nmealat|nmealon)$"
+    r"^(inpstr|outstr|logstr)(\d+)-(type|path|format|nmeareq|nmealat|nmealon|nmeahgt)$"
 )
 
 CONSOLE_KEY_RE = re.compile(r"^console-(passwd|timetype|soltype|solflag)$")
