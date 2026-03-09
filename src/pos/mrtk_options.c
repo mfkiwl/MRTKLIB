@@ -15,6 +15,7 @@
  *----------------------------------------------------------------------------*/
 /* mrtklib modular headers */
 #include "mrtklib/mrtk_options.h"
+#include "mrtklib/mrtk_toml.h"
 #include "mrtklib/mrtk_coords.h"
 #include "mrtklib/mrtk_nav.h"
 
@@ -401,9 +402,17 @@ extern int loadopts(const char *file, opt_t *opts)
     opt_t *opt;
     char buff[2048],*p;
     int n=0;
-    
+    const char *ext;
+
     trace(NULL,3,"loadopts: file=%s\n",file);
-    
+
+    /* detect .toml extension → use TOML loader */
+    ext=strrchr(file,'.');
+    if (ext&&strcmp(ext,".toml")==0) {
+        return loadopts_toml(file,opts);
+    }
+
+    /* legacy .conf key=value parser */
     if (!(fp=fopen(file,"r"))) {
         trace(NULL,1,"loadopts: options file open error (%s)\n",file);
         return 0;
@@ -411,9 +420,9 @@ extern int loadopts(const char *file, opt_t *opts)
     while (fgets(buff,sizeof(buff),fp)) {
         n++;
         chop(buff);
-        
+
         if (buff[0]=='\0') continue;
-        
+
         if (!(p=strstr(buff,"="))) {
             fprintf(stderr,"invalid option %s (%s:%d)\n",buff,file,n);
             continue;
@@ -422,14 +431,14 @@ extern int loadopts(const char *file, opt_t *opts)
         while (*p==' '||*p=='\t') p++; /* skip leading whitespace in value */
         chop(buff);
         if (!(opt=searchopt(buff,opts))) continue;
-        
+
         if (!str2opt(opt,p)) {
             fprintf(stderr,"invalid option value %s (%s:%d)\n",buff,file,n);
             continue;
         }
     }
     fclose(fp);
-    
+
     return 1;
 }
 /* save options to file --------------------------------------------------------
