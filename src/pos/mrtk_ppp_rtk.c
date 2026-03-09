@@ -2020,8 +2020,8 @@ extern void ppp_rtk_pos(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav)
         int nch = opt->l6mrg ? SSR_CH_NUM : 1;
         int ch;
         for (ch = 0; ch < nch; ch++) {
-            /* always re-fetch corrections closest to L6 buffer time
-             * (ensures trop/iono data is as fresh as possible) */
+            /* re-fetch corrections closest to observation time,
+             * falling back to L6 buffer time if obs lookup fails */
             if (grid->network > 0) {
                 int bgrc=clas_bank_get_close(clas, obs[0].time,
                                         grid->network, ch,

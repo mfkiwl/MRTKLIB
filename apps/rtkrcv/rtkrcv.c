@@ -527,8 +527,10 @@ static int startsvr(vt_t *vt)
         vt_printf(vt,"rtk server start error (%s)\n",errmsg);
         return 0;
     }
-    /* load CLAS auxiliary files after server start */
+    /* load CLAS auxiliary files after server start.
+     * lock to avoid racing with the rtksvr thread */
     if (svr.clas) {
+        rtksvrlock(&svr);
         /* grid definition file */
         if (*filopt.grid) {
             if (clas_read_grid_def(svr.clas,filopt.grid)!=0) {
@@ -557,6 +559,7 @@ static int startsvr(vt_t *vt)
             setisb(&svr.nav,prcopt.rectype[0],prcopt.rectype[1],
                    &svr.nav.stas[0],&svr.nav.stas[1]);
         }
+        rtksvrunlock(&svr);
     }
     return 1;
 }

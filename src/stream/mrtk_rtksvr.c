@@ -515,7 +515,9 @@ static int decoderaw(rtksvr_t *svr, int index)
             update_svr(svr,ret,obs,nav,ephsat,ephset,sbsmsg,index,fobs);
         }
         /* redirect L6 payload to CLAS decoder (UBX/L6E → CLAS path) */
-        if (svr->clas&&ret==10&&svr->format[index]!=STRFMT_CLAS) {
+        if (svr->clas&&ret==10&&
+            (svr->format[index]==STRFMT_UBX||
+             svr->format[index]==STRFMT_L6E)) {
             int k,ch=0,cret;
             /* initialize week_ref from obs time (once) */
             if (svr->clas->week_ref[0]==0) {
@@ -545,7 +547,8 @@ static int decoderaw(rtksvr_t *svr, int index)
                             clas_check_grid_status(svr->clas,
                                                    &svr->clas->current[ch],ch);
                         }
-                    } else if (svr->clas->bank[ch]->use) {
+                    } else if (svr->clas->bank[ch] &&
+                               svr->clas->bank[ch]->use) {
                         clas_corr_t *tmp=(clas_corr_t *)calloc(
                             1,sizeof(clas_corr_t));
                         if (tmp) {
