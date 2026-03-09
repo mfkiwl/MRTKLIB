@@ -8,7 +8,7 @@
 
 It is designed to overcome the architectural limitations of the original legacy [RTKLIB](https://www.rtklib.com/), providing a robust foundation for next-generation GNSS applications, including high-scale server processing, containerized environments, and seamless integration of Japanese QZSS augmentation services.
 
-The structural foundation is based on **MALIB (MADOCA-PPP Library) feature/1.2.0** developed by JAXA and TOSHIBA, with the PPP positioning engine replaced by **MADOCALIB**'s implementation for higher-accuracy PPP/PPP-AR processing. Both post-processing (`rnx2rtkp`) and real-time processing (`rtkrcv`) are supported, including L6E (SSR orbit/clock/bias) and L6D (ionospheric STEC) correction streams.
+The structural foundation is based on **MALIB (MADOCA-PPP Library) feature/1.2.0** developed by JAXA and TOSHIBA. The PPP/PPP-AR positioning engine comes from **MADOCALIB**, while the centimetre-level PPP-RTK engine is built on **CLASLIB** — making MRTKLIB the first open-source implementation to support real-time CLAS PPP-RTK positioning via `rtkrcv`. Kinematic positioning accuracy is further enhanced by selected algorithm improvements from **[demo5 RTKLIB](https://github.com/rtklibexplorer/RTKLIB)**. Both post-processing (`rnx2rtkp`) and real-time processing (`rtkrcv`) are supported, including L6E (SSR orbit/clock/bias) and L6D (CLAS CSSR) correction streams.
 
 ---
 
