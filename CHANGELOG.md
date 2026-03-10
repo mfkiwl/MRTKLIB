@@ -23,6 +23,10 @@ improves from 67% to 93%; PP fix rate improves from 87% to 99%.
 
 - **`gen_l6_tag.py` tick_scale calculation** — L6 tag file timing now always
   matches the master tag's scale, not only when the master appears compressed.
+- **`gen_l6_tag.py` UTC→GPST time basis** — L6 tag `time_time` now includes
+  GPS-UTC leap seconds to match the GPST basis used by `gen_bnx_tag.py` and
+  RTKLIB's `strsync()`.  Previously ~18 s mismatch caused L6 data to replay
+  slightly early relative to observations.
 
 ### 2ch CLAS performance (2025/157 dataset)
 

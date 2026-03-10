@@ -212,8 +212,13 @@ entry mapping its `tick_n` (ms since first epoch) to its file offset.
 L6 data is transmitted at 250 bytes/s (one frame per second).  The tag
 generator creates one entry per frame at 1-second intervals.
 
+The L6 filename encodes UTC start time (session letter A–X maps to hours
+0–23).  Since `gen_bnx_tag.py` stores GPST-basis timestamps, `gen_l6_tag.py`
+applies GPS-UTC leap seconds (+18 s as of 2017) to match the same time basis.
+
 With `--sync-tag`, it aligns the L6 tag to a master tag file:
-- Reads the master's `tick_f` and base time
+- Reads the master's `tick_f` and base time (GPST basis)
+- Converts L6 UTC start time to GPST (adds leap seconds)
 - Computes the GNSS-time offset between L6 start and master start
 - Sets `tick_f` so the offset produces correct `strsync()` alignment
 - Matches `tick_n` scaling to the master tag's timing (handles both

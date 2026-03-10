@@ -59,11 +59,13 @@ from CLAS.  With nf=2, the L1-L5 GF slip detector is skipped entirely
 
 ### Improved
 
-- **`scripts/tools/gen_l6_tag.py`** — L6 tag file tick_scale calculation now
-  always matches the master tag's timing scale, not only when the master is
-  detected as "compressed".  Previously, the heuristic
-  (`master_tick_range < expected_realtime * 0.5`) missed cases where the master
-  was recorded slightly slower than real-time.
+- **`scripts/tools/gen_l6_tag.py`** — Two fixes:
+  1. **tick_scale**: now always matches the master tag's timing scale, not only
+     when the master is detected as "compressed".
+  2. **UTC→GPST time basis**: L6 tag `time_time` now includes GPS-UTC leap
+     seconds (+18 s) to match the GPST basis used by `gen_bnx_tag.py` and
+     RTKLIB's `strsync()`.  Previously the ~18 s mismatch caused L6 data to
+     replay early relative to observations.
 
 ### Updated
 
@@ -118,5 +120,5 @@ nf=2 + CLAS:
 | File | Change |
 |------|--------|
 | `conf/claslib/rtkrcv_2ch.toml` | `frequency: "l1+2+3"` → `"l1+2"` |
-| `scripts/tools/gen_l6_tag.py` | Simplified tick_scale to always match master |
-| `tests/data/claslib/claslib_testdata.tar.gz` | Updated RT reference NMEA |
+| `scripts/tools/gen_l6_tag.py` | tick_scale fix + UTC→GPST time basis correction |
+| `tests/data/claslib/claslib_testdata.tar.gz` | Updated RT reference NMEA + regenerated L6 tags |
