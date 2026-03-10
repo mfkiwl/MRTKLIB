@@ -5,6 +5,38 @@ All notable changes to MRTKLIB are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.1] - 2026-03-10
+
+**Dual-channel CLAS fix rate bug fix** — Resolves a significant performance
+degradation in dual-channel CLAS real-time PPP-RTK positioning.  RT fix rate
+improves from 67% to 93%; PP fix rate improves from 87% to 99%.
+
+### Fixed
+
+- **2ch CLAS frequency configuration** — `rtkrcv_2ch.toml` used
+  `frequency = "l1+2+3"` (nf=3), but CLAS does not provide Galileo E5a bias
+  corrections.  This caused false L1-L5 geometry-free cycle slip detection at
+  every epoch, destroying Galileo ambiguities and preventing AR convergence.
+  Changed to `frequency = "l1+2"` (nf=2).
+
+### Improved
+
+- **`gen_l6_tag.py` tick_scale calculation** — L6 tag file timing now always
+  matches the master tag's scale, not only when the master appears compressed.
+
+### 2ch CLAS performance (2025/157 dataset)
+
+| Metric | v0.4.4 (nf=3) | v0.5.1 (nf=2) |
+|--------|:---:|:---:|
+| RT fix rate | 67.4% (2428/3600) | **92.6% (3335/3600)** |
+| PP fix rate | 87.1% | **99.4%** |
+
+### Test Results
+
+59 tests — unchanged from v0.5.0.
+
+---
+
 ## [v0.5.0] - 2026-03-10
 
 **TOML configuration migration** — Replaces the legacy RTKLIB `key=value` `.conf`
@@ -72,7 +104,7 @@ ch2.  Achieves 67.4% fix rate on the 2025/157 dual-channel dataset (PP baseline:
 | Float (Q=5) | ~432 (12%) | 1,155 (32.1%) |
 | SPP (Q=1) | 0 (0%) | 17 (0.5%) |
 
-RT fix rate gap due to real-time L6 stream synchronisation constraints.
+RT fix rate gap resolved in v0.5.1 (root cause: nf=3 config, not stream sync).
 
 ### Test Results
 
@@ -674,6 +706,9 @@ Initial release — MALIB structural migration complete.
 - **MALIB integration** — Structural base from JAXA MALIB feature/1.2.0
   (directory layout, threading, stream I/O).
 
+[v0.5.1]: https://github.com/h-shiono/MRTKLIB/compare/v0.5.0...v0.5.1
+[v0.5.0]: https://github.com/h-shiono/MRTKLIB/compare/v0.4.4...v0.5.0
+[v0.4.4]: https://github.com/h-shiono/MRTKLIB/compare/v0.4.3...v0.4.4
 [v0.4.3]: https://github.com/h-shiono/MRTKLIB/compare/v0.4.2...v0.4.3
 [v0.4.2]: https://github.com/h-shiono/MRTKLIB/compare/v0.4.1...v0.4.2
 [v0.4.1]: https://github.com/h-shiono/MRTKLIB/compare/v0.3.3...v0.4.1
