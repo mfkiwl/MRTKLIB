@@ -1,6 +1,6 @@
 # MRTKLIB : Modernized RTKLIB for Next-Generation GNSS
 
-[![License](https://img.shields.io/badge/License-BSD_2--Clause-blue.svg)](LICENSE.txt)
+[![License](https://img.shields.io/badge/License-BSD_2--Clause-blue.svg)](LICENSE)
 [![Build](https://img.shields.io/badge/build-CMake-success.svg)]()
 [![C11](https://img.shields.io/badge/standard-C11-blue.svg)]()
 
@@ -154,7 +154,7 @@ This project stands on the shoulders of giants:
 | **Cabinet Office, Japan** | MADOCALIB — PPP/PPP-AR positioning algorithms |
 | **Lighthouse Technology & Consulting** | MADOCALIB — system integration and L6E/L6D decoder |
 
-For detailed licensing information, please refer to [LICENSE.txt](LICENSE.txt).
+For detailed licensing information, please refer to [LICENSE](LICENSE).
 
 ## 🗄️ Benchmark Dataset
 
