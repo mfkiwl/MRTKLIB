@@ -2,8 +2,9 @@
 
 MRTKLIB supports real-time CLAS PPP-RTK positioning using `rtkrcv`.
 Input streams can be any RTKLIB-supported type — serial, TCP client/server,
-NTRIP, or file replay.  This document describes the setup, usage, and
-performance characteristics, with file-stream replay as the primary example.
+NTRIP, or file replay.  Both single-channel and dual-channel L6 configurations
+are supported.  This document describes the setup, usage, and performance
+characteristics, with file-stream replay as the primary example.
 
 ---
 
@@ -16,13 +17,24 @@ the rtksvr thread, with corrections decoded from a separate L6 input stream.
 
 ### Supported Input Combinations
 
+**Single-channel L6:**
+
 | Stream 1 (obs) | Stream 3 (corrections) | Format |
 |-----------------|----------------------|--------|
 | BINEX (`.bnx`)  | CLAS L6D (`.l6`)     | `binex` + `clas` |
 | SBF (`.sbf`)    | CLAS L6D (`.l6`)     | `sbf` + `clas` |
 | RTCM3 (`.rtcm`) | UBX L6 (`.ubx`)      | `rtcm3` + `ubx` |
 
-For file replay, both streams require `.tag` time-tag files and the `::T::xN`
+**Dual-channel L6:**
+
+| Stream 1 (obs) | Stream 2 (L6 ch2) | Stream 3 (L6 ch1) | Format |
+|-----------------|-------------------|-------------------|--------|
+| BINEX (`.bnx`)  | CLAS L6D ch2      | CLAS L6D ch1      | `binex` + `clas` + `clas` |
+
+Stream 2 (internal index 1, the base-station slot unused in PPP-RTK) is
+repurposed for L6 ch2.  Channel mapping: `ch = (index == 1) ? 1 : 0`.
+
+For file replay, all streams require `.tag` time-tag files and the `::T::xN`
 suffix for synchronised playback (e.g. `::T::x10` for 10x speed).
 
 ---
@@ -43,32 +55,56 @@ python3 scripts/tools/gen_l6_tag.py   <file.l6>  --sync-tag <file.bnx.tag>
 
 ### 2. Configure
 
-Use `conf/claslib/rtkrcv.conf` as a template.  Key settings:
+Use `conf/claslib/rtkrcv.toml` (single-channel) or `rtkrcv_2ch.toml`
+(dual-channel) as a template.  Key settings:
 
-```ini
-# Positioning mode
-pos1-posmode       =ppp-rtk
-pos1-sateph        =brdc+ssrapc
+```toml
+[positioning]
+mode                = "ppp-rtk"
+frequency           = "l1+2"       # CLAS does not provide E5a bias; use nf=2
+satellite_ephemeris = "brdc+ssrapc"
+constellations      = 25           # GPS + Galileo + QZSS
 
-# Input streams with time-tag replay at 10x speed
-inpstr1-path       =./path/to/obs.bnx::T::x10
-inpstr1-format     =binex
-inpstr3-path       =./path/to/corrections.l6::T::x10
-inpstr3-format     =clas
+# Single-channel L6
+[streams.input.rover]
+path   = "./path/to/obs.bnx::T::x10"
+format = "binex"
 
-# Required support files
-file-cssrgridfile  =./tests/data/claslib/clas_grid.def
-file-blqfile       =./tests/data/claslib/clas_grid.blq
-file-eopfile       =./tests/data/claslib/igu00p01.erp
-file-rcvantfile    =./tests/data/claslib/igs14_L5copy.atx
-file-isbfile       =./tests/data/claslib/isb.tbl
-file-phacycfile    =./tests/data/claslib/l2csft.tbl
+[streams.input.correction]
+path   = "./path/to/corrections.l6::T::x10"
+format = "clas"
+
+# --- OR dual-channel L6 ---
+[streams.input.base]          # repurposed for L6 ch2
+path   = "./path/to/ch2.l6::T::x10"
+format = "clas"
+
+[streams.input.correction]    # L6 ch1
+path   = "./path/to/ch1.l6::T::x10"
+format = "clas"
+
+[files]
+cssr_grid     = "./tests/data/claslib/clas_grid.def"
+ocean_loading = "./tests/data/claslib/clas_grid.blq"
+eop           = "./tests/data/claslib/igu00p01.erp"
+receiver_atx  = "./tests/data/claslib/igs14_L5copy.atx"
+isb_table     = "./tests/data/claslib/isb.tbl"
+phase_cycle   = "./tests/data/claslib/l2csft.tbl"
 ```
+
+> **Important:** Use `frequency = "l1+2"` (nf=2) for CLAS.  CLAS does not
+> provide Galileo E5a bias corrections; using `"l1+2+3"` (nf=3) causes
+> false L1-L5 geometry-free cycle slip detection that destroys Galileo
+> ambiguities and severely degrades AR fix rate.
 
 ### 3. Run
 
 ```bash
-./build/rtkrcv -s -p 52005 -o conf/claslib/rtkrcv.conf
+# Single-channel
+./build/rtkrcv -s -p 52005 -o conf/claslib/rtkrcv.toml
+
+# Dual-channel
+./build/rtkrcv -s -p 52005 -o conf/claslib/rtkrcv_2ch.toml
 ```
 
 Flags:
@@ -82,25 +118,43 @@ Flags:
 ## Performance: Post-Processing vs Real-Time
 
 Both modes use the **same CLAS PPP-RTK engine** (`mrtk_ppp_rtk.c`) and the
-same CLAS correction decoder.  The comparison below uses the 2019/239 dataset
-(0627 station, 2019-08-27 16:00-17:00 UTC, Trimble NetR9).
+same CLAS correction decoder.
+
+### Single-channel (2019/239 dataset)
+
+0627 station, 2019-08-27 16:00-17:00 UTC, Trimble NetR9.
 
 | Metric | Post-Processing (rnx2rtkp) | Real-Time (rtkrcv) |
-|--------|---------------------------|-------------------|
+|--------|:---:|:---:|
 | Total epochs | 3,580 | 3,599 |
 | Fix (Q=4) | 3,575 (99.86%) | 3,517 (97.72%) |
 | Float (Q=5) | 5 (0.14%) | 5 (0.14%) |
 | SPP (Q=1) | 0 (0.00%) | 77 (2.14%) |
-| **Fix rate** | **99.86%** | **97.72%** |
+
+The 77 Q=1 epochs correspond to the initial convergence period (~77 seconds).
+After convergence, the steady-state fix rate is identical: ~99.86%.
+
+### Dual-channel (2025/157 dataset)
+
+0627 station, 2025-06-06 20:00-21:00 UTC, Trimble NetR9.
+
+| Metric | Post-Processing (rnx2rtkp) | Real-Time (rtkrcv) |
+|--------|:---:|:---:|
+| Fix (Q=4) | 3,579 (99.4%) | ~3,335 (92.6%) |
+| Float (Q=5) | ~21 (0.6%) | ~192 (5.3%) |
+| SPP (Q=1) | 0 (0.0%) | ~73 (2.0%) |
+
+RT fix rate varies slightly between runs due to stream timing, but consistently
+exceeds 90%.  The RT-PP gap is primarily from initial convergence and stream
+synchronisation latency.
 
 ### Analysis
 
-- The 77 Q=1 epochs in real-time correspond to the initial **convergence period**
-  (~77 seconds) before the Kalman filter reaches fixing state.  In post-processing,
-  the full navigation data is available from the start, enabling faster convergence.
-- After convergence, the steady-state fix rate is identical: ~99.86%.
-- The slight epoch count difference (3,599 vs 3,580) arises from the real-time
-  server processing more observation boundaries at stream startup.
+- After convergence, the steady-state fix rate is near-identical between PP and RT.
+- The slight epoch count differences arise from the real-time server processing
+  more observation boundaries at stream startup.
+- **nf=2 is required for CLAS** — Using nf=3 degrades the 2ch fix rate to ~67%
+  due to false L1-L5 GF cycle slips on Galileo (see Troubleshooting).
 
 ---
 
@@ -109,17 +163,19 @@ same CLAS correction decoder.  The comparison below uses the 2019/239 dataset
 ### Server Thread Flow
 
 ```
-strread(obs)  ──> decoderaw(0)  ──> rtkpos()  ──> writesol()
-strread(l6)   ──> decoderaw(2)  ──> clas_decode_msg()
-                                  ──> clas_bank_get_close()
-                                  ──> clas_update_global() ──> nav.ssr[]
+strread(obs)       ──> decoderaw(0)  ──> rtkpos()  ──> writesol()
+strread(l6_ch2)    ──> decoderaw(1)  ──> clas_decode_msg(ch=1)  [2ch only]
+strread(l6_ch1)    ──> decoderaw(2)  ──> clas_decode_msg(ch=0)
+                                       ──> clas_bank_get_close()
+                                       ──> clas_update_global() ──> nav.ssr[]
 ```
 
 The rtksvr main loop processes all input streams in each cycle:
 
 1. Read bytes from all streams (`strread`)
-2. Decode observations (stream 0) and corrections (stream 2)
-3. When a new observation epoch is available, call `rtkpos()` which
+2. Decode observations (stream 0) and corrections (stream 1/2)
+3. Channel mapping: `ch = (index == 1) ? 1 : 0` — stream 2 → ch0, stream 1 → ch1
+4. When a new observation epoch is available, call `rtkpos()` which
    accesses CLAS corrections via `nav->clas_ctx`
 
 ### L6 Rate Limiter
@@ -160,82 +216,102 @@ With `--sync-tag`, it aligns the L6 tag to a master tag file:
 - Reads the master's `tick_f` and base time
 - Computes the GNSS-time offset between L6 start and master start
 - Sets `tick_f` so the offset produces correct `strsync()` alignment
-- Detects compressed master tags (recorded faster than real-time) and
-  adjusts `tick_n` scaling accordingly
+- Matches `tick_n` scaling to the master tag's timing (handles both
+  real-time and non-real-time recorded masters)
 
 ---
 
 ## CTest Integration
 
-The `rtkrcv_rt_clas` test is registered in `CMakeLists.txt` and runs
-automatically as part of the full test suite:
+Two CLAS real-time tests are registered in `CMakeLists.txt`:
 
 ```bash
 cd build && ctest -R rtkrcv_rt_clas --output-on-failure
 ```
 
-The test:
+| Test | Config | Dataset | Wall time |
+|------|--------|---------|-----------|
+| `rtkrcv_rt_clas` | `rtkrcv.toml` | 2019/239 (1ch) | ~370s at x10 |
+| `rtkrcv_rt_clas_2ch` | `rtkrcv_2ch.toml` | 2025/157 (2ch) | ~372s at x10 |
+
+Each test:
 1. Extracts test data from `claslib_testdata.tar.gz` (fixture)
-2. Patches the config file with a temporary output path
-3. Runs `rtkrcv` at x10 speed (~370s wall time for 1 hour of data)
+2. Patches the TOML config with a temporary output path
+3. Runs `rtkrcv` at x10 speed
 4. Compares output line count against reference (>=90% threshold)
 
-The test uses `RESOURCE_LOCK rtkrcv_port` to prevent parallel execution
+Both tests use `RESOURCE_LOCK rtkrcv_port` to prevent parallel execution
 conflicts with the MADOCA `rtkrcv_rt` test.
 
 ---
 
 ## Configuration Reference
 
-### Key rtkrcv.conf Options for CLAS PPP-RTK
+### Key TOML Options for CLAS PPP-RTK
 
-| Option | Value | Description |
-|--------|-------|-------------|
-| `pos1-posmode` | `ppp-rtk` | CLAS PPP-RTK positioning mode |
-| `pos1-sateph` | `brdc+ssrapc` | Broadcast + SSR (antenna phase centre) |
-| `pos1-navsys` | `25` | GPS(1) + Galileo(8) + QZSS(16) |
-| `pos1-dynamics` | `on` | Enable kinematic dynamics model |
-| `pos1-ionoopt` | `est-adaptive` | Adaptive ionosphere estimation |
-| `pos1-gridsel` | `1000` | CLAS grid selection radius (m) |
-| `pos2-armode` | `fix-and-hold` | Ambiguity resolution mode |
-| `pos2-isb` | `on` | Inter-system bias correction |
-| `file-cssrgridfile` | `clas_grid.def` | CLAS grid definition (required) |
-| `misc-timeinterp` | `on` | Interpolate corrections between epochs |
-| `misc-maxobsloss` | `90` | Max epochs without obs before reset |
-| `misc-floatcnt` | `15` | Float epochs before fix attempt |
+| TOML Key | Value | Description |
+|----------|-------|-------------|
+| `positioning.mode` | `"ppp-rtk"` | CLAS PPP-RTK positioning mode |
+| `positioning.frequency` | `"l1+2"` | **Must be nf=2** (CLAS has no E5a bias) |
+| `positioning.satellite_ephemeris` | `"brdc+ssrapc"` | Broadcast + SSR (antenna phase centre) |
+| `positioning.constellations` | `25` | GPS(1) + Galileo(8) + QZSS(16) |
+| `positioning.dynamics` | `true` | Enable kinematic dynamics model |
+| `positioning.atmosphere.ionosphere` | `"est-adaptive"` | Adaptive ionosphere estimation |
+| `positioning.clas.grid_selection_radius` | `1000` | CLAS grid selection radius (m) |
+| `ambiguity_resolution.mode` | `"fix-and-hold"` | Ambiguity resolution mode |
+| `receiver.isb` | `true` | Inter-system bias correction |
+| `files.cssr_grid` | `"clas_grid.def"` | CLAS grid definition (required) |
+| `server.time_interpolation` | `true` | Interpolate corrections between epochs |
+| `server.max_obs_loss` | `90.0` | Max epochs without obs before reset |
+| `server.float_count` | `15` | Float epochs before fix attempt |
 
 ### Required Support Files
 
-| File | Description |
-|------|-------------|
-| `clas_grid.def` | CLAS correction grid point definitions |
-| `clas_grid.blq` | Ocean tide loading at grid points |
-| `igu00p01.erp` | Earth rotation parameters |
-| `igs14_L5copy.atx` | Satellite/receiver antenna phase centres |
-| `isb.tbl` | Inter-system bias correction table |
-| `l2csft.tbl` | L2C 1/4-cycle phase shift correction |
+| File | TOML Key | Description |
+|------|----------|-------------|
+| `clas_grid.def` | `files.cssr_grid` | CLAS correction grid point definitions |
+| `clas_grid.blq` | `files.ocean_loading` | Ocean tide loading at grid points |
+| `igu00p01.erp` | `files.eop` | Earth rotation parameters |
+| `igs14_L5copy.atx` | `files.receiver_atx` | Satellite/receiver antenna phase centres |
+| `isb.tbl` | `files.isb_table` | Inter-system bias correction table |
+| `l2csft.tbl` | `files.phase_cycle` | L2C 1/4-cycle phase shift correction |
 
 ---
 
 ## Troubleshooting
 
+### Low fix rate with Galileo satellites
+
+**Symptom:** Fix rate drops to ~67% (2ch) or noticeably below expected
+levels, with frequent ambiguity resets on Galileo satellites.
+
+**Cause:** `frequency = "l1+2+3"` (nf=3) in the config.  CLAS does not
+provide Galileo E5a (L5) phase bias corrections.  With nf=3, the L1-L5
+geometry-free cycle slip detector (`detslp_gf()` in `mrtk_ppp_rtk.c`)
+fires false slips at every epoch because `pbias[2]` remains invalid.
+This destroys Galileo ambiguities and prevents AR convergence.
+
+**Fix:** Set `frequency = "l1+2"` (nf=2).  This skips the L1-L5 GF
+slip detector entirely and uses only L1+L2 observations, which have
+valid CLAS bias corrections.
+
 ### All solutions are Q=1 (SPP)
 
 1. **Missing `clas_grid.def`**: This is the most common cause. Ensure
-   `file-cssrgridfile` points to a valid grid definition file. Without it,
+   `files.cssr_grid` points to a valid grid definition file. Without it,
    the CLAS engine cannot select atmospheric correction grids.
 
 2. **Missing `.tag` files**: Without time tags, both streams dump data at
    maximum speed with no synchronisation. Generate tags using the scripts
    in `scripts/tools/`.
 
-3. **Stream format mismatch**: Verify `inpstr1-format` and `inpstr3-format`
-   match the actual file formats.
+3. **Stream format mismatch**: Verify stream format settings match the
+   actual file formats.
 
 ### `clas grid file error` in output
 
 The grid definition file path is invalid or the file doesn't exist.
-Check `file-cssrgridfile` in the config.
+Check `files.cssr_grid` in the config.
 
 ### `Error: vt is NULL`
 
