@@ -141,53 +141,25 @@ def gen_tag(l6_path: str, sync_tag: str = None) -> str:
             tick_f = 0
 
         # Scale tick_n to match master's recording speed.
-        # If master tag spans T_master ms but covers D_master seconds of
-        # GNSS data, the effective recording speed is D_master / T_master.
-        # We must use the same scale so slave releases data at the same
-        # rate as the master.
+        # The master tag spans master_tick_range ms for some GNSS duration.
+        # L6 must use the same ms-per-GNSS-second scale so that strsync
+        # delivers L6 data at the same rate as the master.
         if master_tick_range > 0:
-            # Master's GNSS duration (seconds) — approximate from its file
-            # size or from header time vs L6 base time.  For robustness,
-            # use the time delta: master covers from master_base to at
-            # least L6 start + L6 duration.
-            # Simpler: assume master and L6 cover the same session (~1 hour)
-            # and scale by master_tick_range / n_frames.
-            # tick_scale = master_tick_range / n_frames  =>  ms per frame
-            # But n_frames is L6-specific.  Better: derive from dt_sec.
-            # Actually the most reliable: master_tick_range / (master_duration_s)
-            # We don't know master_duration_s exactly, but we know that
-            # at offset dt_sec, L6 frame 0 corresponds to master tick = dt_sec * tick_scale.
-            # So tick_scale = master_tick_range / (total GNSS duration of master).
-            # Since we can't know the master's GNSS duration precisely,
-            # use: dt_sec is the GNSS-time offset from master start to L6 start.
-            # The L6 session covers n_frames seconds.  If the master
-            # also covers at least dt_sec + n_frames seconds, then:
-            #   tick_scale ≈ master_tick_range / (dt_sec + n_frames)
-            # But this is fragile.  A simpler and more robust approach:
-            # if tick_f > 0, then dt_sec * tick_scale = tick_f - master_tick_f
-            # Actually, tick_f = master_tick_f + dt_sec * 1000 was already set
-            # using the 1000 ms/s scale.  We need to adjust both tick_f and
-            # tick_scale together.
-            #
-            # Most robust: detect if master tag is "compressed" by checking
-            # if master_tick_range < expected_real_time_range.
-            # Expected real-time range for 1 hour session = 3,600,000 ms.
-            # If master_tick_range << 3,600,000, it was recorded non-real-time.
-            expected_realtime = (dt_sec + n_frames) * 1000
-            if expected_realtime > 0 and master_tick_range < expected_realtime * 0.5:
-                # Master was recorded faster than real-time.
-                # Scale: ms_per_gnss_second = master_tick_range / master_gnss_duration
-                # Approximate master_gnss_duration as dt_sec + n_frames (assume
-                # master covers at least up to end of L6 data).
-                master_gnss_dur = dt_sec + n_frames
-                tick_scale = master_tick_range / master_gnss_dur if master_gnss_dur > 0 else 1000.0
-                # Recompute tick_f with the corrected scale
+            # Approximate the master's GNSS duration (seconds) as
+            # dt_sec (offset from master start to L6 start) + n_frames
+            # (L6 session length).  This assumes the master covers at
+            # least the full L6 session.
+            master_gnss_dur = dt_sec + n_frames
+            if master_gnss_dur > 0:
+                tick_scale = master_tick_range / master_gnss_dur
+                # Recompute tick_f with the matched scale
                 tick_f = int(master_tick_f + dt_sec * tick_scale)
                 if tick_f < 0:
                     tick_f = 0
-                print(f"  Master tag is compressed: {master_tick_range} ms for "
+                print(f"  Master tick range: {master_tick_range} ms for "
                       f"~{master_gnss_dur:.0f}s GNSS data")
-                print(f"  Tick scale: {tick_scale:.3f} ms/s (vs 1000 ms/s real-time)")
+                print(f"  Tick scale: {tick_scale:.3f} ms/s "
+                      f"(vs 1000 ms/s real-time)")
 
         master_dt = datetime.fromtimestamp(master_base, tz=timezone.utc)
         print(f"Sync with master tag: {sync_tag}")
