@@ -3,7 +3,7 @@
 
 [positioning]
 mode                = "ppp-rtk"  # (9:ppp-rtk)
-frequency           = "l1+2+3"  # (3:l1+2+3 for GPS/QZSS L1+L2+L5, Galileo E1+E5b)
+frequency           = "l1+2"  # (2:l1+2) CLAS does not provide E5a bias; nf=3 degrades AR
 solution_type       = "forward"  # (0:forward)
 elevation_mask      = 15.0  # (deg)
 dynamics            = true  # kinematic
