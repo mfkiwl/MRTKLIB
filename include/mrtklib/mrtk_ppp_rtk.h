@@ -34,8 +34,8 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_opt.h"
 #include "mrtklib/mrtk_rtkpos.h"
 
@@ -45,21 +45,21 @@ extern "C" {
  * @param[out]    buff  Output buffer
  * @return Number of bytes written
  */
-int ppprtk_outstat(rtk_t *rtk, char *buff);
+int ppprtk_outstat(rtk_t* rtk, char* buff);
 
 /**
  * @brief Compute number of estimated states for PPP-RTK.
  * @param[in] opt  Processing options
  * @return Total number of states (position + iono + trop + bias)
  */
-int ppp_rtk_nx(const prcopt_t *opt);
+int ppp_rtk_nx(const prcopt_t* opt);
 
 /**
  * @brief Compute number of non-ambiguity states for PPP-RTK.
  * @param[in] opt  Processing options
  * @return Number of non-ambiguity states (position + iono + trop)
  */
-int ppp_rtk_na(const prcopt_t *opt);
+int ppp_rtk_na(const prcopt_t* opt);
 
 /**
  * @brief PPP-RTK positioning for one epoch (CLAS).
@@ -73,20 +73,20 @@ int ppp_rtk_na(const prcopt_t *opt);
  * @param[in]     n    Number of observations
  * @param[in,out] nav  Navigation data (includes SSR via nav->ssr[])
  */
-void ppp_rtk_pos(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav);
+void ppp_rtk_pos(rtk_t* rtk, const obsd_t* obs, int n, nav_t* nav);
 
 /**
  * @brief Initialize RTK control struct for PPP-RTK positioning.
  * @param[in,out] rtk  RTK control struct to initialize
  * @param[in]     opt  Processing options
  */
-void rtkinit_ppp_rtk(rtk_t *rtk, const prcopt_t *opt);
+void rtkinit_ppp_rtk(rtk_t* rtk, const prcopt_t* opt);
 
 /**
  * @brief Free RTK control struct for PPP-RTK positioning.
  * @param[in,out] rtk  RTK control struct to free
  */
-void rtkfree_ppp_rtk(rtk_t *rtk);
+void rtkfree_ppp_rtk(rtk_t* rtk);
 
 #ifdef __cplusplus
 }

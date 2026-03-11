@@ -30,9 +30,10 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+
 #include "mrtklib/mrtk_context.h"
-#include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_obs.h"
 
 /*============================================================================
  * Debug Trace Functions
@@ -43,20 +44,20 @@ extern "C" {
  * @param[in] ctx   Runtime context (NULL = use global)
  * @param[in] file  Trace file path (opened for writing)
  */
-void traceopen(mrtk_ctx_t *ctx, const char *file);
+void traceopen(mrtk_ctx_t* ctx, const char* file);
 
 /**
  * @brief Close trace output.
  * @param[in] ctx  Runtime context (NULL = use global)
  */
-void traceclose(mrtk_ctx_t *ctx);
+void traceclose(mrtk_ctx_t* ctx);
 
 /**
  * @brief Set trace level.
  * @param[in] ctx    Runtime context (NULL = use global)
  * @param[in] level  Trace level (0:off, 1:error, 2:warn, 3:info, 4-5:debug)
  */
-void tracelevel(mrtk_ctx_t *ctx, int level);
+void tracelevel(mrtk_ctx_t* ctx, int level);
 
 /**
  * @brief Output trace message.
@@ -65,7 +66,7 @@ void tracelevel(mrtk_ctx_t *ctx, int level);
  * @param[in] format  printf-style format string
  * @param[in] ...     Format arguments
  */
-void trace(mrtk_ctx_t *ctx, int level, const char *format, ...);
+void trace(mrtk_ctx_t* ctx, int level, const char* format, ...);
 
 /**
  * @brief Output trace message with elapsed time.
@@ -74,7 +75,7 @@ void trace(mrtk_ctx_t *ctx, int level, const char *format, ...);
  * @param[in] format  printf-style format string
  * @param[in] ...     Format arguments
  */
-void tracet(mrtk_ctx_t *ctx, int level, const char *format, ...);
+void tracet(mrtk_ctx_t* ctx, int level, const char* format, ...);
 
 /**
  * @brief Output trace matrix.
@@ -86,7 +87,7 @@ void tracet(mrtk_ctx_t *ctx, int level, const char *format, ...);
  * @param[in] p      Total field width
  * @param[in] q      Decimal places
  */
-void tracemat(mrtk_ctx_t *ctx, int level, const double *A, int n, int m, int p, int q);
+void tracemat(mrtk_ctx_t* ctx, int level, const double* A, int n, int m, int p, int q);
 
 /**
  * @brief Output trace observation data.
@@ -95,7 +96,7 @@ void tracemat(mrtk_ctx_t *ctx, int level, const double *A, int n, int m, int p, 
  * @param[in] obs    Observation data array
  * @param[in] n      Number of observations
  */
-void traceobs(mrtk_ctx_t *ctx, int level, const obsd_t *obs, int n);
+void traceobs(mrtk_ctx_t* ctx, int level, const obsd_t* obs, int n);
 
 /**
  * @brief Output trace navigation data (GPS ephemeris).
@@ -103,7 +104,7 @@ void traceobs(mrtk_ctx_t *ctx, int level, const obsd_t *obs, int n);
  * @param[in] level  Trace level
  * @param[in] nav    Navigation data
  */
-void tracenav(mrtk_ctx_t *ctx, int level, const nav_t *nav);
+void tracenav(mrtk_ctx_t* ctx, int level, const nav_t* nav);
 
 /**
  * @brief Output trace GLONASS navigation data.
@@ -111,7 +112,7 @@ void tracenav(mrtk_ctx_t *ctx, int level, const nav_t *nav);
  * @param[in] level  Trace level
  * @param[in] nav    Navigation data
  */
-void tracegnav(mrtk_ctx_t *ctx, int level, const nav_t *nav);
+void tracegnav(mrtk_ctx_t* ctx, int level, const nav_t* nav);
 
 /**
  * @brief Output trace SBAS navigation data.
@@ -119,7 +120,7 @@ void tracegnav(mrtk_ctx_t *ctx, int level, const nav_t *nav);
  * @param[in] level  Trace level
  * @param[in] nav    Navigation data
  */
-void tracehnav(mrtk_ctx_t *ctx, int level, const nav_t *nav);
+void tracehnav(mrtk_ctx_t* ctx, int level, const nav_t* nav);
 
 /**
  * @brief Output trace precise ephemeris data.
@@ -127,7 +128,7 @@ void tracehnav(mrtk_ctx_t *ctx, int level, const nav_t *nav);
  * @param[in] level  Trace level
  * @param[in] nav    Navigation data
  */
-void tracepeph(mrtk_ctx_t *ctx, int level, const nav_t *nav);
+void tracepeph(mrtk_ctx_t* ctx, int level, const nav_t* nav);
 
 /**
  * @brief Output trace precise clock data.
@@ -135,7 +136,7 @@ void tracepeph(mrtk_ctx_t *ctx, int level, const nav_t *nav);
  * @param[in] level  Trace level
  * @param[in] nav    Navigation data
  */
-void tracepclk(mrtk_ctx_t *ctx, int level, const nav_t *nav);
+void tracepclk(mrtk_ctx_t* ctx, int level, const nav_t* nav);
 
 /**
  * @brief Output trace binary data.
@@ -144,7 +145,7 @@ void tracepclk(mrtk_ctx_t *ctx, int level, const nav_t *nav);
  * @param[in] p      Binary data
  * @param[in] n      Data length (bytes)
  */
-void traceb(mrtk_ctx_t *ctx, int level, const uint8_t *p, int n);
+void traceb(mrtk_ctx_t* ctx, int level, const uint8_t* p, int n);
 
 #ifdef __cplusplus
 }

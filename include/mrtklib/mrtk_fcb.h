@@ -29,8 +29,8 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_time.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_time.h"
 
 /*============================================================================
  * FCB Functions
@@ -41,7 +41,7 @@ extern "C" {
  * @param[in] file  FCB file path (wild-card * expanded)
  * @return Status (1: success, 0: failure)
  */
-int readfcb(const char *file);
+int readfcb(const char* file);
 
 /**
  * @brief Update satellite FCB structure with current biases.
@@ -50,7 +50,7 @@ int readfcb(const char *file);
  * @param[in]  mode  Mode (0: current, 1: all)
  * @return Number of updated biases
  */
-int udfcb_sat(osb_t *osb, gtime_t gt, int mode);
+int udfcb_sat(osb_t* osb, gtime_t gt, int mode);
 
 #ifdef __cplusplus
 }

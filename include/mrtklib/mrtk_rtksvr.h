@@ -30,66 +30,66 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_foundation.h"
+#include "mrtklib/mrtk_clas.h"
 #include "mrtklib/mrtk_context.h"
-#include "mrtklib/mrtk_time.h"
-#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_nav.h"
-#include "mrtklib/mrtk_sol.h"
+#include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_opt.h"
 #include "mrtklib/mrtk_rcvraw.h"
 #include "mrtklib/mrtk_rtcm.h"
 #include "mrtklib/mrtk_rtkpos.h"
+#include "mrtklib/mrtk_sol.h"
 #include "mrtklib/mrtk_stream.h"
-#include "mrtklib/mrtk_clas.h"
+#include "mrtklib/mrtk_time.h"
 
 /*============================================================================
  * RTK Server Type
  *===========================================================================*/
 
-typedef struct {        /* RTK server type */
-    int state;          /* server state (0:stop,1:running) */
-    int cycle;          /* processing cycle (ms) */
-    int nmeacycle;      /* NMEA request cycle (ms) (0:no req) */
-    int nmeareq;        /* NMEA request (0:no,1:nmeapos,2:single sol) */
-    double nmeapos[3];  /* NMEA request position (ecef) (m) */
-    int buffsize;       /* input buffer size (bytes) */
-    int format[3];      /* input format {rov,base,corr} */
-    solopt_t solopt[2]; /* output solution options {sol1,sol2} */
-    int navsel;         /* ephemeris select (0:all,1:rover,2:base,3:corr) */
-    int nsbs;           /* number of sbas message */
-    int nsol;           /* number of solution buffer */
-    rtk_t rtk;          /* RTK control/result struct */
-    int nb [3];         /* bytes in input buffers {rov,base} */
-    int nsb[2];         /* bytes in soulution buffers */
-    int npb[3];         /* bytes in input peek buffers */
-    uint8_t *buff[3];   /* input buffers {rov,base,corr} */
-    uint8_t *sbuf[2];   /* output buffers {sol1,sol2} */
-    uint8_t *pbuf[3];   /* peek buffers {rov,base,corr} */
-    sol_t solbuf[MAXSOLBUF]; /* solution buffer */
-    uint32_t nmsg[3][12]; /* input message counts */
-    raw_t  raw [3];     /* receiver raw control {rov,base,corr} */
-    rtcm_t rtcm[3];     /* RTCM control {rov,base,corr} */
-    sstat_t sstat;      /* single stat control */
-    gtime_t ftime[3];   /* download time {rov,base,corr} */
-    char files[3][MAXSTRPATH]; /* download paths {rov,base,corr} */
-    obs_t obs[3][MAXOBSBUF]; /* observation data {rov,base,corr} */
-    nav_t nav;          /* navigation data */
-    sbsmsg_t sbsmsg[MAXSBSMSG]; /* SBAS message buffer */
-    stream_t stream[8]; /* streams {rov,base,corr,sol1,sol2,logr,logb,logc} */
-    stream_t *moni;     /* monitor stream */
-    uint32_t tick;      /* start tick */
-    rtk_thread_t thread; /* server thread */
-    int cputime;        /* CPU time (ms) for a processing cycle */
-    int prcout;         /* missing observation data count */
-    int nave;           /* number of averaging base pos */
-    double rb_ave[3];   /* averaging base pos */
+typedef struct {                      /* RTK server type */
+    int state;                        /* server state (0:stop,1:running) */
+    int cycle;                        /* processing cycle (ms) */
+    int nmeacycle;                    /* NMEA request cycle (ms) (0:no req) */
+    int nmeareq;                      /* NMEA request (0:no,1:nmeapos,2:single sol) */
+    double nmeapos[3];                /* NMEA request position (ecef) (m) */
+    int buffsize;                     /* input buffer size (bytes) */
+    int format[3];                    /* input format {rov,base,corr} */
+    solopt_t solopt[2];               /* output solution options {sol1,sol2} */
+    int navsel;                       /* ephemeris select (0:all,1:rover,2:base,3:corr) */
+    int nsbs;                         /* number of sbas message */
+    int nsol;                         /* number of solution buffer */
+    rtk_t rtk;                        /* RTK control/result struct */
+    int nb[3];                        /* bytes in input buffers {rov,base} */
+    int nsb[2];                       /* bytes in soulution buffers */
+    int npb[3];                       /* bytes in input peek buffers */
+    uint8_t* buff[3];                 /* input buffers {rov,base,corr} */
+    uint8_t* sbuf[2];                 /* output buffers {sol1,sol2} */
+    uint8_t* pbuf[3];                 /* peek buffers {rov,base,corr} */
+    sol_t solbuf[MAXSOLBUF];          /* solution buffer */
+    uint32_t nmsg[3][12];             /* input message counts */
+    raw_t raw[3];                     /* receiver raw control {rov,base,corr} */
+    rtcm_t rtcm[3];                   /* RTCM control {rov,base,corr} */
+    sstat_t sstat;                    /* single stat control */
+    gtime_t ftime[3];                 /* download time {rov,base,corr} */
+    char files[3][MAXSTRPATH];        /* download paths {rov,base,corr} */
+    obs_t obs[3][MAXOBSBUF];          /* observation data {rov,base,corr} */
+    nav_t nav;                        /* navigation data */
+    sbsmsg_t sbsmsg[MAXSBSMSG];       /* SBAS message buffer */
+    stream_t stream[8];               /* streams {rov,base,corr,sol1,sol2,logr,logb,logc} */
+    stream_t* moni;                   /* monitor stream */
+    uint32_t tick;                    /* start tick */
+    rtk_thread_t thread;              /* server thread */
+    int cputime;                      /* CPU time (ms) for a processing cycle */
+    int prcout;                       /* missing observation data count */
+    int nave;                         /* number of averaging base pos */
+    double rb_ave[3];                 /* averaging base pos */
     char cmds_periodic[3][MAXRCVCMD]; /* periodic commands */
-    char cmd_reset[MAXRCVCMD]; /* reset command */
-    double bl_reset;    /* baseline length to reset (km) */
-    rtk_lock_t lock;    /* lock flag */
-    mrtk_ctx_t *ctx;    /* runtime context */
-    clas_ctx_t *clas;   /* CLAS CSSR decoder context (NULL if unused) */
+    char cmd_reset[MAXRCVCMD];        /* reset command */
+    double bl_reset;                  /* baseline length to reset (km) */
+    rtk_lock_t lock;                  /* lock flag */
+    mrtk_ctx_t* ctx;                  /* runtime context */
+    clas_ctx_t* clas;                 /* CLAS CSSR decoder context (NULL if unused) */
 } rtksvr_t;
 
 /*============================================================================
@@ -101,13 +101,13 @@ typedef struct {        /* RTK server type */
  * @param[in,out] svr  RTK server struct
  * @return status (0:error,1:ok)
  */
-int rtksvrinit(rtksvr_t *svr);
+int rtksvrinit(rtksvr_t* svr);
 
 /**
  * @brief Free RTK server resources.
  * @param[in,out] svr  RTK server struct
  */
-void rtksvrfree(rtksvr_t *svr);
+void rtksvrfree(rtksvr_t* svr);
 
 /**
  * @brief Start RTK server.
@@ -131,18 +131,16 @@ void rtksvrfree(rtksvr_t *svr);
  * @param[out]    errmsg        error message
  * @return status (0:error,1:ok)
  */
-int rtksvrstart(rtksvr_t *svr, int cycle, int buffsize, int *strs, char **paths,
-                int *formats, int navsel, char **cmds, char **cmds_periodic,
-                char **rcvopts, int nmeacycle, int nmeareq,
-                const double *nmeapos, prcopt_t *prcopt, solopt_t *solopt,
-                stream_t *moni, gtime_t rst, char *errmsg);
+int rtksvrstart(rtksvr_t* svr, int cycle, int buffsize, int* strs, char** paths, int* formats, int navsel, char** cmds,
+                char** cmds_periodic, char** rcvopts, int nmeacycle, int nmeareq, const double* nmeapos,
+                prcopt_t* prcopt, solopt_t* solopt, stream_t* moni, gtime_t rst, char* errmsg);
 
 /**
  * @brief Stop RTK server.
  * @param[in,out] svr   RTK server struct
  * @param[in]     cmds  shutdown commands (3)
  */
-void rtksvrstop(rtksvr_t *svr, char **cmds);
+void rtksvrstop(rtksvr_t* svr, char** cmds);
 
 /**
  * @brief Open RTK server output/log stream.
@@ -153,27 +151,26 @@ void rtksvrstop(rtksvr_t *svr, char **cmds);
  * @param[in]     solopt  solution options
  * @return status (0:error,1:ok)
  */
-int rtksvropenstr(rtksvr_t *svr, int index, int str, const char *path,
-                  const solopt_t *solopt);
+int rtksvropenstr(rtksvr_t* svr, int index, int str, const char* path, const solopt_t* solopt);
 
 /**
  * @brief Close RTK server output/log stream.
  * @param[in,out] svr    RTK server struct
  * @param[in]     index  stream index
  */
-void rtksvrclosestr(rtksvr_t *svr, int index);
+void rtksvrclosestr(rtksvr_t* svr, int index);
 
 /**
  * @brief Lock RTK server mutex.
  * @param[in,out] svr  RTK server struct
  */
-void rtksvrlock(rtksvr_t *svr);
+void rtksvrlock(rtksvr_t* svr);
 
 /**
  * @brief Unlock RTK server mutex.
  * @param[in,out] svr  RTK server struct
  */
-void rtksvrunlock(rtksvr_t *svr);
+void rtksvrunlock(rtksvr_t* svr);
 
 /**
  * @brief Get observation data status.
@@ -187,8 +184,7 @@ void rtksvrunlock(rtksvr_t *svr);
  * @param[out] vsat  valid satellite flags
  * @return number of satellites
  */
-int rtksvrostat(rtksvr_t *svr, int type, gtime_t *time, int *sat, double *az,
-                double *el, int **snr, int *vsat);
+int rtksvrostat(rtksvr_t* svr, int type, gtime_t* time, int* sat, double* az, double* el, int** snr, int* vsat);
 
 /**
  * @brief Get stream status.
@@ -196,7 +192,7 @@ int rtksvrostat(rtksvr_t *svr, int type, gtime_t *time, int *sat, double *az,
  * @param[out]    sstat  stream status
  * @param[out]    msg    status message
  */
-void rtksvrsstat(rtksvr_t *svr, int *sstat, char *msg);
+void rtksvrsstat(rtksvr_t* svr, int* sstat, char* msg);
 
 /**
  * @brief Mark current position in solution.
@@ -205,7 +201,7 @@ void rtksvrsstat(rtksvr_t *svr, int *sstat, char *msg);
  * @param[in]     comment  mark comment
  * @return status (0:error,1:ok)
  */
-int rtksvrmark(rtksvr_t *svr, const char *name, const char *comment);
+int rtksvrmark(rtksvr_t* svr, const char* name, const char* comment);
 
 #ifdef __cplusplus
 }

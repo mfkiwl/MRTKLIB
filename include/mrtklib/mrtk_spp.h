@@ -30,13 +30,13 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_context.h"
-#include "mrtklib/mrtk_time.h"
+#include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_nav.h"
 #include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_opt.h"
 #include "mrtklib/mrtk_sol.h"
+#include "mrtklib/mrtk_time.h"
 
 /*============================================================================
  * Single-Point Positioning Functions
@@ -56,9 +56,8 @@ extern "C" {
  * @param[out]   msg   Error message for error exit
  * @return Status (1:ok, 0:error)
  */
-int pntpos(mrtk_ctx_t *ctx, const obsd_t *obs, int n, const nav_t *nav,
-           const prcopt_t *opt, sol_t *sol, double *azel, ssat_t *ssat,
-           char *msg);
+int pntpos(mrtk_ctx_t* ctx, const obsd_t* obs, int n, const nav_t* nav, const prcopt_t* opt, sol_t* sol, double* azel,
+           ssat_t* ssat, char* msg);
 
 #ifdef __cplusplus
 }

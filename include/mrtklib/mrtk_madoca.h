@@ -30,13 +30,13 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_context.h"
-#include "mrtklib/mrtk_time.h"
-#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_rtcm.h"
 #include "mrtklib/mrtk_rtkpos.h"
+#include "mrtklib/mrtk_time.h"
 
 /*============================================================================
  * MADOCA-PPP Functions
@@ -66,7 +66,7 @@ void init_mcssr(const gtime_t gt);
  * @return Status (-1: error, 0: no message, 10: input SSR messages)
  * @note Before calling this function, call init_mcssr().
  */
-int decode_qzss_l6emsg(rtcm_t *rtcm);
+int decode_qzss_l6emsg(rtcm_t* rtcm);
 
 /**
  * @brief Stack QZSS L6E message and synchronize frame with L6 preamble.
@@ -75,7 +75,7 @@ int decode_qzss_l6emsg(rtcm_t *rtcm);
  * @return Status (-1: error, 0: no message, 10: input CSSR messages)
  * @note Before calling this function, call init_mcssr().
  */
-int input_qzssl6e(rtcm_t *rtcm, const uint8_t data);
+int input_qzssl6e(rtcm_t* rtcm, const uint8_t data);
 
 /**
  * @brief Fetch next QZSS L6E message and input a message from file.
@@ -84,7 +84,7 @@ int input_qzssl6e(rtcm_t *rtcm, const uint8_t data);
  * @return Status (-2: end of file, -1...10: same as input_qzssl6e())
  * @note Same as input_qzssl6e().
  */
-int input_qzssl6ef(rtcm_t *rtcm, FILE *fp);
+int input_qzssl6ef(rtcm_t* rtcm, FILE* fp);
 
 /**
  * @brief Select MADOCA-PPP code/phase bias code from observation code.
@@ -93,7 +93,6 @@ int input_qzssl6ef(rtcm_t *rtcm, FILE *fp);
  * @return MADOCA-PPP CB/PB code
  */
 int mcssr_sel_biascode(const int sys, const int code);
-
 
 #ifdef __cplusplus
 }

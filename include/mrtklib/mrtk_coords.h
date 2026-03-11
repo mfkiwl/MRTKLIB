@@ -46,14 +46,14 @@ extern "C" {
  * @param[out] dms   Degree-minute-second {deg, min, sec}
  * @param[in]  ndec  Number of decimals of second
  */
-void deg2dms(double deg, double *dms, int ndec);
+void deg2dms(double deg, double* dms, int ndec);
 
 /**
  * @brief Convert degree-minute-second to degree.
  * @param[in] dms  Degree-minute-second {deg, min, sec}
  * @return Degree
  */
-double dms2deg(const double *dms);
+double dms2deg(const double* dms);
 
 /*============================================================================
  * ECEF / Geodetic Conversions
@@ -65,7 +65,7 @@ double dms2deg(const double *dms);
  * @param[out] pos  Geodetic position {lat, lon, h} (rad, m)
  * @note WGS84, ellipsoidal height.
  */
-void ecef2pos(const double *r, double *pos);
+void ecef2pos(const double* r, double* pos);
 
 /**
  * @brief Transform geodetic position to ECEF position.
@@ -73,7 +73,7 @@ void ecef2pos(const double *r, double *pos);
  * @param[out] r    ECEF position {x, y, z} (m)
  * @note WGS84, ellipsoidal height.
  */
-void pos2ecef(const double *pos, double *r);
+void pos2ecef(const double* pos, double* r);
 
 /*============================================================================
  * ENU / ECEF Transformations
@@ -85,7 +85,7 @@ void pos2ecef(const double *pos, double *r);
  * @param[out] E    ECEF to local coord transformation matrix (3x3)
  * @note Matrix stored by column-major order (Fortran convention).
  */
-void xyz2enu(const double *pos, double *E);
+void xyz2enu(const double* pos, double* E);
 
 /**
  * @brief Transform ECEF vector to local tangential coordinate.
@@ -93,7 +93,7 @@ void xyz2enu(const double *pos, double *E);
  * @param[in]  r    Vector in ECEF coordinate {x, y, z}
  * @param[out] e    Vector in local tangential coordinate {e, n, u}
  */
-void ecef2enu(const double *pos, const double *r, double *e);
+void ecef2enu(const double* pos, const double* r, double* e);
 
 /**
  * @brief Transform local tangential coordinate vector to ECEF.
@@ -101,7 +101,7 @@ void ecef2enu(const double *pos, const double *r, double *e);
  * @param[in]  e    Vector in local tangential coordinate {e, n, u}
  * @param[out] r    Vector in ECEF coordinate {x, y, z}
  */
-void enu2ecef(const double *pos, const double *e, double *r);
+void enu2ecef(const double* pos, const double* e, double* r);
 
 /**
  * @brief Transform ECEF covariance to local tangential coordinate.
@@ -109,7 +109,7 @@ void enu2ecef(const double *pos, const double *e, double *r);
  * @param[in]  P    Covariance in ECEF coordinate
  * @param[out] Q    Covariance in local tangential coordinate
  */
-void covenu(const double *pos, const double *P, double *Q);
+void covenu(const double* pos, const double* P, double* Q);
 
 /**
  * @brief Transform local ENU covariance to ECEF coordinate.
@@ -117,7 +117,7 @@ void covenu(const double *pos, const double *P, double *Q);
  * @param[in]  Q    Covariance in local ENU coordinate
  * @param[out] P    Covariance in ECEF coordinate
  */
-void covecef(const double *pos, const double *Q, double *P);
+void covecef(const double* pos, const double* Q, double* P);
 
 /*============================================================================
  * ECI / ECEF Transformation
@@ -131,7 +131,7 @@ void covecef(const double *pos, const double *Q, double *P);
  * @param[in,out] gmst  Greenwich mean sidereal time (rad) (NULL: no output)
  * @note Not thread-safe (uses static cache).
  */
-void eci2ecef(gtime_t tutc, const double *erpv, double *U, double *gmst);
+void eci2ecef(gtime_t tutc, const double* erpv, double* U, double* gmst);
 
 /*============================================================================
  * Positioning Geometry
@@ -145,7 +145,7 @@ void eci2ecef(gtime_t tutc, const double *erpv, double *U, double *gmst);
  * @return Geometric distance (m) (<0: error/no satellite position)
  * @note Distance includes Sagnac effect correction.
  */
-double geodist(const double *rs, const double *rr, double *e);
+double geodist(const double* rs, const double* rr, double* e);
 
 /**
  * @brief Compute satellite azimuth/elevation angle.
@@ -155,7 +155,7 @@ double geodist(const double *rs, const double *rr, double *e);
  *                      (0.0<=azel[0]<2*pi, -pi/2<=azel[1]<=pi/2)
  * @return Elevation angle (rad)
  */
-double satazel(const double *pos, const double *e, double *azel);
+double satazel(const double* pos, const double* e, double* azel);
 
 /**
  * @brief Compute DOP (dilution of precision).
@@ -165,7 +165,7 @@ double satazel(const double *pos, const double *e, double *azel);
  * @param[out] dop    DOPs {GDOP, PDOP, HDOP, VDOP}
  * @note dop[0]-[3] return 0 in case of DOP computation error.
  */
-void dops(int ns, const double *azel, double elmin, double *dop);
+void dops(int ns, const double* azel, double elmin, double* dop);
 
 #ifdef __cplusplus
 }

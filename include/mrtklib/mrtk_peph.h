@@ -46,19 +46,19 @@ extern "C" {
  * @brief ERP (earth rotation parameter) data type.
  */
 typedef struct {
-    double mjd;         /* mjd (days) */
-    double xp,yp;       /* pole offset (rad) */
-    double xpr,ypr;     /* pole offset rate (rad/day) */
-    double ut1_utc;     /* ut1-utc (s) */
-    double lod;         /* length of day (s/day) */
+    double mjd;      /* mjd (days) */
+    double xp, yp;   /* pole offset (rad) */
+    double xpr, ypr; /* pole offset rate (rad/day) */
+    double ut1_utc;  /* ut1-utc (s) */
+    double lod;      /* length of day (s/day) */
 } erpd_t;
 
 /**
  * @brief ERP (earth rotation parameter) type.
  */
 typedef struct {
-    int n,nmax;         /* number and max number of data */
-    erpd_t *data;       /* earth rotation parameter data */
+    int n, nmax;  /* number and max number of data */
+    erpd_t* data; /* earth rotation parameter data */
 } erp_t;
 
 /*============================================================================
@@ -71,7 +71,7 @@ typedef struct {
  * @param[out] erp   Earth rotation parameters
  * @return Status (1:ok, 0:file open error)
  */
-int readerp(const char *file, erp_t *erp);
+int readerp(const char* file, erp_t* erp);
 
 /**
  * @brief Get earth rotation parameter values at specified time.
@@ -80,7 +80,7 @@ int readerp(const char *file, erp_t *erp);
  * @param[out] erpv  ERP values {xp,yp,ut1_utc,lod} (rad,rad,s,s/d)
  * @return Status (1:ok, 0:error)
  */
-int geterp(const erp_t *erp, gtime_t time, double *erpv);
+int geterp(const erp_t* erp, gtime_t time, double* erpv);
 
 #ifdef __cplusplus
 }

@@ -31,8 +31,8 @@ extern "C" {
 #endif
 
 #include "mrtklib/mrtk_foundation.h"
-#include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_rtkpos.h"
 
 /**
@@ -49,8 +49,7 @@ extern "C" {
  * @param[in,out] nav  Navigation data (SSR corrections)
  * @return 1 if solution updated, 0 otherwise
  */
-extern int relposvrs(rtk_t *rtk, const obsd_t *obs, int nu, int *nr,
-                     nav_t *nav);
+extern int relposvrs(rtk_t* rtk, const obsd_t* obs, int nu, int* nr, nav_t* nav);
 
 #ifdef __cplusplus
 }

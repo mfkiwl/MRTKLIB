@@ -45,7 +45,7 @@ extern "C" {
  * @param[in] len   Bit length (bits) (len<=32)
  * @return Extracted unsigned bits
  */
-uint32_t getbitu(const uint8_t *buff, int pos, int len);
+uint32_t getbitu(const uint8_t* buff, int pos, int len);
 
 /**
  * @brief Extract signed bits from byte data.
@@ -54,7 +54,7 @@ uint32_t getbitu(const uint8_t *buff, int pos, int len);
  * @param[in] len   Bit length (bits) (len<=32)
  * @return Extracted signed bits
  */
-int32_t getbits(const uint8_t *buff, int pos, int len);
+int32_t getbits(const uint8_t* buff, int pos, int len);
 
 /**
  * @brief Set unsigned bits in byte data.
@@ -63,7 +63,7 @@ int32_t getbits(const uint8_t *buff, int pos, int len);
  * @param[in]     len   Bit length (bits) (len<=32)
  * @param[in]     data  Unsigned data to set
  */
-void setbitu(uint8_t *buff, int pos, int len, uint32_t data);
+void setbitu(uint8_t* buff, int pos, int len, uint32_t data);
 
 /**
  * @brief Set signed bits in byte data.
@@ -72,7 +72,7 @@ void setbitu(uint8_t *buff, int pos, int len, uint32_t data);
  * @param[in]     len   Bit length (bits) (len<=32)
  * @param[in]     data  Signed data to set
  */
-void setbits(uint8_t *buff, int pos, int len, int32_t data);
+void setbits(uint8_t* buff, int pos, int len, int32_t data);
 
 /*============================================================================
  * CRC Parity Functions
@@ -85,7 +85,7 @@ void setbits(uint8_t *buff, int pos, int len, int32_t data);
  * @return CRC-32 parity
  * @note See NovAtel OEMV firmware manual 1.7 32-bit CRC
  */
-uint32_t rtk_crc32(const uint8_t *buff, int len);
+uint32_t rtk_crc32(const uint8_t* buff, int len);
 
 /**
  * @brief Compute CRC-24Q parity for SBAS and RTCM3.
@@ -93,7 +93,7 @@ uint32_t rtk_crc32(const uint8_t *buff, int len);
  * @param[in] len   Data length (bytes)
  * @return CRC-24Q parity
  */
-uint32_t rtk_crc24q(const uint8_t *buff, int len);
+uint32_t rtk_crc24q(const uint8_t* buff, int len);
 
 /**
  * @brief Compute CRC-16 parity for BINEX and NVS.
@@ -101,7 +101,7 @@ uint32_t rtk_crc24q(const uint8_t *buff, int len);
  * @param[in] len   Data length (bytes)
  * @return CRC-16 parity
  */
-uint16_t rtk_crc16(const uint8_t *buff, int len);
+uint16_t rtk_crc16(const uint8_t* buff, int len);
 
 /*============================================================================
  * Navigation Data Word Decoding
@@ -115,7 +115,7 @@ uint16_t rtk_crc16(const uint8_t *buff, int len);
  * @return Status (1:ok, 0:parity error)
  * @note See reference [1] 20.3.5.2 user parity algorithm
  */
-int decode_word(uint32_t word, uint8_t *data);
+int decode_word(uint32_t word, uint8_t* data);
 
 #ifdef __cplusplus
 }

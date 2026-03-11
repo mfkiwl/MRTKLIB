@@ -45,7 +45,7 @@ extern "C" {
  *       other files are recognized as NGS format.
  *       Only supports non-azimuth-dependent parameters.
  */
-int readpcv(const char *file, pcvs_t *pcvs);
+int readpcv(const char* file, pcvs_t* pcvs);
 
 /**
  * @brief Search antenna parameter by satellite number or antenna type.
@@ -55,8 +55,7 @@ int readpcv(const char *file, pcvs_t *pcvs);
  * @param[in] pcvs  Antenna parameters
  * @return Antenna parameter (NULL: no antenna found)
  */
-pcv_t *searchpcv(int sat, const char *type, gtime_t time,
-                 const pcvs_t *pcvs);
+pcv_t* searchpcv(int sat, const char* type, gtime_t time, const pcvs_t* pcvs);
 
 /*============================================================================
  * Antenna Model Functions
@@ -71,8 +70,7 @@ pcv_t *searchpcv(int sat, const char *type, gtime_t time,
  * @param[out] dant  Range offsets for each frequency (m)
  * @note Current version does not support azimuth dependent terms
  */
-void antmodel(const pcv_t *pcv, const double *del, const double *azel,
-              int opt, double *dant);
+void antmodel(const pcv_t* pcv, const double* del, const double* azel, int opt, double* dant);
 
 /**
  * @brief Compute satellite antenna phase center parameters.
@@ -80,7 +78,7 @@ void antmodel(const pcv_t *pcv, const double *del, const double *azel,
  * @param[in]  nadir  Nadir angle for satellite (rad)
  * @param[out] dant   Range offsets for each frequency (m)
  */
-void antmodel_s(const pcv_t *pcv, double nadir, double *dant);
+void antmodel_s(const pcv_t* pcv, double nadir, double* dant);
 
 #ifdef __cplusplus
 }

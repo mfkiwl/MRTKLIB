@@ -25,83 +25,80 @@
  * References:
  *   [1] upstream claslib util/ssr2obs/ssr2obs.c
  */
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
+#include "mrtklib/mrtk_clas.h"
 #include "mrtklib/mrtk_const.h"
-#include "mrtklib/mrtk_opt.h"
-#include "mrtklib/mrtk_nav.h"
-#include "mrtklib/mrtk_obs.h"
-#include "mrtklib/mrtk_sol.h"
-#include "mrtklib/mrtk_time.h"
 #include "mrtklib/mrtk_coords.h"
 #include "mrtklib/mrtk_mat.h"
-#include "mrtklib/mrtk_trace.h"
-#include "mrtklib/mrtk_sys.h"
+#include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_opt.h"
 #include "mrtklib/mrtk_options.h"
 #include "mrtklib/mrtk_rinex.h"
 #include "mrtklib/mrtk_rtcm.h"
 #include "mrtklib/mrtk_rtkpos.h"
-#include "mrtklib/mrtk_clas.h"
+#include "mrtklib/mrtk_sol.h"
+#include "mrtklib/mrtk_sys.h"
+#include "mrtklib/mrtk_time.h"
+#include "mrtklib/mrtk_trace.h"
 
 /* constants and macros ------------------------------------------------------*/
 
-#define PROGNAME    "ssr2obs"
-#define PROG_VER    "1.0"
+#define PROGNAME "ssr2obs"
+#define PROG_VER "1.0"
 
-#define OSR_RCORR   1                 /* output mode: range corrections */
-#define OSR_RTCM3   2                 /* output mode: RTCM 3 MSM */
-#define OSR_RINEX   3                 /* output mode: RINEX OBS */
+#define OSR_RCORR 1 /* output mode: range corrections */
+#define OSR_RTCM3 2 /* output mode: RTCM 3 MSM */
+#define OSR_RINEX 3 /* output mode: RINEX OBS */
 
-#define OSR_SYS     (SYS_GPS|SYS_QZS|SYS_GAL)
-#define OSR_NFREQ   4
-#define OSR_ELMASK  0.0
-#define OSR_RNXVER  302            /* RINEX version x100 */
-#define OSR_MARKER  "CLAS_FOR_VRS"
+#define OSR_SYS (SYS_GPS | SYS_QZS | SYS_GAL)
+#define OSR_NFREQ 4
+#define OSR_ELMASK 0.0
+#define OSR_RNXVER 302 /* RINEX version x100 */
+#define OSR_MARKER "CLAS_FOR_VRS"
 
-#define MAXFILE     16
-#define OUT_FILE    "out.txt"
+#define MAXFILE 16
+#define OUT_FILE "out.txt"
 
 #ifndef CLIGHT
-#define CLIGHT      299792458.0
+#define CLIGHT 299792458.0
 #endif
 #ifndef D2R
-#define D2R         (3.1415926535897932384626433832795/180.0)
+#define D2R (3.1415926535897932384626433832795 / 180.0)
 #endif
 
 /* global variables ----------------------------------------------------------*/
 
-static const char *usage[] = {
-    "usage: ssr2obs [options] file ...",
-    "",
-    "options: ([] as default)",
-    "  -ts y/m/d h:m:s   start time of OBS (GPST) []",
-    "  -te y/m/d h:m:s   end time of OBS   (GPST) [start time + 1h]",
-    "  -ti tint          time interval (s) [1]",
-    "  -k  file          configuration file []",
-    "  -o  file          output file [" OUT_FILE "]",
-    "  -r                output RINEX3 OBS (default)",
-    "  -b                output RTCM3 MSM4 binary",
-    "  -c  file          also write OSR corrections CSV to file",
-    "  -x                debug trace level (0: no trace) [0]",
-    "  file ...          QZSS L6 message file (.l6/.L6) and RINEX NAV files",
-    NULL
-};
+static const char* usage[] = {"usage: ssr2obs [options] file ...",
+                              "",
+                              "options: ([] as default)",
+                              "  -ts y/m/d h:m:s   start time of OBS (GPST) []",
+                              "  -te y/m/d h:m:s   end time of OBS   (GPST) [start time + 1h]",
+                              "  -ti tint          time interval (s) [1]",
+                              "  -k  file          configuration file []",
+                              "  -o  file          output file [" OUT_FILE "]",
+                              "  -r                output RINEX3 OBS (default)",
+                              "  -b                output RTCM3 MSM4 binary",
+                              "  -c  file          also write OSR corrections CSV to file",
+                              "  -x                debug trace level (0: no trace) [0]",
+                              "  file ...          QZSS L6 message file (.l6/.L6) and RINEX NAV files",
+                              NULL};
 
-#define OSR_CSV_HDR \
+#define OSR_CSV_HDR                         \
     "msg,tow,sys,prn,pbias0,pbias1,pbias2," \
-    "cbias0,cbias1,cbias2,trop,iono," \
+    "cbias0,cbias1,cbias2,trop,iono,"       \
     "CPC0,CPC1,CPC2,PRC0,PRC1,PRC2,sis\n"
 
 static rnxopt_t rnx_opt = {0};
 
 /* find and open L6 file from input list -------------------------------------*/
-static FILE *open_L6(char **infile, int n)
-{
-    FILE *fp;
-    char *ext;
+static FILE* open_L6(char** infile, int n) {
+    FILE* fp;
+    char* ext;
     int i;
 
     for (i = 0; i < n; i++) {
@@ -124,13 +121,9 @@ static FILE *open_L6(char **infile, int n)
 }
 
 /* set RINEX output options --------------------------------------------------*/
-static void set_rnxopt(rnxopt_t *opt, char **infile, int n,
-                       const prcopt_t *prcopt)
-{
+static void set_rnxopt(rnxopt_t* opt, char** infile, int n, const prcopt_t* prcopt) {
     static const int sys[] = {SYS_GPS, SYS_GLO, SYS_GAL, SYS_QZS};
-    static const char *tobs[][OSR_NFREQ] = {
-        {"1C", "2W", "2X", "5X"}, {"1C", "2P"}, {"1X", "5X"}, {"1C", "2X", "5X"}
-    };
+    static const char* tobs[][OSR_NFREQ] = {{"1C", "2W", "2X", "5X"}, {"1C", "2P"}, {"1X", "5X"}, {"1C", "2X", "5X"}};
     gtime_t time = {0};
     int i, j, nobs;
 
@@ -160,10 +153,8 @@ static void set_rnxopt(rnxopt_t *opt, char **infile, int n,
 }
 
 /* open output file ----------------------------------------------------------*/
-static FILE *open_osr(const char *file, nav_t *nav, int mode,
-                      char **infile, int n, const prcopt_t *prcopt)
-{
-    FILE *fp = NULL;
+static FILE* open_osr(const char* file, nav_t* nav, int mode, char** infile, int n, const prcopt_t* prcopt) {
+    FILE* fp = NULL;
 
     if (!(fp = fopen(file, mode == OSR_RTCM3 ? "wb" : "w"))) {
         fprintf(stderr, "Output file open error. %s\n", file);
@@ -177,8 +168,7 @@ static FILE *open_osr(const char *file, nav_t *nav, int mode,
 }
 
 /* close output file ---------------------------------------------------------*/
-static void close_osr(FILE *fp, nav_t *nav, int mode)
-{
+static void close_osr(FILE* fp, nav_t* nav, int mode) {
     if (mode == OSR_RINEX) {
         rewind(fp);
         outrnxobsh(fp, &rnx_opt, nav);
@@ -187,8 +177,7 @@ static void close_osr(FILE *fp, nav_t *nav, int mode)
 }
 
 /* write RINEX observation body ----------------------------------------------*/
-static void write_osr(FILE *fp, int mode, const obs_t *obs, nav_t *nav)
-{
+static void write_osr(FILE* fp, int mode, const obs_t* obs, nav_t* nav) {
     if (mode == OSR_RINEX) {
         if (obs->n > 0) {
             outrnxobsb(fp, &rnx_opt, obs->data, obs->n, 0);
@@ -201,32 +190,31 @@ static void write_osr(FILE *fp, int mode, const obs_t *obs, nav_t *nav)
 }
 
 /* write OSR corrections as CSV (one row per satellite) ----------------------*/
-static void output_osr_csv(FILE *fp, gtime_t time, int sat,
-                            const clas_osrd_t *osr, int *first)
-{
+static void output_osr_csv(FILE* fp, gtime_t time, int sat, const clas_osrd_t* osr, int* first) {
     int sys, prn, week;
     double tow;
 
-    if (*first) { fprintf(fp, OSR_CSV_HDR); *first = 0; }
+    if (*first) {
+        fprintf(fp, OSR_CSV_HDR);
+        *first = 0;
+    }
     sys = satsys(sat, &prn);
     tow = time2gpst(time, &week);
     fprintf(fp, "OSRRES,%.1f,%d,%d,", tow, sys, prn);
     fprintf(fp, "%.3f,%.3f,%.3f,", osr->pbias[0], osr->pbias[1], osr->pbias[2]);
     fprintf(fp, "%.3f,%.3f,%.3f,", osr->cbias[0], osr->cbias[1], osr->cbias[2]);
-    fprintf(fp, "%.3f,%.3f,",       osr->trop, osr->iono);
+    fprintf(fp, "%.3f,%.3f,", osr->trop, osr->iono);
     fprintf(fp, "%.3f,%.3f,%.3f,", osr->CPC[0], osr->CPC[1], osr->CPC[2]);
     fprintf(fp, "%.3f,%.3f,%.3f,", osr->PRC[0], osr->PRC[1], osr->PRC[2]);
-    fprintf(fp, "%.3f\n",           osr->sis);
+    fprintf(fp, "%.3f\n", osr->sis);
 }
 
 /* write VRS observations as RTCM3 MSM4 per constellation -------------------*/
 static const int rtcm3_msm_types[] = {1074, 1084, 1094, 1114, 0};
-static const int rtcm3_msm_sys[]   = {SYS_GPS, SYS_GLO, SYS_GAL, SYS_QZS, 0};
+static const int rtcm3_msm_sys[] = {SYS_GPS, SYS_GLO, SYS_GAL, SYS_QZS, 0};
 
-static void write_rtcm3(FILE *fp, const obs_t *obs, nav_t *nav,
-                        const prcopt_t *prcopt)
-{
-    rtcm_t *rtcm;
+static void write_rtcm3(FILE* fp, const obs_t* obs, nav_t* nav, const prcopt_t* prcopt) {
+    rtcm_t* rtcm;
     int i, j, k, sys, sync;
 
     if (obs->n <= 0) {
@@ -235,7 +223,10 @@ static void write_rtcm3(FILE *fp, const obs_t *obs, nav_t *nav,
     if (!(rtcm = (rtcm_t*)calloc(1, sizeof(rtcm_t)))) {
         return;
     }
-    if (!init_rtcm(rtcm)) { free(rtcm); return; }
+    if (!init_rtcm(rtcm)) {
+        free(rtcm);
+        return;
+    }
     rtcm->time = obs->data[0].time;
     matcpy(rtcm->sta.pos, prcopt->ru, 3, 1);
 
@@ -262,7 +253,8 @@ static void write_rtcm3(FILE *fp, const obs_t *obs, nav_t *nav,
         for (j = k + 1; rtcm3_msm_sys[j] && !sync; j++) {
             for (i = 0; i < obs->n; i++) {
                 if (satsys(obs->data[i].sat, NULL) & rtcm3_msm_sys[j]) {
-                    sync = 1; break;
+                    sync = 1;
+                    break;
                 }
             }
         }
@@ -275,13 +267,12 @@ static void write_rtcm3(FILE *fp, const obs_t *obs, nav_t *nav,
 }
 
 /* calculate actual geometric distance between receiver and satellites -------*/
-static int actualdist(gtime_t time, obs_t *obs, nav_t *nav, const double *x)
-{
+static int actualdist(gtime_t time, obs_t* obs, nav_t* nav, const double* x) {
     int i, n, sat, lsat[MAXSAT];
     double r, rr[3], dt, dt_p;
     double rs1[6], dts1[2], var1, e1[3];
     gtime_t tg;
-    obsd_t *obsd = obs->data;
+    obsd_t* obsd = obs->data;
     int svh1;
 
     obs->n = 0;
@@ -306,11 +297,11 @@ static int actualdist(gtime_t time, obs_t *obs, nav_t *nav, const double *x)
     /* compute pseudorange via iterative light-time correction */
     for (i = 0; i < n; i++) {
         sat = lsat[i];
-        dt = 0.08; dt_p = 0.0;
+        dt = 0.08;
+        dt_p = 0.0;
         while (1) {
             tg = timeadd(time, -dt);
-            if (!satpos(tg, time, sat, EPHOPT_BRDC, nav,
-                        rs1, dts1, &var1, &svh1)) {
+            if (!satpos(tg, time, sat, EPHOPT_BRDC, nav, rs1, dts1, &var1, &svh1)) {
                 obsd[i].sat = 0;
                 break;
             }
@@ -333,15 +324,13 @@ static int actualdist(gtime_t time, obs_t *obs, nav_t *nav, const double *x)
 }
 
 /* generate OSR (main processing loop) --------------------------------------*/
-static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode,
-                   prcopt_t *prcopt, filopt_t *fopt,
-                   char **infile, int n, const char *outfile, FILE *fp_csv)
-{
+static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode, prcopt_t* prcopt, filopt_t* fopt, char** infile, int n,
+                   const char* outfile, FILE* fp_csv) {
     static rtk_t rtk = {0};
     static obsd_t data[MAXOBS] = {{0}};
     static clas_osrd_t osr[MAXOBS] = {{0}};
-    clas_ctx_t *clas;
-    nav_t *nav;
+    clas_ctx_t* clas;
+    nav_t* nav;
     FILE *fp_in, *fp_out;
     obs_t obs = {0};
     gtime_t time;
@@ -353,18 +342,20 @@ static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode,
     nt = ti <= 0.0 ? 0 : (int)((timediff(te, ts)) / ti) + 1;
 
     /* heap-allocate large structures (clas_ctx_t ~5.7MB, nav_t ~2.4MB) */
-    clas = (clas_ctx_t *)calloc(1, sizeof(clas_ctx_t));
-    nav  = (nav_t *)calloc(1, sizeof(nav_t));
+    clas = (clas_ctx_t*)calloc(1, sizeof(clas_ctx_t));
+    nav = (nav_t*)calloc(1, sizeof(nav_t));
     if (!clas || !nav) {
         fprintf(stderr, "Memory allocation error.\n");
-        free(clas); free(nav);
+        free(clas);
+        free(nav);
         return -1;
     }
 
     /* initialize CLAS context */
     if (clas_ctx_init(clas) != 0) {
         fprintf(stderr, "CLAS context init error.\n");
-        free(clas); free(nav);
+        free(clas);
+        free(nav);
         return -1;
     }
 
@@ -381,7 +372,9 @@ static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode,
     /* read grid definition file */
     if (clas_read_grid_def(clas, fopt->grid)) {
         fprintf(stderr, "Grid file read error. %s\n", fopt->grid);
-        clas_ctx_free(clas); free(clas); free(nav);
+        clas_ctx_free(clas);
+        free(clas);
+        free(nav);
         return -1;
     }
 
@@ -390,14 +383,16 @@ static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode,
         if (!readblqgrid(fopt->blq, clas)) {
             fprintf(stderr, "OTL grid read error. %s\n", fopt->blq);
             freenav(nav, 0xFF);
-            clas_ctx_free(clas); free(clas); free(nav);
+            clas_ctx_free(clas);
+            free(clas);
+            free(nav);
             return -1;
         }
     }
 
     /* read RINEX NAV files */
     for (i = 0; i < n; i++) {
-        char *ext = strrchr(infile[i], '.');
+        char* ext = strrchr(infile[i], '.');
         if (ext && (!strcmp(ext, ".l6") || !strcmp(ext, ".L6"))) {
             continue;
         }
@@ -408,14 +403,18 @@ static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode,
 
     if (nav->n <= 0) {
         fprintf(stderr, "No navigation data.\n");
-        clas_ctx_free(clas); free(clas); free(nav);
+        clas_ctx_free(clas);
+        free(clas);
+        free(nav);
         return -1;
     }
 
     /* open QZSS L6 message file */
     if (!(fp_in = open_L6(infile, n))) {
         freenav(nav, 0xFF);
-        clas_ctx_free(clas); free(clas); free(nav);
+        clas_ctx_free(clas);
+        free(clas);
+        free(nav);
         return -1;
     }
 
@@ -424,7 +423,9 @@ static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode,
     if (!(fp_out = open_osr(path, nav, mode, infile, n, prcopt))) {
         fclose(fp_in);
         freenav(nav, 0xFF);
-        clas_ctx_free(clas); free(clas); free(nav);
+        clas_ctx_free(clas);
+        free(clas);
+        free(nav);
         return -1;
     }
 
@@ -453,8 +454,7 @@ static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode,
                 /* subtype 10 (service info) received — update corrections */
                 int net = clas->grid[ch].network;
                 if (net > 0) {
-                    if (clas_bank_get_close(clas, clas->l6buf[ch].time,
-                                            net, ch, &clas->current[ch]) == 0) {
+                    if (clas_bank_get_close(clas, clas->l6buf[ch].time, net, ch, &clas->current[ch]) == 0) {
                         clas_update_global(nav, &clas->current[ch], ch);
                         clas_check_grid_status(clas, &clas->current[ch], ch);
                     }
@@ -464,12 +464,11 @@ static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode,
 
         /* bootstrap: scan all networks when network is unknown */
         if (clas->grid[ch].network <= 0 && clas->bank[ch] && clas->bank[ch]->use) {
-            clas_corr_t *tmp = (clas_corr_t *)calloc(1, sizeof(clas_corr_t));
+            clas_corr_t* tmp = (clas_corr_t*)calloc(1, sizeof(clas_corr_t));
             if (tmp) {
                 int net;
                 for (net = 1; net < CLAS_MAX_NETWORK; net++) {
-                    if (clas_bank_get_close(clas, clas->l6buf[ch].time,
-                                            net, ch, tmp) == 0) {
+                    if (clas_bank_get_close(clas, clas->l6buf[ch].time, net, ch, tmp) == 0) {
                         clas_check_grid_status(clas, tmp, ch);
                         clas_update_global(nav, tmp, ch);
                     }
@@ -494,8 +493,7 @@ static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode,
             }
             if (fp_csv) {
                 for (j = 0; j < obs.n; j++) {
-                    output_osr_csv(fp_csv, obs.data[j].time,
-                                   obs.data[j].sat, &osr[j], &first_csv);
+                    output_osr_csv(fp_csv, obs.data[j].time, obs.data[j].sat, &osr[j], &first_csv);
                 }
             }
         }
@@ -505,19 +503,19 @@ static int gen_osr(gtime_t ts, gtime_t te, double ti, int mode,
     close_osr(fp_out, nav, mode);
     fclose(fp_in);
     freenav(nav, 0xFF);
-    clas_ctx_free(clas); free(clas); free(nav);
+    clas_ctx_free(clas);
+    free(clas);
+    free(nav);
 
     return 0;
 }
 
 /* set processing options ----------------------------------------------------*/
-static int set_prcopt(const char *file, prcopt_t *prcopt, solopt_t *solopt,
-                      filopt_t *filopt, double *pos)
-{
-    prcopt->mode    = PMODE_SSR2OSR;
-    prcopt->nf      = OSR_NFREQ;
-    prcopt->navsys  = OSR_SYS;
-    prcopt->elmin   = OSR_ELMASK * D2R;
+static int set_prcopt(const char* file, prcopt_t* prcopt, solopt_t* solopt, filopt_t* filopt, double* pos) {
+    prcopt->mode = PMODE_SSR2OSR;
+    prcopt->nf = OSR_NFREQ;
+    prcopt->navsys = OSR_SYS;
+    prcopt->elmin = OSR_ELMASK * D2R;
     prcopt->tidecorr = 1;
     prcopt->posopt[2] = 1; /* phase windup correction */
     solopt->timef = 0;
@@ -543,16 +541,15 @@ static int set_prcopt(const char *file, prcopt_t *prcopt, solopt_t *solopt,
 }
 
 /* main ----------------------------------------------------------------------*/
-int main(int argc, char **argv)
-{
+int main(int argc, char** argv) {
     prcopt_t prcopt = prcopt_default;
     solopt_t solopt = solopt_default;
     filopt_t filopt = {""};
     gtime_t ts = {0}, te = {0};
     double es[6] = {0}, ee[6] = {0}, ti = 1.0, pos[3] = {0};
     char *conffile = "", *outfile = OUT_FILE, *csvfile = NULL;
-    char *infile[MAXFILE];
-    FILE *fp_csv = NULL;
+    char* infile[MAXFILE];
+    FILE* fp_csv = NULL;
     int i, j, n = 0, stat, mode = OSR_RINEX;
 
     prcopt.mode = PMODE_SSR2OSR;
@@ -566,8 +563,7 @@ int main(int argc, char **argv)
             sscanf(argv[++i], "%lf/%lf/%lf", es, es + 1, es + 2);
             sscanf(argv[++i], "%lf:%lf:%lf", es + 3, es + 4, es + 5);
             ts = epoch2time(es);
-        }
-        else if (!strcmp(argv[i], "-te") && i + 2 < argc) {
+        } else if (!strcmp(argv[i], "-te") && i + 2 < argc) {
             sscanf(argv[++i], "%lf/%lf/%lf", ee, ee + 1, ee + 2);
             sscanf(argv[++i], "%lf:%lf:%lf", ee + 3, ee + 4, ee + 5);
             te = epoch2time(ee);

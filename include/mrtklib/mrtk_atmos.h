@@ -31,11 +31,11 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_foundation.h"
-#include "mrtklib/mrtk_time.h"
 #include "mrtklib/mrtk_coords.h"
+#include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_nav.h"
 #include "mrtklib/mrtk_opt.h"
+#include "mrtklib/mrtk_time.h"
 
 /*============================================================================
  * Ionosphere Models
@@ -49,8 +49,7 @@ extern "C" {
  * @param[in] azel  Azimuth/elevation angle {az,el} (rad)
  * @return Ionospheric delay (L1) (m)
  */
-double ionmodel(gtime_t t, const double *ion, const double *pos,
-                const double *azel);
+double ionmodel(gtime_t t, const double* ion, const double* pos, const double* azel);
 
 /**
  * @brief Compute ionospheric delay mapping function by single layer model.
@@ -58,7 +57,7 @@ double ionmodel(gtime_t t, const double *ion, const double *pos,
  * @param[in] azel  Azimuth/elevation angle {az,el} (rad)
  * @return Ionospheric mapping function
  */
-double ionmapf(const double *pos, const double *azel);
+double ionmapf(const double* pos, const double* azel);
 
 /**
  * @brief Compute ionospheric pierce point (IPP) position and slant factor.
@@ -70,8 +69,7 @@ double ionmapf(const double *pos, const double *azel);
  * @return Slant factor
  * @note Only valid on the earth surface.
  */
-double ionppp(const double *pos, const double *azel, double re, double hion,
-              double *posp);
+double ionppp(const double* pos, const double* azel, double re, double hion, double* posp);
 
 /*============================================================================
  * Troposphere Models
@@ -85,8 +83,7 @@ double ionppp(const double *pos, const double *azel, double re, double hion,
  * @param[in] humi  Relative humidity
  * @return Tropospheric delay (m)
  */
-double tropmodel(gtime_t time, const double *pos, const double *azel,
-                 double humi);
+double tropmodel(gtime_t time, const double* pos, const double* azel, double humi);
 
 /**
  * @brief Compute tropospheric mapping function by NMF.
@@ -97,8 +94,7 @@ double tropmodel(gtime_t time, const double *pos, const double *azel,
  * @return Dry mapping function
  * @note See ref [5] (NMF) and [9] (GMF).
  */
-double tropmapf(gtime_t time, const double *pos, const double *azel,
-                double *mapfw);
+double tropmapf(gtime_t time, const double* pos, const double* azel, double* mapfw);
 
 /*============================================================================
  * Ionosphere / Troposphere Correction (multi-model dispatch)
@@ -116,8 +112,8 @@ double tropmapf(gtime_t time, const double *pos, const double *azel,
  * @param[out] var      Ionospheric delay (L1) variance (m^2)
  * @return Status (1:ok, 0:error)
  */
-int ionocorr(gtime_t time, const nav_t *nav, int sat, const double *pos,
-             const double *azel, int ionoopt, double *ion, double *var);
+int ionocorr(gtime_t time, const nav_t* nav, int sat, const double* pos, const double* azel, int ionoopt, double* ion,
+             double* var);
 
 /**
  * @brief Compute tropospheric correction.
@@ -130,8 +126,8 @@ int ionocorr(gtime_t time, const nav_t *nav, int sat, const double *pos,
  * @param[out] var      Tropospheric delay variance (m^2)
  * @return Status (1:ok, 0:error)
  */
-int tropcorr(gtime_t time, const nav_t *nav, const double *pos,
-             const double *azel, int tropopt, double *trp, double *var);
+int tropcorr(gtime_t time, const nav_t* nav, const double* pos, const double* azel, int tropopt, double* trp,
+             double* var);
 
 #ifdef __cplusplus
 }

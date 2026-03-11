@@ -29,8 +29,8 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_time.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_time.h"
 
 /*============================================================================
  * IONEX Functions
@@ -42,7 +42,7 @@ extern "C" {
  * @param[in,out] nav   Navigation data (tec grid data appended)
  * @param[in]     opt   Read option (1: no clear of old TEC data, 0: clear)
  */
-void readtec(const char *file, nav_t *nav, int opt);
+void readtec(const char* file, nav_t* nav, int opt);
 
 /**
  * @brief Compute ionospheric delay by TEC grid data.
@@ -56,8 +56,7 @@ void readtec(const char *file, nav_t *nav, int opt);
  * @param[out] var    Ionospheric delay variance (L1) (m^2)
  * @return Status (1:ok, 0:error)
  */
-int iontec(gtime_t time, const nav_t *nav, const double *pos,
-           const double *azel, int opt, double *delay, double *var);
+int iontec(gtime_t time, const nav_t* nav, const double* pos, const double* azel, int opt, double* delay, double* var);
 
 #ifdef __cplusplus
 }
