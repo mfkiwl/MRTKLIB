@@ -35,62 +35,62 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "mrtklib/mrtk_antenna.h"
+#include "mrtklib/mrtk_astro.h"
+#include "mrtklib/mrtk_atmos.h"
 #include "mrtklib/mrtk_clas.h"
 #include "mrtklib/mrtk_const.h"
 #include "mrtklib/mrtk_coords.h"
-#include "mrtklib/mrtk_atmos.h"
-#include "mrtklib/mrtk_astro.h"
+#include "mrtklib/mrtk_eph.h"
 #include "mrtklib/mrtk_geoid.h"
 #include "mrtklib/mrtk_mat.h"
+#include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_opt.h"
+#include "mrtklib/mrtk_ppp_rtk.h"
+#include "mrtklib/mrtk_rtkpos.h"
+#include "mrtklib/mrtk_sol.h"
+#include "mrtklib/mrtk_tides.h"
 #include "mrtklib/mrtk_time.h"
 #include "mrtklib/mrtk_trace.h"
-#include "mrtklib/mrtk_obs.h"
-#include "mrtklib/mrtk_nav.h"
-#include "mrtklib/mrtk_opt.h"
-#include "mrtklib/mrtk_sol.h"
-#include "mrtklib/mrtk_rtkpos.h"
-#include "mrtklib/mrtk_antenna.h"
-#include "mrtklib/mrtk_tides.h"
-#include "mrtklib/mrtk_ppp_rtk.h"
-#include "mrtklib/mrtk_eph.h"
 
 /*============================================================================
  * Local Macros
  *===========================================================================*/
 
-#define SQR(x)          ((x)*(x))
+#define SQR(x) ((x) * (x))
 
 /* PPP-RTK state index macros (duplicated from mrtk_ppp_rtk.c) */
-#define NF_RTK(opt)     ((opt)->nf)
-#define NP_RTK(opt)     ((opt)->dynamics==0?3:9)
-#define NI_RTK(opt)     ((opt)->ionoopt!=IONOOPT_EST?0:MAXSAT)
+#define NF_RTK(opt) ((opt)->nf)
+#define NP_RTK(opt) ((opt)->dynamics == 0 ? 3 : 9)
+#define NI_RTK(opt) ((opt)->ionoopt != IONOOPT_EST ? 0 : MAXSAT)
 static inline int NT_RTK(const prcopt_t* opt) {
     if (opt->tropopt < TROPOPT_EST) return 0;
     if (opt->tropopt < TROPOPT_ESTG) return 1;
     return 3;
 }
-#define NR_RTK(opt)     (NP_RTK(opt)+NI_RTK(opt)+NT_RTK(opt))
-#define IB_RTK(s,f,opt) (NR_RTK(opt)+MAXSAT*(f)+(s)-1)
+#define NR_RTK(opt) (NP_RTK(opt) + NI_RTK(opt) + NT_RTK(opt))
+#define IB_RTK(s, f, opt) (NR_RTK(opt) + MAXSAT * (f) + (s) - 1)
 
 /** Earth gravitational constant (m^3/s^2) -- for Shapiro correction */
-#define GME             3.986004415E+14
+#define GME 3.986004415E+14
 
 /** Frequency pair selection modes (upstream claslib rtklib.h) */
-#define POSL1           1  /* L1 single freq positioning */
-#define POSL1L2         2  /* L1+L2 dual freq positioning */
-#define POSL1L5         3  /* L1+L5 dual freq positioning */
-#define POSL1L2L5       4  /* L1+L2+L5 triple freq positioning */
-#define POSL1L5_L2      5  /* L1+L5(or L2) dual freq positioning */
+#define POSL1 1      /* L1 single freq positioning */
+#define POSL1L2 2    /* L1+L2 dual freq positioning */
+#define POSL1L5 3    /* L1+L5 dual freq positioning */
+#define POSL1L2L5 4  /* L1+L2+L5 triple freq positioning */
+#define POSL1L5_L2 5 /* L1+L5(or L2) dual freq positioning */
 
 /** CSSR signal mode to frequency band mapping table.
  *  Index = signal tracking mode code, value = 1:L1,2:L2,3:L5,4:L6,5:L7,6:L8
  */
 static const unsigned char obsfreqs[] = {
-    0, 1, 1, 1, 1,  1, 1, 1, 1, 1, /*  0- 9 */
-    1, 1, 1, 1, 2,  2, 2, 2, 2, 2, /* 10-19 */
-    2, 2, 2, 2, 3,  3, 3, 5, 5, 5, /* 20-29 */
-    4, 4, 4, 4, 4,  4, 4, 6, 6, 6, /* 30-39 */
-    2, 2, 4, 4, 3,  3, 3, 1, 1, 0  /* 40-49 */
+    0, 1, 1, 1, 1, 1, 1, 1, 1, 1, /*  0- 9 */
+    1, 1, 1, 1, 2, 2, 2, 2, 2, 2, /* 10-19 */
+    2, 2, 2, 2, 3, 3, 3, 5, 5, 5, /* 20-29 */
+    4, 4, 4, 4, 4, 4, 4, 6, 6, 6, /* 30-39 */
+    2, 2, 4, 4, 3, 3, 3, 1, 1, 0  /* 40-49 */
 };
 
 /*============================================================================
@@ -105,8 +105,7 @@ static const unsigned char obsfreqs[] = {
  * @param[in] rrcv  Receiver position (ECEF) (m)
  * @return Shapiro correction (m)
  */
-static double shapiro(const double *rsat, const double *rrcv)
-{
+static double shapiro(const double* rsat, const double* rrcv) {
     double rs, rr, rrs, rsr[3];
     int i;
 
@@ -133,9 +132,7 @@ static double shapiro(const double *rsat, const double *rrcv)
  * @param[in]     rr    Receiver position (ECEF, 3 elements)
  * @param[in,out] phw   Phase windup correction (cycle), previous value as input
  */
-static void windupcorr(gtime_t time, const double *rs, const double *rr,
-                        double *phw)
-{
+static void windupcorr(gtime_t time, const double* rs, const double* rr, double* phw) {
     double ek[3], exs[3], eys[3], ezs[3], ess[3], exr[3], eyr[3];
     double eks[3], ekr[3], E[9];
     double dr[3], ds[3], drs[3], r[3], pos[3], rsun[3], cosp, ph;
@@ -182,8 +179,12 @@ static void windupcorr(gtime_t time, const double *rs, const double *rr,
     /* unit vectors of receiver antenna */
     ecef2pos(rr, pos);
     xyz2enu(pos, E);
-    exr[0] = E[0]; exr[1] = E[3]; exr[2] = E[6];
-    eyr[0] = E[1]; eyr[1] = E[4]; eyr[2] = E[7];
+    exr[0] = E[0];
+    exr[1] = E[3];
+    exr[2] = E[6];
+    eyr[0] = E[1];
+    eyr[1] = E[4];
+    eyr[2] = E[7];
 
     /* phase windup effect */
     cross3(ek, eys, eks);
@@ -214,7 +215,7 @@ static void windupcorr(gtime_t time, const double *rs, const double *rr,
  * field in nav_t; we compute wavelengths via sat2freq().
  *===========================================================================*/
 
-extern double sat2freq(int sat, uint8_t code, const nav_t *nav);
+extern double sat2freq(int sat, uint8_t code, const nav_t* nav);
 
 /**
  * @brief Fill wavelength array for a satellite from observation codes.
@@ -223,9 +224,7 @@ extern double sat2freq(int sat, uint8_t code, const nav_t *nav);
  * @param[in]  nav   Navigation data (for GLONASS FCN)
  * @param[out] lam   Wavelength array [NFREQ+NEXOBS]
  */
-static void sat_wavelengths(int sat, const obsd_t *obs, const nav_t *nav,
-                             double *lam)
-{
+static void sat_wavelengths(int sat, const obsd_t* obs, const nav_t* nav, double* lam) {
     int f;
     double freq;
     for (f = 0; f < NFREQ + NEXOBS; f++) {
@@ -243,8 +242,7 @@ static void sat_wavelengths(int sat, const obsd_t *obs, const nav_t *nav,
  * @param[in] smode  Signal mode array for one satellite
  * @return Number of valid signal modes
  */
-static int count_nsig(const int smode[MAXCODE])
-{
+static int count_nsig(const int smode[MAXCODE]) {
     int i, n = 0;
     for (i = 0; i < MAXCODE; i++) {
         if (smode[i] != 0) {
@@ -262,15 +260,14 @@ static int count_nsig(const int smode[MAXCODE])
  * @brief Initialize OSR conversion context (zero all persistent state).
  * @param[out] ctx  OSR context to initialize
  */
-void clas_osr_ctx_init(clas_osr_ctx_t *ctx)
-{
+void clas_osr_ctx_init(clas_osr_ctx_t* ctx) {
     int ch, i;
     memset(ctx, 0, sizeof(clas_osr_ctx_t));
     for (ch = 0; ch < CLAS_CH_NUM; ch++) {
         for (i = 0; i < MAXSAT; i++) {
-            ctx->satcorr[ch][i].currtow      = -1;
-            ctx->satcorr[ch][i].prevtow      = -1;
-            ctx->satcorr[ch][i].previode     = -1;
+            ctx->satcorr[ch][i].currtow = -1;
+            ctx->satcorr[ch][i].prevtow = -1;
+            ctx->satcorr[ch][i].previode = -1;
             ctx->satcorr[ch][i].prev_orb_tow = -1;
         }
     }
@@ -294,9 +291,7 @@ void clas_osr_ctx_init(clas_osr_ctx_t *ctx)
  * @param[in] ztd   Zenith total delay from grid (m)
  * @return Slant tropospheric delay (m), 0 on error
  */
-double clas_osr_prectrop(gtime_t time, const double *pos, const double *azel,
-                          double zwd, double ztd)
-{
+double clas_osr_prectrop(gtime_t time, const double* pos, const double* azel, double zwd, double ztd) {
     double m_d, m_w, tdvd, twvd, gh;
 
     gh = geoidh(pos);
@@ -305,8 +300,7 @@ double clas_osr_prectrop(gtime_t time, const double *pos, const double *azel,
      * clas_get_stTv() is declared in mrtk_clas.h but implemented as the
      * static get_stTv() in mrtk_clas_grid.c.  Since this function is in the
      * same library, we forward-declare and call it directly. */
-    extern int get_stTv(gtime_t t, const double lat, const double hs,
-                        const double hg, double *tdv, double *twv);
+    extern int get_stTv(gtime_t t, const double lat, const double hs, const double hg, double* tdv, double* twv);
     if (get_stTv(time, pos[0], pos[2], gh, &tdvd, &twvd)) {
         return 0.0;
     }
@@ -337,15 +331,13 @@ double clas_osr_prectrop(gtime_t time, const double *pos, const double *azel,
  * @param[in] obs  Observation data for this satellite
  * @return Frequency pair bitmask (0=L1 only, 1=L2, 2=L5, 3=L2+L5)
  */
-int clas_osr_selfreqpair(int sat, const prcopt_t *opt, const obsd_t *obs)
-{
+int clas_osr_selfreqpair(int sat, const prcopt_t* opt, const obsd_t* obs) {
     int optf, sys;
 
     sys = satsys(sat, NULL);
 
     /* GPS: posopt[10], QZS: posopt[12], default: 0 (→ L1+L2) */
-    optf = (sys == SYS_GPS) ? opt->posopt[10] :
-           (sys == SYS_QZS) ? opt->posopt[12] : 0;
+    optf = (sys == SYS_GPS) ? opt->posopt[10] : (sys == SYS_QZS) ? opt->posopt[12] : 0;
 
     /* For GAL: prefer L5 if available */
     if (sys & SYS_GAL) {
@@ -401,13 +393,9 @@ int clas_osr_selfreqpair(int sat, const prcopt_t *opt, const obsd_t *obs)
  * @param[in,out] osr_ctx OSR context for persistent state
  * @param[in]     nav     Navigation data (for wavelengths)
  */
-void clas_osr_compensatedisp(clas_corr_t *corr, const int *index,
-                              const obsd_t *obs, int sat,
-                              double iono, const double *pb,
-                              double *compL, int *pbreset,
-                              const prcopt_t *opt, ssat_t ssat, int ch,
-                              clas_osr_ctx_t *osr_ctx, const nav_t *nav)
-{
+void clas_osr_compensatedisp(clas_corr_t* corr, const int* index, const obsd_t* obs, int sat, double iono,
+                             const double* pb, double* compL, int* pbreset, const prcopt_t* opt, ssat_t ssat, int ch,
+                             clas_osr_ctx_t* osr_ctx, const nav_t* nav) {
     gtime_t time = obs->time;
     int i, k, qi, qj, isat = sat - 1, oft = isat * NFREQ, oft_b;
     double lam[NFREQ + NEXOBS];
@@ -428,21 +416,17 @@ void clas_osr_compensatedisp(clas_corr_t *corr, const int *index,
         }
     }
 
-    if (flag == 1 &&
-        timediff(corr->stec[index[0]].data[k].time,
-                 osr_ctx->comp_t0[ch][isat]) > 0.0) {
+    if (flag == 1 && timediff(corr->stec[index[0]].data[k].time, osr_ctx->comp_t0[ch][isat]) > 0.0) {
         if (opt->posopt[5] == 1) {
             osr_ctx->comp_tm[ch][isat] = osr_ctx->comp_t0[ch][isat];
             osr_ctx->comp_t0[ch][isat] = corr->stec[index[0]].data[k].time;
-            dt = timediff(osr_ctx->comp_t0[ch][isat],
-                          osr_ctx->comp_tm[ch][isat]);
+            dt = timediff(osr_ctx->comp_t0[ch][isat], osr_ctx->comp_tm[ch][isat]);
             if (dt <= 0.0) {
                 return;
             }
 
             for (i = 0; i < nf; i++) {
-                if (osr_ctx->comp_b0[ch][oft_b + i] == 0.0 ||
-                    osr_ctx->comp_iono0[ch][isat] == 0.0) {
+                if (osr_ctx->comp_b0[ch][oft_b + i] == 0.0 || osr_ctx->comp_iono0[ch][isat] == 0.0) {
                     osr_ctx->comp_b0[ch][oft_b + i] = pb[i];
                     osr_ctx->comp_iono0[ch][isat] = iono;
                     return;
@@ -459,29 +443,24 @@ void clas_osr_compensatedisp(clas_corr_t *corr, const int *index,
             osr_ctx->comp_iono0[ch][isat] = iono;
 
             for (i = 1; i < nf; i++) {
-                qi = 0; qj = i;
+                qi = 0;
+                qj = i;
                 /* map signal mode to frequency band index */
                 fqi = obsfreqs[corr->smode[isat][qi]] - 1;
                 fqj = obsfreqs[corr->smode[isat][qj]] - 1;
                 if (fqi < 0 || fqj < 0) {
                     continue;
                 }
-                fi = (lam[fqi] > 0.0 && lam[fqj] > 0.0) ?
-                      lam[fqj] / lam[fqi] : 0.0;
+                fi = (lam[fqi] > 0.0 && lam[fqj] > 0.0) ? lam[fqj] / lam[fqi] : 0.0;
 
                 if (pb[qi] == CLAS_CSSRINVALID || pb[qj] == CLAS_CSSRINVALID || iono == 0.0) {
                     continue;
                 }
-                dispm = -FREQ2 / FREQ1 * (1.0 - fi * fi) *
-                         osr_ctx->comp_ionom[ch][isat] +
-                         osr_ctx->comp_bm[ch][oft_b + qi] -
-                         osr_ctx->comp_bm[ch][oft_b + qj];
-                disp0 = -FREQ2 / FREQ1 * (1.0 - fi * fi) *
-                         osr_ctx->comp_iono0[ch][isat] +
-                         osr_ctx->comp_b0[ch][oft_b + qi] -
-                         osr_ctx->comp_b0[ch][oft_b + qj];
-                osr_ctx->comp_coef[ch][isat + (i - 1) * MAXSAT] =
-                    (disp0 - dispm) / dt;
+                dispm = -FREQ2 / FREQ1 * (1.0 - fi * fi) * osr_ctx->comp_ionom[ch][isat] +
+                        osr_ctx->comp_bm[ch][oft_b + qi] - osr_ctx->comp_bm[ch][oft_b + qj];
+                disp0 = -FREQ2 / FREQ1 * (1.0 - fi * fi) * osr_ctx->comp_iono0[ch][isat] +
+                        osr_ctx->comp_b0[ch][oft_b + qi] - osr_ctx->comp_b0[ch][oft_b + qj];
+                osr_ctx->comp_coef[ch][isat + (i - 1) * MAXSAT] = (disp0 - dispm) / dt;
             }
         } else {
             for (i = 0; i < nf; i++) {
@@ -497,14 +476,14 @@ void clas_osr_compensatedisp(clas_corr_t *corr, const int *index,
 
     if (opt->posopt[5] == 1) {
         for (i = 1; i < nf; i++) {
-            qi = 0; qj = i;
+            qi = 0;
+            qj = i;
             fqi = obsfreqs[corr->smode[isat][qi]] - 1;
             fqj = obsfreqs[corr->smode[isat][qj]] - 1;
             if (fqi < 0 || fqj < 0) {
                 continue;
             }
-            fi = (lam[fqi] > 0.0 && lam[fqj] > 0.0) ?
-                  lam[fqj] / lam[fqi] : 0.0;
+            fi = (lam[fqi] > 0.0 && lam[fqj] > 0.0) ? lam[fqj] / lam[fqi] : 0.0;
 
             if (fabs(osr_ctx->comp_coef[ch][isat + (i - 1) * MAXSAT] / (FREQ2 / FREQ1 * (1.0 - fi * fi))) > 0.008) {
                 continue;
@@ -513,12 +492,10 @@ void clas_osr_compensatedisp(clas_corr_t *corr, const int *index,
                 osr_ctx->comp_coef[ch][isat] = 0.0;
                 return;
             }
-            compL[qi] = (compL[qi] == 0.0) ?
-                (1.0 / (1.0 - SQR(fi)) *
-                 osr_ctx->comp_coef[ch][isat + (i - 1) * MAXSAT] * dt) :
-                compL[qi];
-            compL[qj] = SQR(fi) / (1.0 - SQR(fi)) *
-                         osr_ctx->comp_coef[ch][isat + (i - 1) * MAXSAT] * dt;
+            compL[qi] = (compL[qi] == 0.0)
+                            ? (1.0 / (1.0 - SQR(fi)) * osr_ctx->comp_coef[ch][isat + (i - 1) * MAXSAT] * dt)
+                            : compL[qi];
+            compL[qj] = SQR(fi) / (1.0 - SQR(fi)) * osr_ctx->comp_coef[ch][isat + (i - 1) * MAXSAT] * dt;
         }
     } else {
         for (i = 0; i < nf; i++) {
@@ -527,18 +504,16 @@ void clas_osr_compensatedisp(clas_corr_t *corr, const int *index,
             }
         }
         for (i = 1; i < nf; i++) {
-            qi = 0; qj = i;
-            fi = (lam[qi] > 0.0 && lam[qj] > 0.0) ?
-                  lam[qj] / lam[qi] : 0.0;
+            qi = 0;
+            qj = i;
+            fi = (lam[qi] > 0.0 && lam[qj] > 0.0) ? lam[qj] / lam[qi] : 0.0;
             if (osr_ctx->comp_slip[ch][oft + qi] || osr_ctx->comp_slip[ch][oft + qj] || obs->L[qi] * lam[qi] == 0.0 ||
                 obs->L[qj] * lam[qj] == 0.0 || pbreset[qi] || pbreset[qj]) {
                 continue;
             }
             dgf = obs->L[qi] * lam[qi] - obs->L[qj] * lam[qj] -
-                  (osr_ctx->comp_b0[ch][oft_b + qi] -
-                   osr_ctx->comp_b0[ch][oft_b + qj]);
-            compL[qi] = (compL[qi] == 0.0) ?
-                (1.0 / (1.0 - SQR(fi)) * dgf) : compL[qi];
+                  (osr_ctx->comp_b0[ch][oft_b + qi] - osr_ctx->comp_b0[ch][oft_b + qj]);
+            compL[qi] = (compL[qi] == 0.0) ? (1.0 / (1.0 - SQR(fi)) * dgf) : compL[qi];
             compL[qj] = SQR(fi) / (1.0 - SQR(fi)) * dgf;
         }
     }
@@ -570,12 +545,9 @@ void clas_osr_compensatedisp(clas_corr_t *corr, const int *index,
  * @param[in,out] osr_ctx  OSR context
  * @return 1=ok, 0=error (stale bias, missing iono)
  */
-int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
-                       const double *azel, const prcopt_t *opt,
-                       clas_grid_t *grid, clas_corr_t *corr,
-                       ssat_t ssat, int *brk, clas_osrd_t *osr,
-                       int *pbreset, int ch, clas_osr_ctx_t *osr_ctx)
-{
+int clas_osr_corrmeas(const obsd_t* obs, nav_t* nav, const double* pos, const double* azel, const prcopt_t* opt,
+                      clas_grid_t* grid, clas_corr_t* corr, ssat_t ssat, int* brk, clas_osrd_t* osr, int* pbreset,
+                      int ch, clas_osr_ctx_t* osr_ctx) {
     double lam[NFREQ + NEXOBS];
     double vari, dant[NFREQPCV] = {0}, compL[NFREQ + NEXOBS] = {0};
     double stec = 0.0, rate, t5, t6;
@@ -584,8 +556,7 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
     int flag;
     double dt;
 
-    trace(NULL, 3, "clas_osr_corrmeas: time=%s, sat=%2d\n",
-          time_str(obs->time, 0), obs->sat);
+    trace(NULL, 3, "clas_osr_corrmeas: time=%s, sat=%2d\n", time_str(obs->time, 0), obs->sat);
 
     sat = obs->sat;
     sat_wavelengths(sat, obs, nav, lam);
@@ -599,13 +570,9 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
     t6 = timediff(obs->time, nav->ssr_ch[ch][sat - 1].t0[5]); /* pbias */
 
     if (fabs(t5) > CLAS_MAXAGESSR_BIAS || fabs(t6) > CLAS_MAXAGESSR_BIAS) {
-        trace(NULL, 2,
-              "age of ssr bias error: time=%s sat=%2d tc,tp=%.0f,%.0f\n",
-              time_str(obs->time, 0), sat, t5, t6);
-        memset(&nav->ssr_ch[ch][sat - 1].t0[4], 0x00,
-               sizeof(nav->ssr_ch[ch][sat - 1].t0[4]));
-        memset(&nav->ssr_ch[ch][sat - 1].t0[5], 0x00,
-               sizeof(nav->ssr_ch[ch][sat - 1].t0[5]));
+        trace(NULL, 2, "age of ssr bias error: time=%s sat=%2d tc,tp=%.0f,%.0f\n", time_str(obs->time, 0), sat, t5, t6);
+        memset(&nav->ssr_ch[ch][sat - 1].t0[4], 0x00, sizeof(nav->ssr_ch[ch][sat - 1].t0[4]));
+        memset(&nav->ssr_ch[ch][sat - 1].t0[5], 0x00, sizeof(nav->ssr_ch[ch][sat - 1].t0[5]));
         return 0;
     }
 
@@ -626,12 +593,9 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
     }
 
     /* ionosphere correction via STEC grid interpolation */
-    if (!clas_stec_grid_data(corr, grid->index, obs->time, sat,
-                             grid->num, grid->weight, grid->Gmat, grid->Emat,
-                             &stec, &rate, &vari, brk)) {
-        trace(NULL, 2,
-              "clas_osr_corrmeas: iono correction error: time=%s sat=%2d\n",
-              time_str(obs->time, 2), obs->sat);
+    if (!clas_stec_grid_data(corr, grid->index, obs->time, sat, grid->num, grid->weight, grid->Gmat, grid->Emat, &stec,
+                             &rate, &vari, brk)) {
+        trace(NULL, 2, "clas_osr_corrmeas: iono correction error: time=%s sat=%2d\n", time_str(obs->time, 2), obs->sat);
         return 0;
     }
 
@@ -643,8 +607,7 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
         }
     }
     if (flag == 1) {
-        dt = timediff(corr->stec[grid->index[0]].data[i].time,
-                      nav->ssr_ch[ch][sat - 1].t0[5]);
+        dt = timediff(corr->stec[grid->index[0]].data[i].time, nav->ssr_ch[ch][sat - 1].t0[5]);
         /* store STEC time in t0[8] -- but ssr_t only has t0[6], skip */
         if (dt < 0.0 || dt >= 30.0) {
             trace(NULL, 2,
@@ -653,8 +616,7 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
                   time_str(obs->time, 0), sat, dt);
             return 0;
         }
-        dt = timediff(corr->stec[grid->index[0]].data[i].time,
-                      nav->ssr_ch[ch][sat - 1].t0[0]);
+        dt = timediff(corr->stec[grid->index[0]].data[i].time, nav->ssr_ch[ch][sat - 1].t0[0]);
         if (dt < -30.0 || dt > 30.0) {
             trace(NULL, 2,
                   "inconsist ssr correction (iono-orbit): time=%s sat=%2d "
@@ -666,22 +628,19 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
 
     /* pbias-cbias consistency */
     dt = timediff(nav->ssr_ch[ch][sat - 1].t0[5], nav->ssr_ch[ch][sat - 1].t0[4]);
-    trace(NULL, 5, "clas_osr_corrmeas: pbias_tow=%.1f, cbias_tow=%.1f, "
+    trace(NULL, 5,
+          "clas_osr_corrmeas: pbias_tow=%.1f, cbias_tow=%.1f, "
           "dt=%.1f\n",
-          time2gpst(nav->ssr_ch[ch][sat - 1].t0[5], NULL),
-          time2gpst(nav->ssr_ch[ch][sat - 1].t0[4], NULL), dt);
-    if ((!opt->posopt[9] && fabs(dt) > 0.0) ||
-        (opt->posopt[9] && (dt > 0.0 || dt < -30.0))) {
-        trace(NULL, 2,
-              "inconsist correction (pbias-cbias): time=%s sat=%2d dt=%.2f\n",
-              time_str(obs->time, 0), sat, dt);
+          time2gpst(nav->ssr_ch[ch][sat - 1].t0[5], NULL), time2gpst(nav->ssr_ch[ch][sat - 1].t0[4], NULL), dt);
+    if ((!opt->posopt[9] && fabs(dt) > 0.0) || (opt->posopt[9] && (dt > 0.0 || dt < -30.0))) {
+        trace(NULL, 2, "inconsist correction (pbias-cbias): time=%s sat=%2d dt=%.2f\n", time_str(obs->time, 0), sat,
+              dt);
         return 0;
     }
 
     /* compensate time variation of signal bias and ionosphere delay */
     if (opt->posopt[5] > 0) {
-        clas_osr_compensatedisp(corr, grid->index, obs, sat, stec, pbias,
-                                 compL, pbreset, opt, ssat, ch, osr_ctx, nav);
+        clas_osr_compensatedisp(corr, grid->index, obs, sat, stec, pbias, compL, pbreset, opt, ssat, ch, osr_ctx, nav);
     }
 
     /* receiver antenna phase center correction */
@@ -724,12 +683,8 @@ int clas_osr_corrmeas(const obsd_t *obs, nav_t *nav, const double *pos,
  * @param[in]  weight  Interpolation weights (4x1)
  * @param[out] dr      Displacement (ECEF, m) — accumulated
  */
-static void ocean_tide_clasgrid(gtime_t tut, const clas_oload_t *oload,
-                                 const int *index, int nn,
-                                 const double *E, const double *Emat,
-                                 const double *Gmat, const double *weight,
-                                 double *dr)
-{
+static void ocean_tide_clasgrid(gtime_t tut, const clas_oload_t* oload, const int* index, int nn, const double* E,
+                                const double* Emat, const double* Gmat, const double* weight, double* dr) {
     int i, j;
     double drt[3], val[4], val_[4], denu_grid[4][3], denu[3] = {0};
 
@@ -761,8 +716,7 @@ static void ocean_tide_clasgrid(gtime_t tut, const clas_oload_t *oload,
         dr[i] += drt[i];
     }
 
-    trace(NULL, 5, "ocean_tide_clasgrid: denu=%.4f %.4f %.4f\n",
-          denu[0], denu[1], denu[2]);
+    trace(NULL, 5, "ocean_tide_clasgrid: denu=%.4f %.4f %.4f\n", denu[0], denu[1], denu[2]);
 }
 
 /*============================================================================
@@ -774,9 +728,9 @@ static void ocean_tide_clasgrid(gtime_t tut, const clas_oload_t *oload,
  *===========================================================================*/
 
 /* SSR correction age/magnitude limits (matching mrtk_eph.c) */
-#define MAXAGESSR_SIS      60.0         /* max age of ssr orbit/clock (s) */
-#define MAXECORSSR_SIS     10.0         /* max orbit correction (m) */
-#define MAXCCORSSR_SIS     (1E-6*CLIGHT) /* max clock correction (m) */
+#define MAXAGESSR_SIS 60.0             /* max age of ssr orbit/clock (s) */
+#define MAXECORSSR_SIS 10.0            /* max orbit correction (m) */
+#define MAXCCORSSR_SIS (1E-6 * CLIGHT) /* max clock correction (m) */
 
 /**
  * @brief Update per-satellite SIS correction state for IODE adjustment.
@@ -786,17 +740,15 @@ static void ocean_tide_clasgrid(gtime_t tut, const clas_oload_t *oload,
  *
  * Ported from upstream satpos_ssr_sis() in ephemeris.c.
  */
-int clas_osr_satcorr_update(gtime_t time, gtime_t teph, int sat,
-                             const prcopt_t *opt, const nav_t *nav, int ch,
-                             clas_osr_ctx_t *ctx)
-{
-    const ssr_t *ssr;
+int clas_osr_satcorr_update(gtime_t time, gtime_t teph, int sat, const prcopt_t* opt, const nav_t* nav, int ch,
+                            clas_osr_ctx_t* ctx) {
+    const ssr_t* ssr;
     double t1, t2, t3, deph[3], dclk, dorb[3], orbit;
     double rs[6], dts[2], var, sig[3], nsig[3];
     double er[3], ea[3], ec[3], rc[3];
     double tow = time2gpst(teph, NULL);
     int i, svh;
-    clas_satcorr_t *sc;
+    clas_satcorr_t* sc;
 
     double orb_tow;
     ssr = nav->ssr_ch[ch] + sat - 1;
@@ -829,8 +781,7 @@ int clas_osr_satcorr_update(gtime_t time, gtime_t teph, int sat,
     }
     dclk = ssr->dclk[0] + ssr->dclk[1] * t2 + ssr->dclk[2] * t2 * t2;
 
-    if (ssr->iod[0] == ssr->iod[2] && ssr->t0[2].time &&
-        fabs(t3) < 10.0) {
+    if (ssr->iod[0] == ssr->iod[2] && ssr->t0[2].time && fabs(t3) < 10.0) {
         dclk += ssr->hrclk;
     }
     if (norm(deph, 3) > MAXECORSSR_SIS || fabs(dclk) > MAXCCORSSR_SIS) {
@@ -873,10 +824,10 @@ int clas_osr_satcorr_update(gtime_t time, gtime_t teph, int sat,
     sc->clk = dclk;
     sc->tow = tow;
 
-    trace(NULL, 4, "satcorr_update: tow=%.1f sat=%2d clk_tow=%.1f clk=%.6f "
+    trace(NULL, 4,
+          "satcorr_update: tow=%.1f sat=%2d clk_tow=%.1f clk=%.6f "
           "orb_tow=%.1f orb=%.6f prev_tow=%.1f\n",
-          tow, sat, time2gpst(ssr->t0[1], NULL), dclk,
-          time2gpst(ssr->t0[0], NULL), orbit, sc->prevtow);
+          tow, sat, time2gpst(ssr->t0[1], NULL), dclk, time2gpst(ssr->t0[0], NULL), orbit, sc->prevtow);
 
     /* skip SIS tracking if posopt[9] (don't adjust phase bias) is set */
     if (opt->posopt[9]) {
@@ -886,16 +837,15 @@ int clas_osr_satcorr_update(gtime_t time, gtime_t teph, int sat,
     orb_tow = time2gpst(ssr->t0[0], NULL);
 
     /* detect 25s boundary: clk_tow - orb_tow == 25 (orbit is 25s older than clock) */
-    if (sc->prevtow != time2gpst(ssr->t0[1], NULL) &&
-        timediff(ssr->t0[0], ssr->t0[1]) < 0.0 &&
+    if (sc->prevtow != time2gpst(ssr->t0[1], NULL) && timediff(ssr->t0[0], ssr->t0[1]) < 0.0 &&
         timediff(ssr->t0[1], ssr->t0[0]) == 25.0) {
-        sc->prevtow  = time2gpst(ssr->t0[1], NULL);
-        sc->prevsis  = -dclk + orbit;
+        sc->prevtow = time2gpst(ssr->t0[1], NULL);
+        sc->prevsis = -dclk + orbit;
         sc->previode = ssr->iode;
-        trace(NULL, 4, "prevsis: tow=%.1f clk_tow=%.1f orb_tow=%.1f sat=%2d "
+        trace(NULL, 4,
+              "prevsis: tow=%.1f clk_tow=%.1f orb_tow=%.1f sat=%2d "
               "iode=%3d prevsis=%f clk=%f orb=%f\n",
-              tow, sc->prevtow, orb_tow, sat,
-              sc->previode, sc->prevsis, -dclk, orbit);
+              tow, sc->prevtow, orb_tow, sat, sc->previode, sc->prevsis, -dclk, orbit);
     }
 
     /* detect orbit-update boundary: orbit epoch has advanced since prevsis was saved.
@@ -906,16 +856,14 @@ int clas_osr_satcorr_update(gtime_t time, gtime_t teph, int sat,
      * than requiring orb_tow == clk_tow.  prev_orb_tow tracks the last seen orbit
      * epoch; when it changes we have crossed a 30s correction boundary.
      */
-    if (sc->prevtow != -1 &&
-        sc->prev_orb_tow != -1 &&
-        orb_tow != sc->prev_orb_tow &&   /* orbit epoch just advanced */
-        sc->currtow != orb_tow) {         /* not yet computed for this orbit epoch */
+    if (sc->prevtow != -1 && sc->prev_orb_tow != -1 && orb_tow != sc->prev_orb_tow && /* orbit epoch just advanced */
+        sc->currtow != orb_tow) { /* not yet computed for this orbit epoch */
         sc->currsis = (-dclk + orbit) - sc->prevsis;
         sc->currtow = orb_tow;
-        trace(NULL, 4, "currsis: tow=%.1f orb_tow=%.1f clk_tow=%.1f sat=%2d "
+        trace(NULL, 4,
+              "currsis: tow=%.1f orb_tow=%.1f clk_tow=%.1f sat=%2d "
               "currsis=%f clk=%f orb=%f\n",
-              tow, orb_tow, time2gpst(ssr->t0[1], NULL), sat,
-              sc->currsis, -dclk, orbit);
+              tow, orb_tow, time2gpst(ssr->t0[1], NULL), sat, sc->currsis, -dclk, orbit);
         /* reset prevtow so the 25s boundary can fire fresh next cycle */
         sc->prevtow = -1;
     }
@@ -929,12 +877,10 @@ int clas_osr_satcorr_update(gtime_t time, gtime_t teph, int sat,
  * When phase bias TOW differs from current SIS TOW by exactly 30s,
  * subtracts the SIS discontinuity from CPC to maintain phase continuity.
  */
-static double clas_osr_adjust_cpc(gtime_t teph, int sat, const ssr_t *ssr,
-                                   int sig, double cpc, double *sis, int *flag,
-                                   int ch, clas_osr_ctx_t *ctx)
-{
+static double clas_osr_adjust_cpc(gtime_t teph, int sat, const ssr_t* ssr, int sig, double cpc, double* sis, int* flag,
+                                  int ch, clas_osr_ctx_t* ctx) {
     double before = cpc;
-    clas_satcorr_t *sc = &ctx->satcorr[ch][sat - 1];
+    clas_satcorr_t* sc = &ctx->satcorr[ch][sat - 1];
     *flag = 0;
 
     if (time2gpst(ssr->t0[5], NULL) != sc->currtow) {
@@ -947,18 +893,18 @@ static double clas_osr_adjust_cpc(gtime_t teph, int sat, const ssr_t *ssr,
             return cpc;
         }
         if (ssr->iode != sc->previode) {
-            trace(NULL, 4, "adjust_cpc: IODE diff tow=%.1f sat=%2d orb_tow=%.1f "
+            trace(NULL, 4,
+                  "adjust_cpc: IODE diff tow=%.1f sat=%2d orb_tow=%.1f "
                   "%3d sis_tow=%.1f %3d\n",
-                  time2gpst(teph, NULL), sat, time2gpst(ssr->t0[0], NULL),
-                  ssr->iode, sc->prevtow, sc->previode);
+                  time2gpst(teph, NULL), sat, time2gpst(ssr->t0[0], NULL), ssr->iode, sc->prevtow, sc->previode);
             *flag = 1;
         }
         *sis = sc->currsis;
         cpc -= *sis;
-        trace(NULL, 4, "adjust_cpc: tow=%.1f sat=%2d pb_tow=%.1f sis_tow=%.1f "
+        trace(NULL, 4,
+              "adjust_cpc: tow=%.1f sat=%2d pb_tow=%.1f sis_tow=%.1f "
               "sig=%d sis=%f cpc=%.6f-->%.6f\n",
-              time2gpst(teph, NULL), sat, time2gpst(ssr->t0[5], NULL),
-              sc->currtow, sig, *sis, before, cpc);
+              time2gpst(teph, NULL), sat, time2gpst(ssr->t0[5], NULL), sc->currtow, sig, *sis, before, cpc);
     }
     return cpc;
 }
@@ -968,12 +914,10 @@ static double clas_osr_adjust_cpc(gtime_t teph, int sat, const ssr_t *ssr,
  *
  * Same logic as adjust_cpc but applied to PRC.
  */
-static double clas_osr_adjust_prc(gtime_t teph, int sat, const ssr_t *ssr,
-                                   int sig, double prc, double *sis, int *flag,
-                                   int ch, clas_osr_ctx_t *ctx)
-{
+static double clas_osr_adjust_prc(gtime_t teph, int sat, const ssr_t* ssr, int sig, double prc, double* sis, int* flag,
+                                  int ch, clas_osr_ctx_t* ctx) {
     double before = prc;
-    clas_satcorr_t *sc = &ctx->satcorr[ch][sat - 1];
+    clas_satcorr_t* sc = &ctx->satcorr[ch][sat - 1];
     *flag = 0;
 
     if (time2gpst(ssr->t0[5], NULL) != sc->currtow) {
@@ -989,10 +933,10 @@ static double clas_osr_adjust_prc(gtime_t teph, int sat, const ssr_t *ssr,
         }
         *sis = sc->currsis;
         prc -= *sis;
-        trace(NULL, 4, "adjust_prc: tow=%.1f sat=%2d pb_tow=%.1f sis_tow=%.1f "
+        trace(NULL, 4,
+              "adjust_prc: tow=%.1f sat=%2d pb_tow=%.1f sis_tow=%.1f "
               "sig=%d sis=%f prc=%.6f-->%.6f\n",
-              time2gpst(teph, NULL), sat, time2gpst(ssr->t0[5], NULL),
-              sc->currtow, sig, *sis, before, prc);
+              time2gpst(teph, NULL), sat, time2gpst(ssr->t0[5], NULL), sc->currtow, sig, *sis, before, prc);
     }
     return prc;
 }
@@ -1004,16 +948,14 @@ static double clas_osr_adjust_prc(gtime_t teph, int sat, const ssr_t *ssr,
  * This recomputes the geometric range using the previous IODE's ephemeris
  * to maintain consistency.
  */
-static void clas_osr_adjust_r_dts(double *retr, double *retdts, gtime_t teph,
-                                   int sat, nav_t *nav, const double *rr,
-                                   gtime_t dts_time, int ch, clas_osr_ctx_t *ctx)
-{
+static void clas_osr_adjust_r_dts(double* retr, double* retdts, gtime_t teph, int sat, nav_t* nav, const double* rr,
+                                  gtime_t dts_time, int ch, clas_osr_ctx_t* ctx) {
     double rs[6] = {0}, dts[2] = {0}, e[3], var;
     double er[3], ea[3], ec[3], rc[3];
     int sys = satsys(sat, NULL), svh0, i;
-    const ssr_t *ssr = nav->ssr_ch[ch] + sat - 1;
-    clas_satcorr_t *sc = &ctx->satcorr[ch][sat - 1];
-    eph_t *eph;
+    const ssr_t* ssr = nav->ssr_ch[ch] + sat - 1;
+    clas_satcorr_t* sc = &ctx->satcorr[ch][sat - 1];
+    eph_t* eph;
 
     if (sys == SYS_GPS || sys == SYS_GAL || sys == SYS_QZS || sys == SYS_CMP) {
         eph = seleph(dts_time, sat, sc->previode, nav);
@@ -1035,14 +977,12 @@ static void clas_osr_adjust_r_dts(double *retr, double *retdts, gtime_t teph,
 
         /* satellite antenna offset correction */
         for (i = 0; i < 3; i++) {
-            rs[i] += -(er[i] * ssr->deph[0] + ea[i] * ssr->deph[1] +
-                       ec[i] * ssr->deph[2]);
+            rs[i] += -(er[i] * ssr->deph[0] + ea[i] * ssr->deph[1] + ec[i] * ssr->deph[2]);
         }
         *retr = geodist(rs, rr, e);
     }
     *retdts = dts[0] + ssr->dclk[0] / CLIGHT;
-    trace(NULL, 2, "adjust_r_dts: tow=%.1f sat=%d r=%.8f dts=%.8f\n",
-          time2gpst(teph, NULL), sat, *retr, *retdts);
+    trace(NULL, 2, "adjust_r_dts: tow=%.1f sat=%d r=%.8f dts=%.8f\n", time2gpst(teph, NULL), sat, *retr, *retdts);
 }
 
 /*============================================================================
@@ -1086,20 +1026,16 @@ static void clas_osr_adjust_r_dts(double *retr, double *retdts, gtime_t teph,
  * @param[in]     ch       SSR channel (0 in MRTKLIB)
  * @return Number of valid residual measurements
  */
-int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
-                    const double *dts, const double *vare, const int *svh,
-                    nav_t *nav, double *x, double *y, double *e, double *azel,
-                    rtk_t *rtk, int osrlog,
-                    clas_osr_ctx_t *osr_ctx, clas_grid_t *grid,
-                    clas_corr_t *corr, ssat_t *ssat,
-                    prcopt_t *opt, sol_t *sol, clas_osrd_t *osr, int ch)
-{
+int clas_osr_zdres(const obsd_t* obs, int n, const double* rs, const double* dts, const double* vare, const int* svh,
+                   nav_t* nav, double* x, double* y, double* e, double* azel, rtk_t* rtk, int osrlog,
+                   clas_osr_ctx_t* osr_ctx, clas_grid_t* grid, clas_corr_t* corr, ssat_t* ssat, prcopt_t* opt,
+                   sol_t* sol, clas_osrd_t* osr, int ch) {
     double r, rr[3], disp[3], pos[3], meas[NFREQ * 2], zwd, ztd;
     double lam[NFREQ + NEXOBS], fi;
     int i, j, f, qj, sat, sys, brk, nf = opt->nf, nftmp;
     int tbrk = 0;
     double modl[NFREQ * 2];
-    obsd_t *obs_copy = NULL;   /* local mutable copy of obs */
+    obsd_t* obs_copy = NULL; /* local mutable copy of obs */
     int nv = 0;
     clas_osrd_t osrtmp[MAXOBS];
     double dcpc;
@@ -1147,11 +1083,9 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
     ecef2pos(rr, pos);
 
     /* troposphere interpolation from CLAS grid */
-    if (!clas_trop_grid_data(corr, grid->index, obs_copy[0].time,
-                             grid->num, grid->weight, grid->Gmat, grid->Emat,
-                             &zwd, &ztd, &tbrk)) {
-        trace(NULL, 2, "trop correction error: time=%s\n",
-              time_str(obs_copy[0].time, 2));
+    if (!clas_trop_grid_data(corr, grid->index, obs_copy[0].time, grid->num, grid->weight, grid->Gmat, grid->Emat, &zwd,
+                             &ztd, &tbrk)) {
+        trace(NULL, 2, "trop correction error: time=%s\n", time_str(obs_copy[0].time, 2));
         free(obs_copy);
         return 0;
     }
@@ -1166,36 +1100,30 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
     if (opt->tidecorr) {
         if (opt->tidecorr == 3) {
             /* solid + grid OTL + pole */
-            tidedisp(gpst2utc(obs_copy[0].time), rr, 5, &nav->erp,
-                     NULL, disp); /* bitmask 5 = solid(1) + pole(4) */
+            tidedisp(gpst2utc(obs_copy[0].time), rr, 5, &nav->erp, NULL, disp); /* bitmask 5 = solid(1) + pole(4) */
 
             /* grid-interpolated ocean tide loading */
-            clas_ctx_t *ctx = (clas_ctx_t *)nav->clas_ctx;
-            if (ctx && grid->network > 0 &&
-                ctx->oload[grid->network - 1].gridnum > 0) {
+            clas_ctx_t* ctx = (clas_ctx_t*)nav->clas_ctx;
+            if (ctx && grid->network > 0 && ctx->oload[grid->network - 1].gridnum > 0) {
                 gtime_t tut;
                 double erpv[5] = {0}, pos_[2], E_[9];
                 if (nav->erp.n > 0) {
-                    geterp(&nav->erp, utc2gpst(gpst2utc(obs_copy[0].time)),
-                           erpv);
+                    geterp(&nav->erp, utc2gpst(gpst2utc(obs_copy[0].time)), erpv);
                 }
                 tut = timeadd(gpst2utc(obs_copy[0].time), erpv[2]);
                 pos_[0] = asin(rr[2] / norm(rr, 3));
                 pos_[1] = atan2(rr[1], rr[0]);
                 xyz2enu(pos_, E_);
-                ocean_tide_clasgrid(tut,
-                    &ctx->oload[grid->network - 1],
-                    grid->index, grid->num,
-                    E_, grid->Emat, grid->Gmat, grid->weight, disp);
+                ocean_tide_clasgrid(tut, &ctx->oload[grid->network - 1], grid->index, grid->num, E_, grid->Emat,
+                                    grid->Gmat, grid->weight, disp);
             }
         } else if (opt->tidecorr == 2) {
             /* solid + station OTL + pole */
-            tidedisp(gpst2utc(obs_copy[0].time), rr, 7, &nav->erp,
-                     opt->odisp[0], disp); /* bitmask 7 = solid+OTL+pole */
+            tidedisp(gpst2utc(obs_copy[0].time), rr, 7, &nav->erp, opt->odisp[0],
+                     disp); /* bitmask 7 = solid+OTL+pole */
         } else {
             /* tidecorr == 1: solid only */
-            tidedisp(gpst2utc(obs_copy[0].time), rr, 1, &nav->erp,
-                     NULL, disp);
+            tidedisp(gpst2utc(obs_copy[0].time), rr, 1, &nav->erp, NULL, disp);
         }
         for (i = 0; i < 3; i++) {
             rr[i] += disp[i];
@@ -1220,8 +1148,7 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
             continue;
         }
         if (satazel(pos, e + i * 3, azel + i * 2) < opt->elmin) {
-            trace(NULL, 3, "elevation mask rejection: sat=%2d, el=%4.1f\n",
-                  sat, azel[i * 2 + 1] * R2D);
+            trace(NULL, 3, "elevation mask rejection: sat=%2d, el=%4.1f\n", sat, azel[i * 2 + 1] * R2D);
             continue;
         }
 
@@ -1238,15 +1165,13 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
         }
 
         /* tropospheric delay correction */
-        osr[i].trop = clas_osr_prectrop(obs_copy[i].time, pos,
-                                         azel + i * 2, zwd, ztd);
+        osr[i].trop = clas_osr_prectrop(obs_copy[i].time, pos, azel + i * 2, zwd, ztd);
 
         /* phase windup correction */
         windupcorr(sol->time, rs + i * 6, rr, &ssat[sat - 1].phw);
 
         /* ionosphere, satellite code/phase bias and phase windup corrected */
-        if (!clas_osr_corrmeas(obs_copy + i, nav, pos, azel + i * 2, opt,
-                               grid, corr, ssat[sat - 1], &brk, osr + i,
+        if (!clas_osr_corrmeas(obs_copy + i, nav, pos, azel + i * 2, opt, grid, corr, ssat[sat - 1], &brk, osr + i,
                                ssat[sat - 1].pbreset, ch, osr_ctx)) {
             continue;
         }
@@ -1265,51 +1190,41 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
 
             fi = (lam[0] > 0.0) ? lam[f] / lam[0] : 0.0;
 
-            if (osr[i].pbias[j] == CLAS_CSSRINVALID ||
-                osr[i].cbias[j] == CLAS_CSSRINVALID) {
+            if (osr[i].pbias[j] == CLAS_CSSRINVALID || osr[i].cbias[j] == CLAS_CSSRINVALID) {
                 /* ENA_PPP_RTK path: skip invalid biases */
                 continue;
             }
 
             /* pseudorange correction */
-            osr[i].PRC[j] = osr[i].trop + osr[i].relatv + osr[i].antr[f] +
-                             fi * fi * FREQ2 / FREQ1 * osr[i].iono +
-                             osr[i].cbias[j];
+            osr[i].PRC[j] =
+                osr[i].trop + osr[i].relatv + osr[i].antr[f] + fi * fi * FREQ2 / FREQ1 * osr[i].iono + osr[i].cbias[j];
 
             /* carrier-phase correction */
-            osr[i].CPC[j] = osr[i].trop + osr[i].relatv + osr[i].antr[f] -
-                             fi * fi * FREQ2 / FREQ1 * osr[i].iono +
-                             osr[i].pbias[j] + osr[i].wupL[f] +
-                             osr[i].compL[j];
+            osr[i].CPC[j] = osr[i].trop + osr[i].relatv + osr[i].antr[f] - fi * fi * FREQ2 / FREQ1 * osr[i].iono +
+                            osr[i].pbias[j] + osr[i].wupL[f] + osr[i].compL[j];
 
             /* SIS/IODE adjustment */
             iodeflag = 0;
             if (!opt->posopt[9]) {
-                osr[i].CPC[j] = clas_osr_adjust_cpc(obs_copy[i].time, sat,
-                    &nav->ssr_ch[ch][sat - 1], f, osr[i].CPC[j],
-                    &osr[i].sis, &iodeflag, ch, osr_ctx);
-                osr[i].PRC[j] = clas_osr_adjust_prc(obs_copy[i].time, sat,
-                    &nav->ssr_ch[ch][sat - 1], f, osr[i].PRC[j],
-                    &osr[i].sis, &iodeflag, ch, osr_ctx);
+                osr[i].CPC[j] = clas_osr_adjust_cpc(obs_copy[i].time, sat, &nav->ssr_ch[ch][sat - 1], f, osr[i].CPC[j],
+                                                    &osr[i].sis, &iodeflag, ch, osr_ctx);
+                osr[i].PRC[j] = clas_osr_adjust_prc(obs_copy[i].time, sat, &nav->ssr_ch[ch][sat - 1], f, osr[i].PRC[j],
+                                                    &osr[i].sis, &iodeflag, ch, osr_ctx);
             }
 
             /* compute model values, adjusting r/dts on IODE change */
             if (iodeflag) {
                 if (tmp_r < 0.0) {
-                    gtime_t dtsat = timeadd(obs_copy[i].time,
-                                            -obs_copy[i].P[0] / CLIGHT);
+                    gtime_t dtsat = timeadd(obs_copy[i].time, -obs_copy[i].P[0] / CLIGHT);
                     tmp_r = r;
-                    clas_osr_adjust_r_dts(&tmp_r, &tmp_dts, obs_copy[i].time,
-                                           sat, nav, rr, dtsat, ch, osr_ctx);
+                    clas_osr_adjust_r_dts(&tmp_r, &tmp_dts, obs_copy[i].time, sat, nav, rr, dtsat, ch, osr_ctx);
                 }
-                modl[j]         = tmp_r - CLIGHT * tmp_dts + osr[i].CPC[j];
+                modl[j] = tmp_r - CLIGHT * tmp_dts + osr[i].CPC[j];
                 modl[nftmp + j] = tmp_r - CLIGHT * tmp_dts + osr[i].PRC[j];
-                osr[i].CPC[j] += tmp_r - CLIGHT * tmp_dts -
-                                  (r - CLIGHT * dts[i * 2]);
-                osr[i].PRC[j] += tmp_r - CLIGHT * tmp_dts -
-                                  (r - CLIGHT * dts[i * 2]);
+                osr[i].CPC[j] += tmp_r - CLIGHT * tmp_dts - (r - CLIGHT * dts[i * 2]);
+                osr[i].PRC[j] += tmp_r - CLIGHT * tmp_dts - (r - CLIGHT * dts[i * 2]);
             } else {
-                modl[j]         = r - CLIGHT * dts[i * 2] + osr[i].CPC[j];
+                modl[j] = r - CLIGHT * dts[i * 2] + osr[i].CPC[j];
                 modl[nftmp + j] = r - CLIGHT * dts[i * 2] + osr[i].PRC[j];
             }
 
@@ -1328,34 +1243,28 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
             }
 
             /* cycle slip detection on phase bias update */
-            if (fabs(timediff(nav->ssr_ch[ch][sat - 1].t0[5],
-                              osr_ctx->pt0tmp[sat - 1])) > 0.0 &&
-                fabs(timediff(nav->ssr_ch[ch][sat - 1].t0[5],
-                              osr_ctx->pt0tmp[sat - 1])) < 120.0) {
-                dcpc = osr[i].orb - osr[i].clk + osr[i].CPC[j] -
-                       osr_ctx->cpctmp[j * MAXSAT + sat - 1];
+            if (fabs(timediff(nav->ssr_ch[ch][sat - 1].t0[5], osr_ctx->pt0tmp[sat - 1])) > 0.0 &&
+                fabs(timediff(nav->ssr_ch[ch][sat - 1].t0[5], osr_ctx->pt0tmp[sat - 1])) < 120.0) {
+                dcpc = osr[i].orb - osr[i].clk + osr[i].CPC[j] - osr_ctx->cpctmp[j * MAXSAT + sat - 1];
                 if (dcpc >= 95.0 * lam[f] && dcpc < 105.0 * lam[f]) {
                     osr_ctx->pbias_ofst[j * MAXSAT + sat - 1] -= 100.0;
                     x[IB_RTK(sat, f, opt)] -= 100.0;
                     trace(NULL, 2,
                           "pbias slip detected t=%s sat=%2d f=%1d "
                           "dcpc[cycle]=%.1f\n",
-                          time_str(obs_copy[i].time, 0), sat, f,
-                          lam[f] > 0.0 ? dcpc / lam[f] : 0.0);
+                          time_str(obs_copy[i].time, 0), sat, f, lam[f] > 0.0 ? dcpc / lam[f] : 0.0);
                 } else if (dcpc <= -95.0 * lam[f] && dcpc > -105.0 * lam[f]) {
                     osr_ctx->pbias_ofst[j * MAXSAT + sat - 1] += 100.0;
                     x[IB_RTK(sat, f, opt)] += 100.0;
                     trace(NULL, 2,
                           "pbias slip detected t=%s sat=%2d f=%1d "
                           "dcpc[cycle]=%.1f\n",
-                          time_str(obs_copy[i].time, 0), sat, f,
-                          lam[f] > 0.0 ? dcpc / lam[f] : 0.0);
+                          time_str(obs_copy[i].time, 0), sat, f, lam[f] > 0.0 ? dcpc / lam[f] : 0.0);
                 }
             } else {
                 osr_ctx->pbias_ofst[j * MAXSAT + sat - 1] = 0.0;
             }
-            osr_ctx->cpctmp[j * MAXSAT + sat - 1] =
-                osr[i].orb - osr[i].clk + osr[i].CPC[j];
+            osr_ctx->cpctmp[j * MAXSAT + sat - 1] = osr[i].orb - osr[i].clk + osr[i].CPC[j];
         }
 
         /* ISB correction */
@@ -1387,17 +1296,13 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
             if (lam[f] == 0.0 || obs_copy[i].L[f] == 0.0 || obs_copy[i].P[f] == 0.0) {
                 continue;
             }
-            if (obs_copy[i].SNR[f] > 0.0 &&
-                testsnr(0, f, azel[i * 2 + 1],
-                        obs_copy[i].SNR[f] * 0.25, &opt->snrmask)) {
-                trace(NULL, 2,
-                      "snr error: sat=%2d f=%d el=%.2f SNR=%.2f\n",
-                      sat, f, azel[i * 2 + 1] * R2D,
+            if (obs_copy[i].SNR[f] > 0.0 && testsnr(0, f, azel[i * 2 + 1], obs_copy[i].SNR[f] * 0.25, &opt->snrmask)) {
+                trace(NULL, 2, "snr error: sat=%2d f=%d el=%.2f SNR=%.2f\n", sat, f, azel[i * 2 + 1] * R2D,
                       obs_copy[i].SNR[f] * 0.25);
                 meas[f] = meas[f + nf] = 0.0;
                 continue;
             }
-            meas[f]      += obs_copy[i].L[f] * lam[f];
+            meas[f] += obs_copy[i].L[f] * lam[f];
             meas[f + nf] += obs_copy[i].P[f];
         }
 
@@ -1424,8 +1329,7 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
                         trace(NULL, 2, "invalid cbias sat=%2d f=%1d\n", sat, f);
                         continue;
                     }
-                    y[nf * i * 2 + nf * j + f] =
-                        meas[nf * j + f] - modl[nf * j + f];
+                    y[nf * i * 2 + nf * j + f] = meas[nf * j + f] - modl[nf * j + f];
                 }
                 nv += nf;
             }
@@ -1440,8 +1344,8 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
         if (sys == SYS_GAL) {
             osr[i].antr[1] = 0.0;
             osr[i].wupL[1] = 0.0;
-            osr[i].CPC[1]  = 0.0;
-            osr[i].PRC[1]  = 0.0;
+            osr[i].CPC[1] = 0.0;
+            osr[i].PRC[1] = 0.0;
         }
 
         if (osrlog) {
@@ -1451,20 +1355,12 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
                   "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,"
                   "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,"
                   "%.3f,%.9f,%.9f,%.3f\n",
-                  ch, tow, sys, prn,
-                  osr[i].pbias[0], osr[i].pbias[1], osr[i].pbias[2],
-                  osr[i].cbias[0], osr[i].cbias[1], osr[i].cbias[2],
-                  osr[i].trop,
-                  osr[i].iono,
-                  osr[i].antr[0], osr[i].antr[1], osr[i].antr[2],
-                  osr[i].relatv,
-                  osr[i].wupL[0], osr[i].wupL[1], osr[i].wupL[2],
-                  osr[i].compL[0], osr[i].compL[1], osr[i].compL[2],
-                  osr[i].sis,
-                  osr[i].CPC[0], osr[i].CPC[1], osr[i].CPC[2],
-                  osr[i].PRC[0], osr[i].PRC[1], osr[i].PRC[2],
-                  osr[i].orb, osr[i].clk,
-                  pos[0] * R2D, pos[1] * R2D, pos[2]);
+                  ch, tow, sys, prn, osr[i].pbias[0], osr[i].pbias[1], osr[i].pbias[2], osr[i].cbias[0],
+                  osr[i].cbias[1], osr[i].cbias[2], osr[i].trop, osr[i].iono, osr[i].antr[0], osr[i].antr[1],
+                  osr[i].antr[2], osr[i].relatv, osr[i].wupL[0], osr[i].wupL[1], osr[i].wupL[2], osr[i].compL[0],
+                  osr[i].compL[1], osr[i].compL[2], osr[i].sis, osr[i].CPC[0], osr[i].CPC[1], osr[i].CPC[2],
+                  osr[i].PRC[0], osr[i].PRC[1], osr[i].PRC[2], osr[i].orb, osr[i].clk, pos[0] * R2D, pos[1] * R2D,
+                  pos[2]);
         }
     }
 
@@ -1494,15 +1390,13 @@ int clas_osr_zdres(const obsd_t *obs, int n, const double *rs,
  * @param[in]     clas  CLAS decoder context (replaces upstream globals)
  * @return Number of valid measurements, 0 on failure
  */
-int clas_ssr2osr(rtk_t *rtk, obsd_t *obs, int n, nav_t *nav,
-                 clas_osrd_t *osr, int mode, clas_ctx_t *clas)
-{
+int clas_ssr2osr(rtk_t* rtk, obsd_t* obs, int n, nav_t* nav, clas_osrd_t* osr, int mode, clas_ctx_t* clas) {
     double *rs, *dts, *var, *e, *azel;
     int i, j, k = 0, nf = rtk->opt.nf, sati;
-    prcopt_t *opt = &rtk->opt;
+    prcopt_t* opt = &rtk->opt;
     int svh[MAXOBS];
-    clas_grid_t *grid;
-    clas_corr_t *corr;
+    clas_grid_t* grid;
+    clas_corr_t* corr;
     double pos[3];
     int ch, nn;
     static clas_osr_ctx_t osr_ctx;
@@ -1513,7 +1407,10 @@ int clas_ssr2osr(rtk_t *rtk, obsd_t *obs, int n, nav_t *nav,
         osr_ctx_init = 1;
     }
 
-    rs = mat(6, n); dts = mat(2, n); var = mat(1, n); azel = zeros(2, n);
+    rs = mat(6, n);
+    dts = mat(2, n);
+    var = mat(1, n);
+    azel = zeros(2, n);
     e = mat(n, 3);
 
     for (i = 0; i < MAXSAT; i++) {
@@ -1547,17 +1444,24 @@ int clas_ssr2osr(rtk_t *rtk, obsd_t *obs, int n, nav_t *nav,
 
     if ((nn = clas_get_grid_index(clas, pos, grid, 0, obs[0].time)) <= 0) {
         trace(NULL, 2, "clas_ssr2osr: no valid grid\n");
-        free(rs); free(dts); free(var); free(e); free(azel);
+        free(rs);
+        free(dts);
+        free(var);
+        free(e);
+        free(azel);
         rtk->sol.stat = SOLQ_SINGLE;
         return 0;
     }
 
     /* fetch corrections from bank */
     if (grid->network > 0 && grid->network != corr->network) {
-        if (clas_bank_get_close(clas, obs[0].time,
-                                grid->network, ch, corr) != 0) {
+        if (clas_bank_get_close(clas, obs[0].time, grid->network, ch, corr) != 0) {
             trace(NULL, 2, "clas_ssr2osr: bank lookup failed\n");
-            free(rs); free(dts); free(var); free(e); free(azel);
+            free(rs);
+            free(dts);
+            free(var);
+            free(e);
+            free(azel);
             rtk->sol.stat = SOLQ_SINGLE;
             return 0;
         }
@@ -1582,9 +1486,7 @@ int clas_ssr2osr(rtk_t *rtk, obsd_t *obs, int n, nav_t *nav,
     satposs(obs[0].time, obs, n, nav, EPHOPT_SSRAPC, rs, dts, var, svh);
 
     /* zero-difference residuals */
-    k = clas_osr_zdres(obs, n, rs, dts, var, svh, nav,
-                       rtk->x, NULL, e, azel, rtk, 1,
-                       &osr_ctx, grid, corr, rtk->ssat,
+    k = clas_osr_zdres(obs, n, rs, dts, var, svh, nav, rtk->x, NULL, e, azel, rtk, 1, &osr_ctx, grid, corr, rtk->ssat,
                        opt, &rtk->sol, osr, ch);
     if (!k) {
         trace(NULL, 2, "clas_ssr2osr: zdres failed\n");
@@ -1669,6 +1571,10 @@ int clas_ssr2osr(rtk_t *rtk, obsd_t *obs, int n, nav_t *nav,
         }
     }
 
-    free(rs); free(dts); free(var); free(e); free(azel);
+    free(rs);
+    free(dts);
+    free(var);
+    free(e);
+    free(azel);
     return k;
 }

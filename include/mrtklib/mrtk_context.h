@@ -40,12 +40,12 @@ extern "C" {
  * @brief Error code enumeration for MRTKLIB functions.
  */
 typedef enum {
-    MRTK_OK          =  0,  /**< Success */
-    MRTK_ERR_VALUE   = -1,  /**< Invalid parameter value */
-    MRTK_ERR_IO      = -2,  /**< I/O error (file, stream) */
-    MRTK_ERR_MEMORY  = -3,  /**< Memory allocation failure */
-    MRTK_ERR_FORMAT  = -4,  /**< Data format error */
-    MRTK_ERR_CANCEL  = -5   /**< Processing cancelled */
+    MRTK_OK = 0,          /**< Success */
+    MRTK_ERR_VALUE = -1,  /**< Invalid parameter value */
+    MRTK_ERR_IO = -2,     /**< I/O error (file, stream) */
+    MRTK_ERR_MEMORY = -3, /**< Memory allocation failure */
+    MRTK_ERR_FORMAT = -4, /**< Data format error */
+    MRTK_ERR_CANCEL = -5  /**< Processing cancelled */
 } mrtk_err_t;
 
 /*============================================================================
@@ -56,7 +56,7 @@ typedef enum {
  * @brief Message display callback (for GUI/app-level status messages).
  * @param[in] msg  Null-terminated message string
  */
-typedef void (*mrtk_showmsg_cb_t)(const char *msg);
+typedef void (*mrtk_showmsg_cb_t)(const char* msg);
 
 /*============================================================================
  * Context Structure
@@ -72,21 +72,21 @@ typedef void (*mrtk_showmsg_cb_t)(const char *msg);
  */
 typedef struct {
     /* Runtime control */
-    volatile int is_running;        /**< Non-zero while processing is active */
-    volatile int cancel_requested;  /**< Non-zero to request cancellation */
+    volatile int is_running;       /**< Non-zero while processing is active */
+    volatile int cancel_requested; /**< Non-zero to request cancellation */
 
     /* Error state */
-    mrtk_err_t last_err_code;       /**< Most recent error code */
-    char       last_err_msg[256];   /**< Most recent error message */
+    mrtk_err_t last_err_code; /**< Most recent error code */
+    char last_err_msg[256];   /**< Most recent error message */
 
     /* Trace / debug */
-    int      trace_level;   /**< Trace level (0:off, 1:error..5:verbose) */
-    FILE    *trace_fp;      /**< Trace output stream (NULL = disabled) */
-    uint32_t tick_trace;    /**< Tick count at traceopen (for elapsed time) */
+    int trace_level;     /**< Trace level (0:off, 1:error..5:verbose) */
+    FILE* trace_fp;      /**< Trace output stream (NULL = disabled) */
+    uint32_t tick_trace; /**< Tick count at traceopen (for elapsed time) */
 
     /* User data and callbacks */
-    void             *user_data;    /**< Application-specific data pointer */
-    mrtk_showmsg_cb_t cb_showmsg;   /**< Status message callback (may be NULL) */
+    void* user_data;              /**< Application-specific data pointer */
+    mrtk_showmsg_cb_t cb_showmsg; /**< Status message callback (may be NULL) */
 } mrtk_ctx_t;
 
 /*============================================================================
@@ -103,7 +103,7 @@ typedef struct {
  *
  * @return Newly allocated context, or NULL on allocation failure.
  */
-mrtk_ctx_t *mrtk_ctx_create(void);
+mrtk_ctx_t* mrtk_ctx_create(void);
 
 /**
  * @brief Destroy a runtime context.
@@ -113,7 +113,7 @@ mrtk_ctx_t *mrtk_ctx_create(void);
  *
  * @param[in] ctx  Context to destroy, or NULL (no-op)
  */
-void mrtk_ctx_destroy(mrtk_ctx_t *ctx);
+void mrtk_ctx_destroy(mrtk_ctx_t* ctx);
 
 /*============================================================================
  * Global Context (transitional)
@@ -129,7 +129,7 @@ void mrtk_ctx_destroy(mrtk_ctx_t *ctx);
  * @note This pointer will be removed once all modules have been migrated
  *       to explicit context passing.
  */
-extern mrtk_ctx_t *g_mrtk_ctx;
+extern mrtk_ctx_t* g_mrtk_ctx;
 
 #ifdef __cplusplus
 }

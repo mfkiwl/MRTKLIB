@@ -30,8 +30,8 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_time.h"
 #include "mrtklib/mrtk_peph.h"
+#include "mrtklib/mrtk_time.h"
 
 /*============================================================================
  * Tidal Displacement Functions
@@ -58,8 +58,7 @@ extern "C" {
  *                        8:Mf,9:Mm,10:Ssa)
  * @param[out] dr     Displacement by earth tides (ECEF) (m)
  */
-void tidedisp(gtime_t tutc, const double *rr, int opt, const erp_t *erp,
-              const double *odisp, double *dr);
+void tidedisp(gtime_t tutc, const double* rr, int opt, const erp_t* erp, const double* odisp, double* dr);
 
 /**
  * @brief Compute displacement by ocean tide loading (11 constituents).
@@ -67,7 +66,7 @@ void tidedisp(gtime_t tutc, const double *rr, int opt, const erp_t *erp,
  * @param[in]  odisp  Ocean tide loading parameters (6*11 values)
  * @param[out] denu   Displacement in ENU (m)
  */
-void tide_oload(gtime_t tut, const double *odisp, double *denu);
+void tide_oload(gtime_t tut, const double* odisp, double* denu);
 
 #ifdef __cplusplus
 }

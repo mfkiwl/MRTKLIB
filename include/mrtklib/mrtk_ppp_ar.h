@@ -29,10 +29,10 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_context.h"
-#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_rtkpos.h"
 
 /**
@@ -48,8 +48,8 @@ extern "C" {
  * @param[in,out] P     Float covariance
  * @return Status (0: no resolution, 1: success)
  */
-int ppp_ar(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int n, int *exc,
-           const nav_t *nav, const double *azel, double *x, double *P);
+int ppp_ar(mrtk_ctx_t* ctx, rtk_t* rtk, const obsd_t* obs, int n, int* exc, const nav_t* nav, const double* azel,
+           double* x, double* P);
 
 #ifdef __cplusplus
 }

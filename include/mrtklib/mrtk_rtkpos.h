@@ -29,43 +29,43 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_context.h"
-#include "mrtklib/mrtk_time.h"
-#include "mrtklib/mrtk_sol.h"
-#include "mrtklib/mrtk_opt.h"
-#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_foundation.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_opt.h"
+#include "mrtklib/mrtk_sol.h"
+#include "mrtklib/mrtk_time.h"
 
 typedef struct {        /* ambiguity control type */
     gtime_t epoch[4];   /* last epoch */
     int n[4];           /* number of epochs */
-    double LC [4];      /* linear combination average */
+    double LC[4];       /* linear combination average */
     double LCv[4];      /* linear combination variance */
     int fixcnt;         /* fix count */
     char flags[MAXSAT]; /* fix flags */
 } ambc_t;
 
-typedef struct {        /* RTK control/result type */
-    sol_t  sol;         /* RTK solution */
-    double rb[6];       /* base position/velocity (ecef) (m|m/s) */
-    int nx,na;          /* number of float states/fixed states */
-    double tt;          /* time difference between current and previous (s) */
-    double *x, *P;      /* float states and their covariance */
-    double *Q;          /* process noise covariance (adaptive filter) */
-    double *xa,*Pa;     /* fixed states and their covariance */
-    int nfix;           /* number of continuous fixes of ambiguity */
-    double com_bias;    /* common bias offset for phase-bias initialization */
-    ambc_t ambc[MAXSAT]; /* ambibuity control */
-    ssat_t ssat[MAXSAT]; /* satellite status */
-    int neb;            /* bytes in error message buffer */
+typedef struct {            /* RTK control/result type */
+    sol_t sol;              /* RTK solution */
+    double rb[6];           /* base position/velocity (ecef) (m|m/s) */
+    int nx, na;             /* number of float states/fixed states */
+    double tt;              /* time difference between current and previous (s) */
+    double *x, *P;          /* float states and their covariance */
+    double* Q;              /* process noise covariance (adaptive filter) */
+    double *xa, *Pa;        /* fixed states and their covariance */
+    int nfix;               /* number of continuous fixes of ambiguity */
+    double com_bias;        /* common bias offset for phase-bias initialization */
+    ambc_t ambc[MAXSAT];    /* ambibuity control */
+    ssat_t ssat[MAXSAT];    /* satellite status */
+    int neb;                /* bytes in error message buffer */
     char errbuf[MAXERRMSG]; /* error message buffer */
-    prcopt_t opt;       /* processing options */
-    int miono_info[2];  /* MADOCA-PPP iono info (0:region id, 1:area No.) */
-    double prev_qr[6];  /* previous position variance/covariance (m^2) */
-    int excsat;         /* index of next satellite to exclude for partial AR */
-    int nb_ar;          /* number of DD ambiguities used for AR last epoch */
-    char holdamb;       /* fix-and-hold has occurred at least once */
+    prcopt_t opt;           /* processing options */
+    int miono_info[2];      /* MADOCA-PPP iono info (0:region id, 1:area No.) */
+    double prev_qr[6];      /* previous position variance/covariance (m^2) */
+    int excsat;             /* index of next satellite to exclude for partial AR */
+    int nb_ar;              /* number of DD ambiguities used for AR last epoch */
+    char holdamb;           /* fix-and-hold has occurred at least once */
 } rtk_t;
 
 /**
@@ -73,13 +73,13 @@ typedef struct {        /* RTK control/result type */
  * @param[in,out] rtk  RTK control/result struct
  * @param[in]     opt  Positioning options
  */
-void rtkinit(rtk_t *rtk, const prcopt_t *opt);
+void rtkinit(rtk_t* rtk, const prcopt_t* opt);
 
 /**
  * @brief Free memory for RTK control struct.
  * @param[in,out] rtk  RTK control/result struct
  */
-void rtkfree(rtk_t *rtk);
+void rtkfree(rtk_t* rtk);
 
 /**
  * @brief Compute rover position by precise positioning.
@@ -89,8 +89,7 @@ void rtkfree(rtk_t *rtk);
  * @param[in,out] nav  Navigation messages
  * @return Status (0: no solution, 1: valid solution)
  */
-int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int nobs,
-           nav_t *nav);
+int rtkpos(mrtk_ctx_t* ctx, rtk_t* rtk, const obsd_t* obs, int nobs, nav_t* nav);
 
 /**
  * @brief Open solution status file and set output level.
@@ -98,7 +97,7 @@ int rtkpos(mrtk_ctx_t *ctx, rtk_t *rtk, const obsd_t *obs, int nobs,
  * @param[in] level RTK status level (0: off)
  * @return Status (1: ok, 0: error)
  */
-int rtkopenstat(const char *file, int level);
+int rtkopenstat(const char* file, int level);
 
 /**
  * @brief Close solution status file.
@@ -111,7 +110,7 @@ void rtkclosestat(void);
  * @param[out]    buff Output buffer
  * @return Number of bytes written
  */
-int rtkoutstat(rtk_t *rtk, char *buff);
+int rtkoutstat(rtk_t* rtk, char* buff);
 
 #ifdef __cplusplus
 }

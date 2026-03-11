@@ -34,12 +34,12 @@ extern "C" {
  * Geoid Model Constants
  *===========================================================================*/
 
-#define GEOID_EMBEDDED    0   /**< geoid model: embedded geoid (1x1 deg) */
-#define GEOID_EGM96_M150  1   /**< geoid model: EGM96 15x15" */
-#define GEOID_EGM2008_M25 2   /**< geoid model: EGM2008 2.5x2.5" */
-#define GEOID_EGM2008_M10 3   /**< geoid model: EGM2008 1.0x1.0" */
-#define GEOID_GSI2000_M15 4   /**< geoid model: GSI geoid 2000 1.0x1.5" */
-#define GEOID_RAF09       5   /**< geoid model: IGN RAF09 for France 1.5"x2" */
+#define GEOID_EMBEDDED 0    /**< geoid model: embedded geoid (1x1 deg) */
+#define GEOID_EGM96_M150 1  /**< geoid model: EGM96 15x15" */
+#define GEOID_EGM2008_M25 2 /**< geoid model: EGM2008 2.5x2.5" */
+#define GEOID_EGM2008_M10 3 /**< geoid model: EGM2008 1.0x1.0" */
+#define GEOID_GSI2000_M15 4 /**< geoid model: GSI geoid 2000 1.0x1.5" */
+#define GEOID_RAF09 5       /**< geoid model: IGN RAF09 for France 1.5"x2" */
 
 /*============================================================================
  * Geoid Functions
@@ -57,7 +57,7 @@ extern "C" {
  *       - gsigeome_ver4: GSI geoid 2000 1.0x1.5" (Japanese area)
  *       (byte-order of binary files must be compatible to CPU)
  */
-int opengeoid(int model, const char *file);
+int opengeoid(int model, const char* file);
 
 /**
  * @brief Close geoid model file.
@@ -71,7 +71,7 @@ void closegeoid(void);
  * @note To use external geoid model, call opengeoid() before this function.
  *       If no external model is open, the embedded geoid model is used.
  */
-double geoidh(const double *pos);
+double geoidh(const double* pos);
 
 #ifdef __cplusplus
 }

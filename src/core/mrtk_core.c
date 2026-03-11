@@ -21,12 +21,12 @@
  * and all associated lifecycle, logging, and error handling functions.
  */
 
-#include "mrtklib/mrtklib.h"
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "mrtklib/mrtklib.h"
 
 /*============================================================================
  * Legacy Migration Support
@@ -60,10 +60,10 @@ mrtk_context_t* g_mrtk_legacy_ctx = NULL;
  * It is intentionally hidden from users to maintain API stability.
  */
 struct mrtk_context_s {
-    mrtk_log_level_t log_level;             /**< Minimum log level threshold */
-    mrtk_log_cb_t    log_callback;          /**< User-defined log handler */
-    char             last_error[MAX_ERROR_LEN]; /**< Most recent error message */
-    void*            user_data;             /**< Application-specific data pointer */
+    mrtk_log_level_t log_level;     /**< Minimum log level threshold */
+    mrtk_log_cb_t log_callback;     /**< User-defined log handler */
+    char last_error[MAX_ERROR_LEN]; /**< Most recent error message */
+    void* user_data;                /**< Application-specific data pointer */
 };
 
 /*============================================================================
@@ -80,29 +80,28 @@ struct mrtk_context_s {
  * @param level Severity level of the message
  * @param msg   Formatted message string
  */
-static void default_log_callback(mrtk_context_t* ctx, mrtk_log_level_t level,
-                                  const char* msg) {
+static void default_log_callback(mrtk_context_t* ctx, mrtk_log_level_t level, const char* msg) {
     const char* level_str;
-    FILE*       output;
+    FILE* output;
 
     (void)ctx; /* Unused in default implementation */
 
     switch (level) {
         case MRTK_LOG_DEBUG:
             level_str = "[DEBUG]";
-            output    = stdout;
+            output = stdout;
             break;
         case MRTK_LOG_INFO:
             level_str = "[INFO] ";
-            output    = stdout;
+            output = stdout;
             break;
         case MRTK_LOG_WARN:
             level_str = "[WARN] ";
-            output    = stdout;
+            output = stdout;
             break;
         case MRTK_LOG_ERROR:
             level_str = "[ERROR]";
-            output    = stderr;
+            output = stderr;
             break;
         case MRTK_LOG_NONE:
         default:
@@ -167,10 +166,10 @@ mrtk_context_t* mrtk_context_new(void) {
     }
 
     /* Initialize with default settings */
-    ctx->log_level     = MRTK_LOG_INFO;
-    ctx->log_callback  = default_log_callback;
+    ctx->log_level = MRTK_LOG_INFO;
+    ctx->log_callback = default_log_callback;
     ctx->last_error[0] = '\0';
-    ctx->user_data     = NULL;
+    ctx->user_data = NULL;
 
     return ctx;
 }
@@ -249,10 +248,9 @@ mrtk_log_level_t mrtk_context_get_log_level(const mrtk_context_t* ctx) {
  * @param fmt   printf-style format string
  * @param args  Pre-initialized va_list
  */
-void mrtk_log_v(mrtk_context_t* ctx, mrtk_log_level_t level, const char* fmt,
-                va_list args) {
+void mrtk_log_v(mrtk_context_t* ctx, mrtk_log_level_t level, const char* fmt, va_list args) {
     char buf[MAX_LOG_LEN];
-    int  written;
+    int written;
 
     /* Validate parameters and check log level threshold */
     if (ctx == NULL || ctx->log_callback == NULL) {
@@ -362,6 +360,4 @@ void* mrtk_context_get_user_data(const mrtk_context_t* ctx) {
  *
  * @return Static version string (e.g., "0.1.0")
  */
-const char* mrtk_version_string(void) {
-    return MRTKLIB_VERSION_STRING;
-}
+const char* mrtk_version_string(void) { return MRTKLIB_VERSION_STRING; }

@@ -42,10 +42,10 @@ extern "C" {
  * @brief Option type for configuration file parsing.
  */
 typedef struct {
-    const char *name;   /**< option name */
-    int format;         /**< option format (0:int,1:double,2:string,3:enum) */
-    void *var;          /**< pointer to option variable */
-    const char *comment; /**< option comment/enum labels/unit */
+    const char* name;    /**< option name */
+    int format;          /**< option format (0:int,1:double,2:string,3:enum) */
+    void* var;           /**< pointer to option variable */
+    const char* comment; /**< option comment/enum labels/unit */
 } opt_t;
 
 /*============================================================================
@@ -68,7 +68,7 @@ extern opt_t sysopts[];
  * @param[in] opts  Options table (terminated with name="")
  * @return Option record (NULL: not found)
  */
-opt_t *searchopt(const char *name, const opt_t *opts);
+opt_t* searchopt(const char* name, const opt_t* opts);
 
 /**
  * @brief Convert string to option value.
@@ -76,7 +76,7 @@ opt_t *searchopt(const char *name, const opt_t *opts);
  * @param[in]  str  Option value string
  * @return Status (1:ok, 0:error)
  */
-int str2opt(opt_t *opt, const char *str);
+int str2opt(opt_t* opt, const char* str);
 
 /**
  * @brief Convert option value to string.
@@ -84,7 +84,7 @@ int str2opt(opt_t *opt, const char *str);
  * @param[out] str  Option value string
  * @return Length of output string
  */
-int opt2str(const opt_t *opt, char *str);
+int opt2str(const opt_t* opt, char* str);
 
 /**
  * @brief Convert option to string (keyword=value # comment).
@@ -92,7 +92,7 @@ int opt2str(const opt_t *opt, char *str);
  * @param[out] buff  Option string
  * @return Length of output string
  */
-int opt2buf(const opt_t *opt, char *buff);
+int opt2buf(const opt_t* opt, char* buff);
 
 /**
  * @brief Load options from file.
@@ -100,7 +100,7 @@ int opt2buf(const opt_t *opt, char *buff);
  * @param[in,out] opts  Options table (terminated with name="")
  * @return Status (1:ok, 0:error)
  */
-int loadopts(const char *file, opt_t *opts);
+int loadopts(const char* file, opt_t* opts);
 
 /**
  * @brief Save options to file.
@@ -110,8 +110,7 @@ int loadopts(const char *file, opt_t *opts);
  * @param[in] opts     Options table (terminated with name="")
  * @return Status (1:ok, 0:error)
  */
-int saveopts(const char *file, const char *mode, const char *comment,
-             const opt_t *opts);
+int saveopts(const char* file, const char* mode, const char* comment, const opt_t* opts);
 
 /**
  * @brief Reset system options to default.
@@ -124,7 +123,7 @@ void resetsysopts(void);
  * @param[out] sopt  Solution options   (NULL: no output)
  * @param[out] fopt  File options       (NULL: no output)
  */
-void getsysopts(prcopt_t *popt, solopt_t *sopt, filopt_t *fopt);
+void getsysopts(prcopt_t* popt, solopt_t* sopt, filopt_t* fopt);
 
 /**
  * @brief Set system options.
@@ -132,8 +131,7 @@ void getsysopts(prcopt_t *popt, solopt_t *sopt, filopt_t *fopt);
  * @param[in] solopt  Solution options   (NULL: default)
  * @param[in] filopt  File options       (NULL: default)
  */
-void setsysopts(const prcopt_t *prcopt, const solopt_t *solopt,
-                const filopt_t *filopt);
+void setsysopts(const prcopt_t* prcopt, const solopt_t* solopt, const filopt_t* filopt);
 
 #ifdef __cplusplus
 }

@@ -23,7 +23,7 @@ extern "C" {
  * Reads a TOML file and maps semantic section.key paths to legacy option names
  * in the opts table. Unknown TOML keys are silently skipped.
  */
-extern int loadopts_toml(const char *file, opt_t *opts);
+extern int loadopts_toml(const char* file, opt_t* opts);
 
 /**
  * @brief Save options to a TOML configuration file.
@@ -32,8 +32,7 @@ extern int loadopts_toml(const char *file, opt_t *opts);
  * @param[in] opts     Options table (terminated by empty name).
  * @return 1 on success, 0 on error.
  */
-extern int saveopts_toml(const char *file, const char *comment,
-                         const opt_t *opts);
+extern int saveopts_toml(const char* file, const char* comment, const opt_t* opts);
 
 #ifdef __cplusplus
 }

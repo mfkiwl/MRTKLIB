@@ -1,18 +1,18 @@
 /*------------------------------------------------------------------------------
-* rnx2rtkp.c : read rinex obs/nav files and compute receiver positions
-*
-* Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
-* Copyright (C) 2023-2025 Cabinet Office, Japan
-* Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
-* Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
-* Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
-* Copyright (C) 2015- Mitsubishi Electric Corp.
-* Copyright (C) 2014 Geospatial Information Authority of Japan
-* Copyright (C) 2014 T.SUZUKI
-* Copyright (C) 2007-2023 T.TAKASU
-*
-* SPDX-License-Identifier: BSD-2-Clause
-*-----------------------------------------------------------------------------*/
+ * rnx2rtkp.c : read rinex obs/nav files and compute receiver positions
+ *
+ * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2023-2025 Cabinet Office, Japan
+ * Copyright (C) 2024-2025 Lighthouse Technology & Consulting Co. Ltd.
+ * Copyright (C) 2023-2025 Japan Aerospace Exploration Agency
+ * Copyright (C) 2023-2025 TOSHIBA ELECTRONIC TECHNOLOGIES CORPORATION
+ * Copyright (C) 2015- Mitsubishi Electric Corp.
+ * Copyright (C) 2014 Geospatial Information Authority of Japan
+ * Copyright (C) 2014 T.SUZUKI
+ * Copyright (C) 2007-2023 T.TAKASU
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *-----------------------------------------------------------------------------*/
 /**
  * @file rnx2rtkp.c
  * @brief Post-processing positioning from RINEX OBS/NAV files.
@@ -39,81 +39,80 @@
  *   2024/12/20  1.16 add option -sta
  */
 #include <stdarg.h>
-#include "rtklib.h"
-#include "mrtklib/mrtklib.h"
+
 #include "mrtklib/mrtk_context.h"
 #include "mrtklib/mrtk_options.h"
 #include "mrtklib/mrtk_postpos.h"
+#include "mrtklib/mrtklib.h"
+#include "rtklib.h"
 
-#define PROGNAME    "rnx2rtkp"          /* program name */
-#define MAXFILE     16                  /* max number of input files */
+#define PROGNAME "rnx2rtkp" /* program name */
+#define MAXFILE 16          /* max number of input files */
 
 /* help text -----------------------------------------------------------------*/
-static const char *help[]={
-"",
-" usage: rnx2rtkp [option]... file file [...]",
-"",
-" Read RINEX OBS/NAV/GNAV/HNAV/CLK, SP3, SBAS message log files and ccompute ",
-" receiver (rover) positions and output position solutions.",
-" The first RINEX OBS file shall contain receiver (rover) observations. For the",
-" relative mode, the second RINEX OBS file shall contain reference",
-" (base station) receiver observations. At least one RINEX NAV/GNAV/HNAV",
-" file shall be included in input files. To use SP3 precise ephemeris, specify",
-" the path in the files. The extension of the SP3 file shall be .sp3 or .eph.",
-" All of the input file paths can include wild-cards (*). To avoid command",
-" line deployment of wild-cards, use \"...\" for paths with wild-cards.",
-" Command line options are as follows ([]:default). With -k option, the",
-" processing options are input from the configuration file. In this case,",
-" command line options precede options in the configuration file.",
-"",
-" -?        print help",
-" -k file   input options from configuration file [off]",
-" -o file   set output file [stdout]",
-" -ts ds ts start day/time (ds=y/m/d ts=h:m:s) [obs start time]",
-" -te de te end day/time   (de=y/m/d te=h:m:s) [obs end time]",
-" -ti tint  time interval (sec) [all]",
-" -p mode   mode (0:single,1:dgps,2:kinematic,3:static,4:moving-base,",
-"                 5:fixed,6:ppp-kinematic,7:ppp-static) [2]",
-" -m mask   elevation mask angle (deg) [15]",
-" -sys s[,s...] nav system(s) (s=G:GPS,R:GLO,E:GAL,J:QZS,C:BDS,I:IRN) [G|R]",
-" -f freq   number of frequencies for relative mode (1:L1,2:L1+L2,3:L1+L2+L5) [2]",
-" -v thres  validation threshold for integer ambiguity (0.0:no AR) [3.0]",
-" -b        backward solutions [off]",
-" -c        forward/backward combined solutions [off]",
-" -i        instantaneous integer ambiguity resolution [off]",
-" -h        fix and hold for integer ambiguity resolution [off]",
-" -e        output x/y/z-ecef position [latitude/longitude/height]",
-" -a        output e/n/u-baseline [latitude/longitude/height]",
-" -n        output NMEA-0183 GGA sentence [off]",
-" -g        output latitude/longitude in the form of ddd mm ss.ss' [ddd.ddd]",
-" -t        output time in the form of yyyy/mm/dd hh:mm:ss.ss [sssss.ss]",
-" -u        output time in utc [gpst]",
-" -d col    number of decimals in time [3]",
-" -s sep    field separator [' ']",
-" -r x y z  reference (base) receiver ecef pos (m) [average of single pos]",
-"           rover receiver ecef pos (m) for fixed or ppp-fixed mode",
-" -l lat lon hgt reference (base) receiver latitude/longitude/height (deg/m)",
-"           rover latitude/longitude/height for fixed or ppp-fixed mode",
-" -ign_chierr ignore chi-square error mode [off]",
-" -sta staname   station name[RINEX MARKER NAME]",
-" -y level  output soltion status (0:off,1:states,2:residuals) [0]",
-" -x level  debug trace level (0:off) [0]",
-" -ver      print version"
-};
+static const char* help[] = {"",
+                             " usage: rnx2rtkp [option]... file file [...]",
+                             "",
+                             " Read RINEX OBS/NAV/GNAV/HNAV/CLK, SP3, SBAS message log files and ccompute ",
+                             " receiver (rover) positions and output position solutions.",
+                             " The first RINEX OBS file shall contain receiver (rover) observations. For the",
+                             " relative mode, the second RINEX OBS file shall contain reference",
+                             " (base station) receiver observations. At least one RINEX NAV/GNAV/HNAV",
+                             " file shall be included in input files. To use SP3 precise ephemeris, specify",
+                             " the path in the files. The extension of the SP3 file shall be .sp3 or .eph.",
+                             " All of the input file paths can include wild-cards (*). To avoid command",
+                             " line deployment of wild-cards, use \"...\" for paths with wild-cards.",
+                             " Command line options are as follows ([]:default). With -k option, the",
+                             " processing options are input from the configuration file. In this case,",
+                             " command line options precede options in the configuration file.",
+                             "",
+                             " -?        print help",
+                             " -k file   input options from configuration file [off]",
+                             " -o file   set output file [stdout]",
+                             " -ts ds ts start day/time (ds=y/m/d ts=h:m:s) [obs start time]",
+                             " -te de te end day/time   (de=y/m/d te=h:m:s) [obs end time]",
+                             " -ti tint  time interval (sec) [all]",
+                             " -p mode   mode (0:single,1:dgps,2:kinematic,3:static,4:moving-base,",
+                             "                 5:fixed,6:ppp-kinematic,7:ppp-static) [2]",
+                             " -m mask   elevation mask angle (deg) [15]",
+                             " -sys s[,s...] nav system(s) (s=G:GPS,R:GLO,E:GAL,J:QZS,C:BDS,I:IRN) [G|R]",
+                             " -f freq   number of frequencies for relative mode (1:L1,2:L1+L2,3:L1+L2+L5) [2]",
+                             " -v thres  validation threshold for integer ambiguity (0.0:no AR) [3.0]",
+                             " -b        backward solutions [off]",
+                             " -c        forward/backward combined solutions [off]",
+                             " -i        instantaneous integer ambiguity resolution [off]",
+                             " -h        fix and hold for integer ambiguity resolution [off]",
+                             " -e        output x/y/z-ecef position [latitude/longitude/height]",
+                             " -a        output e/n/u-baseline [latitude/longitude/height]",
+                             " -n        output NMEA-0183 GGA sentence [off]",
+                             " -g        output latitude/longitude in the form of ddd mm ss.ss' [ddd.ddd]",
+                             " -t        output time in the form of yyyy/mm/dd hh:mm:ss.ss [sssss.ss]",
+                             " -u        output time in utc [gpst]",
+                             " -d col    number of decimals in time [3]",
+                             " -s sep    field separator [' ']",
+                             " -r x y z  reference (base) receiver ecef pos (m) [average of single pos]",
+                             "           rover receiver ecef pos (m) for fixed or ppp-fixed mode",
+                             " -l lat lon hgt reference (base) receiver latitude/longitude/height (deg/m)",
+                             "           rover latitude/longitude/height for fixed or ppp-fixed mode",
+                             " -ign_chierr ignore chi-square error mode [off]",
+                             " -sta staname   station name[RINEX MARKER NAME]",
+                             " -y level  output soltion status (0:off,1:states,2:residuals) [0]",
+                             " -x level  debug trace level (0:off) [0]",
+                             " -ver      print version"};
 /* show message --------------------------------------------------------------*/
-extern int showmsg(const char *format, ...)
-{
+extern int showmsg(const char* format, ...) {
     va_list arg;
-    va_start(arg,format); vfprintf(stderr,format,arg); va_end(arg);
-    fprintf(stderr,"\r");
+    va_start(arg, format);
+    vfprintf(stderr, format, arg);
+    va_end(arg);
+    fprintf(stderr, "\r");
     return 0;
 }
 extern void settspan(gtime_t ts, gtime_t te) {}
 extern void settime(gtime_t time) {}
 
 /* print help ----------------------------------------------------------------*/
-static void printhelp(void)
-{
+static void printhelp(void) {
     int i;
     for (i = 0; i < (int)(sizeof(help) / sizeof(*help)); i++) {
         fprintf(stderr, "%s\n", help[i]);
@@ -121,60 +120,58 @@ static void printhelp(void)
     exit(0);
 }
 /* print version -------------------------------------------------------------*/
-static void printver(void)
-{
-    fprintf(stderr,"%s(%s ver.%s)\n",PROGNAME,MRTKLIB_SOFTNAME,MRTKLIB_VERSION_STRING);
+static void printver(void) {
+    fprintf(stderr, "%s(%s ver.%s)\n", PROGNAME, MRTKLIB_SOFTNAME, MRTKLIB_VERSION_STRING);
     exit(0);
 }
 /* rnx2rtkp main -------------------------------------------------------------*/
-int main(int argc, char **argv)
-{
-    prcopt_t prcopt=prcopt_default;
-    solopt_t solopt=solopt_default;
-    filopt_t filopt={""};
-    gtime_t ts={0},te={0};
-    double tint=0.0,es[]={2000,1,1,0,0,0},ee[]={2000,12,31,23,59,59},pos[3];
-    int i,j,n,ret;
-    char *infile[MAXFILE],*outfile="",*p;
-    mrtk_ctx_t *ctx;
+int main(int argc, char** argv) {
+    prcopt_t prcopt = prcopt_default;
+    solopt_t solopt = solopt_default;
+    filopt_t filopt = {""};
+    gtime_t ts = {0}, te = {0};
+    double tint = 0.0, es[] = {2000, 1, 1, 0, 0, 0}, ee[] = {2000, 12, 31, 23, 59, 59}, pos[3];
+    int i, j, n, ret;
+    char *infile[MAXFILE], *outfile = "", *p;
+    mrtk_ctx_t* ctx;
 
     /* Initialize MRTKLIB runtime context */
-    ctx=mrtk_ctx_create();
-    g_mrtk_ctx=ctx;
-    g_mrtk_legacy_ctx=mrtk_context_new();
+    ctx = mrtk_ctx_create();
+    g_mrtk_ctx = ctx;
+    g_mrtk_legacy_ctx = mrtk_context_new();
 
-    prcopt.mode  =PMODE_KINEMA;
-    prcopt.navsys=0;
-    prcopt.refpos=1;
-    prcopt.glomodear=0;
-    solopt.timef=0;
-    sprintf(solopt.prog ,"%s(%s ver.%s)",PROGNAME,MRTKLIB_SOFTNAME,MRTKLIB_VERSION_STRING);
-    sprintf(filopt.trace,"%s.trace",PROGNAME);
-    
+    prcopt.mode = PMODE_KINEMA;
+    prcopt.navsys = 0;
+    prcopt.refpos = 1;
+    prcopt.glomodear = 0;
+    solopt.timef = 0;
+    sprintf(solopt.prog, "%s(%s ver.%s)", PROGNAME, MRTKLIB_SOFTNAME, MRTKLIB_VERSION_STRING);
+    sprintf(filopt.trace, "%s.trace", PROGNAME);
+
     /* load options from configuration file(s)
      * resetsysopts() is called once before the loop so that multiple -k flags
      * are layered: each subsequent file overrides only the keys it specifies. */
     resetsysopts();
-    for (i=1;i<argc;i++) {
-        if (!strcmp(argv[i],"-k")&&i+1<argc) {
+    for (i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-k") && i + 1 < argc) {
             if (!loadopts(argv[++i], sysopts)) {
                 return -1;
             }
-            getsysopts(&prcopt,&solopt,&filopt);
+            getsysopts(&prcopt, &solopt, &filopt);
             apply_pppsig(prcopt.pppsig);
         }
     }
-    for (i=1,n=0;i<argc;i++) {
+    for (i = 1, n = 0; i < argc; i++) {
         if (!strcmp(argv[i], "-o") && i + 1 < argc) {
             outfile = argv[++i];
         } else if (!strcmp(argv[i], "-ts") && i + 2 < argc) {
-            sscanf(argv[++i],"%lf/%lf/%lf",es,es+1,es+2);
-            sscanf(argv[++i],"%lf:%lf:%lf",es+3,es+4,es+5);
-            ts=epoch2time(es);
+            sscanf(argv[++i], "%lf/%lf/%lf", es, es + 1, es + 2);
+            sscanf(argv[++i], "%lf:%lf:%lf", es + 3, es + 4, es + 5);
+            ts = epoch2time(es);
         } else if (!strcmp(argv[i], "-te") && i + 2 < argc) {
-            sscanf(argv[++i],"%lf/%lf/%lf",ee,ee+1,ee+2);
-            sscanf(argv[++i],"%lf:%lf:%lf",ee+3,ee+4,ee+5);
-            te=epoch2time(ee);
+            sscanf(argv[++i], "%lf/%lf/%lf", ee, ee + 1, ee + 2);
+            sscanf(argv[++i], "%lf:%lf:%lf", ee + 3, ee + 4, ee + 5);
+            te = epoch2time(ee);
         } else if (!strcmp(argv[i], "-ti") && i + 1 < argc) {
             tint = atof(argv[++i]);
         } else if (!strcmp(argv[i], "-k") && i + 1 < argc) {
@@ -185,14 +182,26 @@ int main(int argc, char **argv)
         } else if (!strcmp(argv[i], "-f") && i + 1 < argc) {
             prcopt.nf = atoi(argv[++i]);
         } else if (!strcmp(argv[i], "-sys") && i + 1 < argc) {
-            for (p=argv[++i];*p;p++) {
+            for (p = argv[++i]; *p; p++) {
                 switch (*p) {
-                    case 'G': prcopt.navsys|=SYS_GPS; break;
-                    case 'R': prcopt.navsys|=SYS_GLO; break;
-                    case 'E': prcopt.navsys|=SYS_GAL; break;
-                    case 'J': prcopt.navsys|=SYS_QZS; break;
-                    case 'C': prcopt.navsys|=SYS_CMP; break;
-                    case 'I': prcopt.navsys|=SYS_IRN; break;
+                    case 'G':
+                        prcopt.navsys |= SYS_GPS;
+                        break;
+                    case 'R':
+                        prcopt.navsys |= SYS_GLO;
+                        break;
+                    case 'E':
+                        prcopt.navsys |= SYS_GAL;
+                        break;
+                    case 'J':
+                        prcopt.navsys |= SYS_QZS;
+                        break;
+                    case 'C':
+                        prcopt.navsys |= SYS_CMP;
+                        break;
+                    case 'I':
+                        prcopt.navsys |= SYS_IRN;
+                        break;
                 }
                 if (!(p = strchr(p, ','))) {
                     break;
@@ -227,21 +236,21 @@ int main(int argc, char **argv)
         } else if (!strcmp(argv[i], "-g")) {
             solopt.degf = 1;
         } else if (!strcmp(argv[i], "-r") && i + 3 < argc) {
-            prcopt.refpos=prcopt.rovpos=0;
+            prcopt.refpos = prcopt.rovpos = 0;
             for (j = 0; j < 3; j++) {
                 prcopt.rb[j] = atof(argv[++i]);
             }
-            matcpy(prcopt.ru,prcopt.rb,3,1);
+            matcpy(prcopt.ru, prcopt.rb, 3, 1);
         } else if (!strcmp(argv[i], "-l") && i + 3 < argc) {
-            prcopt.refpos=prcopt.rovpos=0;
+            prcopt.refpos = prcopt.rovpos = 0;
             for (j = 0; j < 3; j++) {
                 pos[j] = atof(argv[++i]);
             }
             for (j = 0; j < 2; j++) {
                 pos[j] *= D2R;
             }
-            pos2ecef(pos,prcopt.rb);
-            matcpy(prcopt.ru,prcopt.rb,3,1);
+            pos2ecef(pos, prcopt.rb);
+            matcpy(prcopt.ru, prcopt.rb, 3, 1);
         } else if (!strcmp(argv[i], "-l6msg") && i + 1 < argc) {
             prcopt.l6mrg = atoi(argv[++i]);
         } else if (!strcmp(argv[i], "-ign_chierr")) {
@@ -261,22 +270,22 @@ int main(int argc, char **argv)
         }
     }
     if (!prcopt.navsys) {
-        prcopt.navsys=SYS_GPS|SYS_GLO;
+        prcopt.navsys = SYS_GPS | SYS_GLO;
     }
-    if (n<=0) {
+    if (n <= 0) {
         showmsg("error : no input file");
         mrtk_context_free(g_mrtk_legacy_ctx);
-        g_mrtk_ctx=NULL;
+        g_mrtk_ctx = NULL;
         mrtk_ctx_destroy(ctx);
         return -2;
     }
-    ret=postpos(ctx,ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
+    ret = postpos(ctx, ts, te, tint, 0.0, &prcopt, &solopt, &filopt, infile, n, outfile, "", "");
 
     if (!ret) {
         fprintf(stderr, "%40s\r", "");
     }
     mrtk_context_free(g_mrtk_legacy_ctx);
-    g_mrtk_ctx=NULL;
+    g_mrtk_ctx = NULL;
     mrtk_ctx_destroy(ctx);
     return ret;
 }

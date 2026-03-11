@@ -47,96 +47,96 @@ typedef struct nav_s nav_t;
  * @brief GPS/GAL/QZS/BDS/IRN almanac type.
  */
 typedef struct {
-    int sat;            /* satellite number */
-    int svh;            /* SV health (0:ok) */
-    int svconf;         /* AS and SV config */
-    int week;           /* GPS/QZS: GPS week, GAL: Galileo week */
-    gtime_t toa;        /* Toa */
-    double A,e,i0,OMG0,omg,M0,OMGd; /* SV orbit parameters */
-    double toas;        /* Toa (s) in week */
-    double f0,f1;       /* SV clock parameters (af0,af1) */
+    int sat;                              /* satellite number */
+    int svh;                              /* SV health (0:ok) */
+    int svconf;                           /* AS and SV config */
+    int week;                             /* GPS/QZS: GPS week, GAL: Galileo week */
+    gtime_t toa;                          /* Toa */
+    double A, e, i0, OMG0, omg, M0, OMGd; /* SV orbit parameters */
+    double toas;                          /* Toa (s) in week */
+    double f0, f1;                        /* SV clock parameters (af0,af1) */
 } alm_t;
 
 /**
  * @brief GLONASS almanac type.
  */
 typedef struct {
-    int sat;            /* satellite number */
-    int Cn;             /* unhealthy flag (1:unhealthy) */
-    int Mn;             /* satellite type (0:GLONASS,1:GLONASS-M) */
-    int Hn;             /* carrier-frequency number */
-    gtime_t toa;        /* Toa */
-    double tn;          /* time of first acsending node passage (s) */
-    double lamn,din,eccn,omgn,dTn,ddTn; /* SV orbit parameters */
-    double taun;        /* SV clock parameters */
+    int sat;                                 /* satellite number */
+    int Cn;                                  /* unhealthy flag (1:unhealthy) */
+    int Mn;                                  /* satellite type (0:GLONASS,1:GLONASS-M) */
+    int Hn;                                  /* carrier-frequency number */
+    gtime_t toa;                             /* Toa */
+    double tn;                               /* time of first acsending node passage (s) */
+    double lamn, din, eccn, omgn, dTn, ddTn; /* SV orbit parameters */
+    double taun;                             /* SV clock parameters */
 } galm_t;
 
 /**
  * @brief GPS/GAL/QZS/BDS/IRN broadcast ephemeris type.
  */
 typedef struct {
-    int sat;            /* satellite number */
-    int iode,iodc;      /* IODE,IODC */
-    int sva;            /* SV accuracy (URA index) */
-    int svh;            /* SV health (0:ok) */
-    int week;           /* GPS/QZS: gps week, GAL: galileo week */
-    int code;           /* GPS/QZS: code on L2 */
-                        /* GAL: data source defined as rinex 3.03 */
-                        /* BDS: data source (0:unknown,1:B1I,2:B1Q,3:B2I,4:B2Q,5:B3I,6:B3Q) */
-    int flag;           /* GPS/QZS: L2 P data flag */
-                        /* BDS: nav type (0:unknown,1:IGSO/MEO,2:GEO) */
-    gtime_t toe,toc,ttr; /* Toe,Toc,T_trans */
-                        /* SV orbit parameters */
-    double A,e,i0,OMG0,omg,M0,deln,OMGd,idot;
-    double crc,crs,cuc,cus,cic,cis;
-    double toes;        /* Toe (s) in week */
-    double fit;         /* fit interval (h) */
-    double f0,f1,f2;    /* SV clock parameters (af0,af1,af2) */
-    double tgd[6];      /* group delay parameters */
-                        /* GPS/QZS:tgd[0]=TGD */
-                        /* GAL:tgd[0]=BGD_E1E5a,tgd[1]=BGD_E1E5b */
-                        /* BDS:tgd[0]=TGD_B1I ,tgd[1]=TGD_B2I/B2b,tgd[2]=TGD_B1Cp */
-                        /*     tgd[3]=TGD_B2ap,tgd[4]=ISC_B1Cd   ,tgd[5]=ISC_B2ad */
-    int type;           /* ephemeris type */
-                        /* GPS/QZS: 0=LNAV,1=CNAV,2=CNAV-2 */
-                        /* GAL    : 0=INAV,1=FNAV */
-                        /* BDS    : 0=D1,1=D2,2=CNAV-1,3=CNAV-2,4=CNAV-3 */
-                        /* IRN    : 0=LNAV */
-    double Adot,ndot;   /* Adot,ndot for CNAV */
+    int sat;               /* satellite number */
+    int iode, iodc;        /* IODE,IODC */
+    int sva;               /* SV accuracy (URA index) */
+    int svh;               /* SV health (0:ok) */
+    int week;              /* GPS/QZS: gps week, GAL: galileo week */
+    int code;              /* GPS/QZS: code on L2 */
+                           /* GAL: data source defined as rinex 3.03 */
+                           /* BDS: data source (0:unknown,1:B1I,2:B1Q,3:B2I,4:B2Q,5:B3I,6:B3Q) */
+    int flag;              /* GPS/QZS: L2 P data flag */
+                           /* BDS: nav type (0:unknown,1:IGSO/MEO,2:GEO) */
+    gtime_t toe, toc, ttr; /* Toe,Toc,T_trans */
+                           /* SV orbit parameters */
+    double A, e, i0, OMG0, omg, M0, deln, OMGd, idot;
+    double crc, crs, cuc, cus, cic, cis;
+    double toes;       /* Toe (s) in week */
+    double fit;        /* fit interval (h) */
+    double f0, f1, f2; /* SV clock parameters (af0,af1,af2) */
+    double tgd[6];     /* group delay parameters */
+                       /* GPS/QZS:tgd[0]=TGD */
+                       /* GAL:tgd[0]=BGD_E1E5a,tgd[1]=BGD_E1E5b */
+                       /* BDS:tgd[0]=TGD_B1I ,tgd[1]=TGD_B2I/B2b,tgd[2]=TGD_B1Cp */
+                       /*     tgd[3]=TGD_B2ap,tgd[4]=ISC_B1Cd   ,tgd[5]=ISC_B2ad */
+    int type;          /* ephemeris type */
+                       /* GPS/QZS: 0=LNAV,1=CNAV,2=CNAV-2 */
+                       /* GAL    : 0=INAV,1=FNAV */
+                       /* BDS    : 0=D1,1=D2,2=CNAV-1,3=CNAV-2,4=CNAV-3 */
+                       /* IRN    : 0=LNAV */
+    double Adot, ndot; /* Adot,ndot for CNAV */
 } eph_t;
 
 /**
  * @brief GLONASS broadcast ephemeris type.
  */
 typedef struct {
-    int sat;            /* satellite number */
-    int iode;           /* IODE (0-6 bit of tb field) */
-    int frq;            /* FCN (frequency channel number) */
-    int svh;            /* extended SVH (b3:ln,b2:Cn_a,b1:Cn,b0:Bn) */
-    int flags;          /* status flags (b78:M,b6:P4,b5:P3,b4:P2,b23:P1,b01:P) */
-    int sva,age;        /* URA index (FT), age of operation (En) */
-    gtime_t toe;        /* epoch of ephemerides (gpst) */
-    gtime_t tof;        /* message frame time (gpst) */
-    double pos[3];      /* satellite position (ecef) (m) */
-    double vel[3];      /* satellite velocity (ecef) (m/s) */
-    double acc[3];      /* satellite acceleration (ecef) (m/s^2) */
-    double taun,gamn;   /* SV clock bias (s)/relative freq bias */
-    double dtaun;       /* delay between L1 and L2 (s) */
+    int sat;           /* satellite number */
+    int iode;          /* IODE (0-6 bit of tb field) */
+    int frq;           /* FCN (frequency channel number) */
+    int svh;           /* extended SVH (b3:ln,b2:Cn_a,b1:Cn,b0:Bn) */
+    int flags;         /* status flags (b78:M,b6:P4,b5:P3,b4:P2,b23:P1,b01:P) */
+    int sva, age;      /* URA index (FT), age of operation (En) */
+    gtime_t toe;       /* epoch of ephemerides (gpst) */
+    gtime_t tof;       /* message frame time (gpst) */
+    double pos[3];     /* satellite position (ecef) (m) */
+    double vel[3];     /* satellite velocity (ecef) (m/s) */
+    double acc[3];     /* satellite acceleration (ecef) (m/s^2) */
+    double taun, gamn; /* SV clock bias (s)/relative freq bias */
+    double dtaun;      /* delay between L1 and L2 (s) */
 } geph_t;
 
 /**
  * @brief SBAS ephemeris type.
  */
 typedef struct {
-    int sat;            /* satellite number */
-    gtime_t t0;         /* reference epoch time (GPST) */
-    gtime_t tof;        /* time of message frame (GPST) */
-    int sva;            /* SV accuracy (URA index) */
-    int svh;            /* SV health (0:ok) */
-    double pos[3];      /* satellite position (m) (ecef) */
-    double vel[3];      /* satellite velocity (m/s) (ecef) */
-    double acc[3];      /* satellite acceleration (m/s^2) (ecef) */
-    double af0,af1;     /* satellite clock-offset/drift (s,s/s) */
+    int sat;         /* satellite number */
+    gtime_t t0;      /* reference epoch time (GPST) */
+    gtime_t tof;     /* time of message frame (GPST) */
+    int sva;         /* SV accuracy (URA index) */
+    int svh;         /* SV health (0:ok) */
+    double pos[3];   /* satellite position (m) (ecef) */
+    double vel[3];   /* satellite velocity (m/s) (ecef) */
+    double acc[3];   /* satellite acceleration (m/s^2) (ecef) */
+    double af0, af1; /* satellite clock-offset/drift (s,s/s) */
 } seph_t;
 
 /*============================================================================
@@ -149,7 +149,7 @@ typedef struct {
  * @param[in] eph   Broadcast ephemeris
  * @return Satellite clock bias (s) without relativity correction
  */
-double eph2clk(gtime_t time, const eph_t *eph);
+double eph2clk(gtime_t time, const eph_t* eph);
 
 /**
  * @brief Compute satellite position and clock with broadcast ephemeris
@@ -160,8 +160,7 @@ double eph2clk(gtime_t time, const eph_t *eph);
  * @param[out] dts   Satellite clock bias (s)
  * @param[out] var   Satellite position and clock variance (m^2)
  */
-void eph2pos(gtime_t time, const eph_t *eph, double *rs, double *dts,
-             double *var);
+void eph2pos(gtime_t time, const eph_t* eph, double* rs, double* dts, double* var);
 
 /**
  * @brief Compute satellite clock bias with GLONASS ephemeris.
@@ -169,7 +168,7 @@ void eph2pos(gtime_t time, const eph_t *eph, double *rs, double *dts,
  * @param[in] geph  GLONASS ephemeris
  * @return Satellite clock bias (s)
  */
-double geph2clk(gtime_t time, const geph_t *geph);
+double geph2clk(gtime_t time, const geph_t* geph);
 
 /**
  * @brief Compute satellite position and clock with GLONASS ephemeris.
@@ -179,8 +178,7 @@ double geph2clk(gtime_t time, const geph_t *geph);
  * @param[out] dts   Satellite clock bias (s)
  * @param[out] var   Satellite position and clock variance (m^2)
  */
-void geph2pos(gtime_t time, const geph_t *geph, double *rs, double *dts,
-              double *var);
+void geph2pos(gtime_t time, const geph_t* geph, double* rs, double* dts, double* var);
 
 /**
  * @brief Compute satellite clock bias with SBAS ephemeris.
@@ -188,7 +186,7 @@ void geph2pos(gtime_t time, const geph_t *geph, double *rs, double *dts,
  * @param[in] seph  SBAS ephemeris
  * @return Satellite clock bias (s)
  */
-double seph2clk(gtime_t time, const seph_t *seph);
+double seph2clk(gtime_t time, const seph_t* seph);
 
 /**
  * @brief Compute satellite position and clock with SBAS ephemeris.
@@ -198,8 +196,7 @@ double seph2clk(gtime_t time, const seph_t *seph);
  * @param[out] dts   Satellite clock bias (s)
  * @param[out] var   Satellite position and clock variance (m^2)
  */
-void seph2pos(gtime_t time, const seph_t *seph, double *rs, double *dts,
-              double *var);
+void seph2pos(gtime_t time, const seph_t* seph, double* rs, double* dts, double* var);
 
 /**
  * @brief Compute satellite position and clock bias with almanac.
@@ -208,7 +205,7 @@ void seph2pos(gtime_t time, const seph_t *seph, double *rs, double *dts,
  * @param[out] rs    Satellite position (ecef) {x,y,z} (m)
  * @param[out] dts   Satellite clock bias (s)
  */
-void alm2pos(gtime_t time, const alm_t *alm, double *rs, double *dts);
+void alm2pos(gtime_t time, const alm_t* alm, double* rs, double* dts);
 
 /*============================================================================
  * Ephemeris Selection Functions
@@ -251,7 +248,7 @@ int get_ssr_ch_idx(void);
  * @param[in] nav   Navigation data
  * @return Pointer to selected ephemeris, NULL if not found
  */
-eph_t *seleph(gtime_t time, int sat, int iode, const nav_t *nav);
+eph_t* seleph(gtime_t time, int sat, int iode, const nav_t* nav);
 
 /**
  * @brief Satellite position and clock by broadcast ephemeris.
@@ -266,8 +263,8 @@ eph_t *seleph(gtime_t time, int sat, int iode, const nav_t *nav);
  * @param[out] svh   Satellite health flag
  * @return 1:ok, 0:error
  */
-int ephpos(gtime_t time, gtime_t teph, int sat, const nav_t *nav,
-           int iode, double *rs, double *dts, double *var, int *svh);
+int ephpos(gtime_t time, gtime_t teph, int sat, const nav_t* nav, int iode, double* rs, double* dts, double* var,
+           int* svh);
 
 #ifdef __cplusplus
 }

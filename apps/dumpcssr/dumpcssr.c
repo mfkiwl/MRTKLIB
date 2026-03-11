@@ -33,60 +33,63 @@
  *     -ch n              L6 channel 0 or 1 [0]
  *     -x  level          trace level [0]
  */
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 
-#include "mrtklib/mrtk_foundation.h"
+#include "mrtklib/mrtk_clas.h"
 #include "mrtklib/mrtk_const.h"
+#include "mrtklib/mrtk_coords.h"
+#include "mrtklib/mrtk_foundation.h"
+#include "mrtklib/mrtk_mat.h"
 #include "mrtklib/mrtk_nav.h"
 #include "mrtklib/mrtk_obs.h"
-#include "mrtklib/mrtk_sol.h"
-#include "mrtklib/mrtk_time.h"
-#include "mrtklib/mrtk_coords.h"
-#include "mrtklib/mrtk_mat.h"
-#include "mrtklib/mrtk_trace.h"
-#include "mrtklib/mrtk_sys.h"
 #include "mrtklib/mrtk_options.h"
 #include "mrtklib/mrtk_rinex.h"
-#include "mrtklib/mrtk_clas.h"
+#include "mrtklib/mrtk_sol.h"
+#include "mrtklib/mrtk_sys.h"
+#include "mrtklib/mrtk_time.h"
+#include "mrtklib/mrtk_trace.h"
 
 /* constants -----------------------------------------------------------------*/
 
-#define PROGNAME    "dumpcssr"
-#define PROG_VER    "1.0"
-#define MAXFILE     16
+#define PROGNAME "dumpcssr"
+#define PROG_VER "1.0"
+#define MAXFILE 16
 #define CSSR_CH_MAX 2
 
 /* cbias/pbias indices for representative CLAS signals */
-#define IDX_L1C  (CODE_L1C - 1)   /* L1C/A  */
-#define IDX_L2W  (CODE_L2W - 1)   /* L2 Z-track (GPS) / L2X (QZS) approx. */
-#define IDX_L5X  (CODE_L5X - 1)   /* L5I+Q  */
+#define IDX_L1C (CODE_L1C - 1) /* L1C/A  */
+#define IDX_L2W (CODE_L2W - 1) /* L2 Z-track (GPS) / L2X (QZS) approx. */
+#define IDX_L5X (CODE_L5X - 1) /* L5I+Q  */
 
-#define DUMP_HDR \
-    "tow,ch,sys,prn," \
-    "orb_r,orb_a,orb_c," \
-    "dclk0,dclk1,dclk2," \
+#define DUMP_HDR            \
+    "tow,ch,sys,prn,"       \
+    "orb_r,orb_a,orb_c,"    \
+    "dclk0,dclk1,dclk2,"    \
     "cb_L1C,cb_L2W,cb_L5X," \
     "pb_L1C,pb_L2W,pb_L5X," \
     "iode\n"
 
 /* showmsg / settspan / settime stubs required by mrtklib ---------------------*/
-extern int showmsg(const char *format, ...)
-{
+extern int showmsg(const char* format, ...) {
     va_list arg;
-    va_start(arg, format); vfprintf(stderr, format, arg); va_end(arg);
+    va_start(arg, format);
+    vfprintf(stderr, format, arg);
+    va_end(arg);
     fprintf(stderr, "\r");
     return 0;
 }
-extern void settspan(gtime_t ts, gtime_t te) { (void)ts; (void)te; }
+extern void settspan(gtime_t ts, gtime_t te) {
+    (void)ts;
+    (void)te;
+}
 extern void settime(gtime_t time) { (void)time; }
 
 /* dump nav->ssr_ch state at one epoch to CSV --------------------------------*/
-static void dump_ssr_state(FILE *fp, gtime_t time, const nav_t *nav, int ch)
-{
-    const ssr_t *ssr;
+static void dump_ssr_state(FILE* fp, gtime_t time, const nav_t* nav, int ch) {
+    const ssr_t* ssr;
     int sat, sys, prn, week;
     double tow;
 
@@ -98,24 +101,19 @@ static void dump_ssr_state(FILE *fp, gtime_t time, const nav_t *nav, int ch)
             continue;
         }
         sys = satsys(sat, &prn);
-        fprintf(fp, "%.1f,%d,%d,%d,",   tow, ch, sys, prn);
-        fprintf(fp, "%.4f,%.4f,%.4f,",  ssr->deph[0], ssr->deph[1], ssr->deph[2]);
-        fprintf(fp, "%.6f,%.6f,%.6f,",  ssr->dclk[0], ssr->dclk[1], ssr->dclk[2]);
-        fprintf(fp, "%.4f,%.4f,%.4f,",  ssr->cbias[IDX_L1C],
-                                         ssr->cbias[IDX_L2W],
-                                         ssr->cbias[IDX_L5X]);
-        fprintf(fp, "%.4f,%.4f,%.4f,",  ssr->pbias[IDX_L1C],
-                                         ssr->pbias[IDX_L2W],
-                                         ssr->pbias[IDX_L5X]);
+        fprintf(fp, "%.1f,%d,%d,%d,", tow, ch, sys, prn);
+        fprintf(fp, "%.4f,%.4f,%.4f,", ssr->deph[0], ssr->deph[1], ssr->deph[2]);
+        fprintf(fp, "%.6f,%.6f,%.6f,", ssr->dclk[0], ssr->dclk[1], ssr->dclk[2]);
+        fprintf(fp, "%.4f,%.4f,%.4f,", ssr->cbias[IDX_L1C], ssr->cbias[IDX_L2W], ssr->cbias[IDX_L5X]);
+        fprintf(fp, "%.4f,%.4f,%.4f,", ssr->pbias[IDX_L1C], ssr->pbias[IDX_L2W], ssr->pbias[IDX_L5X]);
         fprintf(fp, "%d\n", ssr->iode);
     }
 }
 
 /* find L6 file in input list ------------------------------------------------*/
-static FILE *open_l6(char **infile, int n)
-{
-    FILE *fp;
-    const char *ext;
+static FILE* open_l6(char** infile, int n) {
+    FILE* fp;
+    const char* ext;
     int i;
 
     for (i = 0; i < n; i++) {
@@ -136,11 +134,10 @@ static FILE *open_l6(char **infile, int n)
 }
 
 /* main ----------------------------------------------------------------------*/
-int main(int argc, char **argv)
-{
-    clas_ctx_t *clas;
-    nav_t *nav;
-    clas_corr_t *tmp;
+int main(int argc, char** argv) {
+    clas_ctx_t* clas;
+    nav_t* nav;
+    clas_corr_t* tmp;
     gtime_t ts = {0}, te = {0}, t;
     double es[6] = {0}, ee[6] = {0};
     char *infile[MAXFILE], *outfile = NULL, *conffile = "";
@@ -154,8 +151,7 @@ int main(int argc, char **argv)
             sscanf(argv[++i], "%lf/%lf/%lf", es, es + 1, es + 2);
             sscanf(argv[++i], "%lf:%lf:%lf", es + 3, es + 4, es + 5);
             ts = epoch2time(es);
-        }
-        else if (!strcmp(argv[i], "-te") && i + 2 < argc) {
+        } else if (!strcmp(argv[i], "-te") && i + 2 < argc) {
             sscanf(argv[++i], "%lf/%lf/%lf", ee, ee + 1, ee + 2);
             sscanf(argv[++i], "%lf:%lf:%lf", ee + 3, ee + 4, ee + 5);
             te = epoch2time(ee);
@@ -169,14 +165,14 @@ int main(int argc, char **argv)
             trace_level = atoi(argv[++i]);
         } else if (argv[i][0] == '-') {
             fprintf(stderr,
-                "usage: %s [options] l6file [navfile...]\n"
-                "  -ts y/m/d h:m:s   start time (GPST)\n"
-                "  -te y/m/d h:m:s   end time   (GPST)\n"
-                "  -k  file          configuration file\n"
-                "  -o  file          output CSV [stdout]\n"
-                "  -ch n             L6 channel 0|1 [0]\n"
-                "  -x  level         trace level [0]\n",
-                PROGNAME);
+                    "usage: %s [options] l6file [navfile...]\n"
+                    "  -ts y/m/d h:m:s   start time (GPST)\n"
+                    "  -te y/m/d h:m:s   end time   (GPST)\n"
+                    "  -k  file          configuration file\n"
+                    "  -o  file          output CSV [stdout]\n"
+                    "  -ch n             L6 channel 0|1 [0]\n"
+                    "  -x  level         trace level [0]\n",
+                    PROGNAME);
             return 0;
         } else if (n < MAXFILE) {
             infile[n++] = argv[i];
@@ -192,19 +188,23 @@ int main(int argc, char **argv)
     }
 
     /* allocate large structures on heap */
-    clas = (clas_ctx_t *)calloc(1, sizeof(clas_ctx_t));
-    nav  = (nav_t *)calloc(1, sizeof(nav_t));
-    tmp  = (clas_corr_t *)calloc(1, sizeof(clas_corr_t));
+    clas = (clas_ctx_t*)calloc(1, sizeof(clas_ctx_t));
+    nav = (nav_t*)calloc(1, sizeof(nav_t));
+    tmp = (clas_corr_t*)calloc(1, sizeof(clas_corr_t));
     if (!clas || !nav || !tmp) {
         fprintf(stderr, "Memory allocation error.\n");
-        free(clas); free(nav); free(tmp);
+        free(clas);
+        free(nav);
+        free(tmp);
         return -1;
     }
 
     /* initialize CLAS context */
     if (clas_ctx_init(clas) != 0) {
         fprintf(stderr, "CLAS context init error.\n");
-        free(clas); free(nav); free(tmp);
+        free(clas);
+        free(nav);
+        free(tmp);
         return -1;
     }
 
@@ -214,7 +214,7 @@ int main(int argc, char **argv)
         time2gpst(ts, &week);
         for (iw = 0; iw < CSSR_REF_MAX; iw++) {
             clas->week_ref[iw] = week;
-            clas->tow_ref[iw]  = -1;
+            clas->tow_ref[iw] = -1;
         }
     }
 
@@ -226,7 +226,10 @@ int main(int argc, char **argv)
         setsysopts(&prcopt, &solopt, &filopt);
         if (!loadopts(conffile, sysopts)) {
             fprintf(stderr, "Config file read error: %s\n", conffile);
-            clas_ctx_free(clas); free(clas); free(nav); free(tmp);
+            clas_ctx_free(clas);
+            free(clas);
+            free(nav);
+            free(tmp);
             return -1;
         }
         getsysopts(&prcopt, &solopt, &filopt);
@@ -239,7 +242,7 @@ int main(int argc, char **argv)
     /* read RINEX NAV files (optional, for broadcast eph in orbit calcs) */
     for (i = 0; i < n; i++) {
         gtime_t t0 = {0};
-        const char *ext = strrchr(infile[i], '.');
+        const char* ext = strrchr(infile[i], '.');
         if (ext && (!strcmp(ext, ".l6") || !strcmp(ext, ".L6"))) {
             continue;
         }
@@ -253,7 +256,10 @@ int main(int argc, char **argv)
     /* open L6 file */
     if (!(fp_in = open_l6(infile, n))) {
         freenav(nav, 0xFF);
-        clas_ctx_free(clas); free(clas); free(nav); free(tmp);
+        clas_ctx_free(clas);
+        free(clas);
+        free(nav);
+        free(tmp);
         return -1;
     }
 
@@ -263,7 +269,10 @@ int main(int argc, char **argv)
         fprintf(stderr, "Output file open error: %s\n", outfile);
         fclose(fp_in);
         freenav(nav, 0xFF);
-        clas_ctx_free(clas); free(clas); free(nav); free(tmp);
+        clas_ctx_free(clas);
+        free(clas);
+        free(nav);
+        free(tmp);
         return -1;
     }
 
@@ -311,7 +320,10 @@ int main(int argc, char **argv)
     }
     fclose(fp_in);
     freenav(nav, 0xFF);
-    clas_ctx_free(clas); free(clas); free(nav); free(tmp);
+    clas_ctx_free(clas);
+    free(clas);
+    free(nav);
+    free(tmp);
     traceclose(NULL);
     return 0;
 }

@@ -22,34 +22,32 @@
  * Global Context (transitional)
  *===========================================================================*/
 
-mrtk_ctx_t *g_mrtk_ctx = NULL;
+mrtk_ctx_t* g_mrtk_ctx = NULL;
 
 /*============================================================================
  * Lifecycle Functions
  *===========================================================================*/
 
-mrtk_ctx_t *mrtk_ctx_create(void)
-{
-    mrtk_ctx_t *ctx = (mrtk_ctx_t *)calloc(1, sizeof(mrtk_ctx_t));
+mrtk_ctx_t* mrtk_ctx_create(void) {
+    mrtk_ctx_t* ctx = (mrtk_ctx_t*)calloc(1, sizeof(mrtk_ctx_t));
     if (!ctx) {
         return NULL;
     }
 
-    ctx->is_running       = 0;
+    ctx->is_running = 0;
     ctx->cancel_requested = 0;
-    ctx->last_err_code    = MRTK_OK;
-    ctx->last_err_msg[0]  = '\0';
-    ctx->trace_level      = 0;
-    ctx->trace_fp         = NULL;
-    ctx->tick_trace       = 0;
-    ctx->user_data        = NULL;
-    ctx->cb_showmsg       = NULL;
+    ctx->last_err_code = MRTK_OK;
+    ctx->last_err_msg[0] = '\0';
+    ctx->trace_level = 0;
+    ctx->trace_fp = NULL;
+    ctx->tick_trace = 0;
+    ctx->user_data = NULL;
+    ctx->cb_showmsg = NULL;
 
     return ctx;
 }
 
-void mrtk_ctx_destroy(mrtk_ctx_t *ctx)
-{
+void mrtk_ctx_destroy(mrtk_ctx_t* ctx) {
     if (!ctx) {
         return;
     }

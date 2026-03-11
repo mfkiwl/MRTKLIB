@@ -29,10 +29,11 @@
 extern "C" {
 #endif
 
-#include <stdio.h>
 #include <stdint.h>
-#include "mrtklib/mrtk_time.h"
+#include <stdio.h>
+
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_time.h"
 
 /*============================================================================
  * SBAS Global Variables
@@ -52,7 +53,7 @@ extern const sbsigpband_t igpband2[2][5]; /* SBAS IGP band 9-10 */
  * @param[in,out] sbs   SBAS messages
  * @return Status (1:ok, 0:error)
  */
-int sbsreadmsg(const char *file, int sel, sbs_t *sbs);
+int sbsreadmsg(const char* file, int sel, sbs_t* sbs);
 
 /**
  * @brief Read SBAS message file with time span.
@@ -63,15 +64,14 @@ int sbsreadmsg(const char *file, int sel, sbs_t *sbs);
  * @param[in,out] sbs   SBAS messages
  * @return Status (1:ok, 0:error)
  */
-int sbsreadmsgt(const char *file, int sel, gtime_t ts, gtime_t te,
-                sbs_t *sbs);
+int sbsreadmsgt(const char* file, int sel, gtime_t ts, gtime_t te, sbs_t* sbs);
 
 /**
  * @brief Output SBAS message record.
  * @param[in] fp      Output file pointer
  * @param[in] sbsmsg  SBAS message
  */
-void sbsoutmsg(FILE *fp, sbsmsg_t *sbsmsg);
+void sbsoutmsg(FILE* fp, sbsmsg_t* sbsmsg);
 
 /**
  * @brief Decode SBAS message frame words.
@@ -81,8 +81,7 @@ void sbsoutmsg(FILE *fp, sbsmsg_t *sbsmsg);
  * @param[out] sbsmsg  SBAS message
  * @return Status (1:ok, 0:error)
  */
-int sbsdecodemsg(gtime_t time, int prn, const uint32_t *words,
-                 sbsmsg_t *sbsmsg);
+int sbsdecodemsg(gtime_t time, int prn, const uint32_t* words, sbsmsg_t* sbsmsg);
 
 /**
  * @brief Update SBAS corrections in navigation data.
@@ -90,7 +89,7 @@ int sbsdecodemsg(gtime_t time, int prn, const uint32_t *words,
  * @param[in,out] nav  Navigation data
  * @return Message type (0:error)
  */
-int sbsupdatecorr(const sbsmsg_t *msg, nav_t *nav);
+int sbsupdatecorr(const sbsmsg_t* msg, nav_t* nav);
 
 /**
  * @brief SBAS satellite ephemeris and clock correction.
@@ -102,8 +101,7 @@ int sbsupdatecorr(const sbsmsg_t *msg, nav_t *nav);
  * @param[out]    var   Variance of correction
  * @return Status (1:ok, 0:error)
  */
-int sbssatcorr(gtime_t time, int sat, const nav_t *nav, double *rs,
-               double *dts, double *var);
+int sbssatcorr(gtime_t time, int sat, const nav_t* nav, double* rs, double* dts, double* var);
 
 /**
  * @brief SBAS ionospheric delay correction.
@@ -115,8 +113,7 @@ int sbssatcorr(gtime_t time, int sat, const nav_t *nav, double *rs,
  * @param[out] var    Variance of ionospheric delay (m^2)
  * @return Status (1:ok, 0:error)
  */
-int sbsioncorr(gtime_t time, const nav_t *nav, const double *pos,
-               const double *azel, double *delay, double *var);
+int sbsioncorr(gtime_t time, const nav_t* nav, const double* pos, const double* azel, double* delay, double* var);
 
 /**
  * @brief SBAS tropospheric delay correction.
@@ -126,8 +123,7 @@ int sbsioncorr(gtime_t time, const nav_t *nav, const double *pos,
  * @param[out] var   Variance of tropospheric delay (m^2)
  * @return Tropospheric delay (m)
  */
-double sbstropcorr(gtime_t time, const double *pos, const double *azel,
-                   double *var);
+double sbstropcorr(gtime_t time, const double* pos, const double* azel, double* var);
 
 #ifdef __cplusplus
 }

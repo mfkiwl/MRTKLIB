@@ -45,7 +45,7 @@ extern "C" {
  * @return Status (1:ok, 0:file open error)
  * @note Text format: AZ EL per line. Text after %% or # is comment.
  */
-int readelmask(const char *file, int16_t *elmask);
+int readelmask(const char* file, int16_t* elmask);
 
 /**
  * @brief Read station positions from file.
@@ -54,7 +54,7 @@ int readelmask(const char *file, int16_t *elmask);
  * @param[out] pos   Station position {lat,lon,h} (rad/m)
  *                   (all 0 if search error)
  */
-void readpos(const char *file, const char *rcv, double *pos);
+void readpos(const char* file, const char* rcv, double* pos);
 
 /**
  * @brief Read a single BLQ record (6 lines x 11 values).
@@ -62,7 +62,7 @@ void readpos(const char *file, const char *rcv, double *pos);
  * @param[out] odisp  Ocean tide loading parameters (6*11 values)
  * @return 1:ok, 0:format error or EOF
  */
-int readblqrecord(FILE *fp, double *odisp);
+int readblqrecord(FILE* fp, double* odisp);
 
 /**
  * @brief Read BLQ ocean tide loading parameters.
@@ -71,7 +71,7 @@ int readblqrecord(FILE *fp, double *odisp);
  * @param[out] odisp  Ocean tide loading parameters
  * @return Status (1:ok, 0:file open error)
  */
-int readblq(const char *file, const char *sta, double *odisp);
+int readblq(const char* file, const char* sta, double* odisp);
 
 #ifdef __cplusplus
 }
