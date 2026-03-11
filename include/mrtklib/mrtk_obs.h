@@ -242,6 +242,14 @@ mrtk_band_t mrtk_rinex_freq_to_band(int sys, int rinex_freq_id);
 const uint8_t* mrtk_get_signal_priority(int sys, mrtk_band_t band);
 
 /**
+ * @brief Convert physical band to base carrier frequency (Hz).
+ * @param[in] band  Physical frequency band
+ * @return Base carrier frequency (Hz), 0.0 on error.
+ *         For GLONASS G1/G2, returns the base frequency without FDMA offset.
+ */
+double mrtk_band2freq_hz(mrtk_band_t band);
+
+/**
  * @brief Convert physical band back to RINEX frequency number for a given system.
  * @param[in] sys   Satellite system (SYS_???)
  * @param[in] band  Physical frequency band
