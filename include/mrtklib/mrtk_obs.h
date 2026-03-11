@@ -120,14 +120,6 @@ int code2freq_idx(int sys, uint8_t code);
 double code2freq(int sys, uint8_t code, int fcn);
 
 /**
- * @brief Set code priority for multiple codes in a frequency.
- * @param[in] sys  System (or of SYS_???)
- * @param[in] idx  Frequency index (0- )
- * @param[in] pri  Priority of codes (series of code characters)
- */
-void setcodepri(int sys, int idx, const char* pri);
-
-/**
  * @brief Get code priority for multiple codes in a frequency.
  * @param[in] sys   System (SYS_???)
  * @param[in] code  Obs code (CODE_???)

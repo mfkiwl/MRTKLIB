@@ -402,18 +402,6 @@ extern void apply_pppsig(const int* pppsig) {
             break;
     }
 }
-/* get code priority string for system and frequency index --------------------
- * args   : int    sys        I   satellite system
- *          int    freq_idx   I   frequency index (0,1,2,...)
- * return : code priority string (from obsdef table) or "" on error
- *-----------------------------------------------------------------------------*/
-extern const char* get_codepris(int sys, int freq_idx) {
-    obsdef_t* obsdef = get_obsdef(sys);
-    if (!obsdef || freq_idx < 0 || MAXFREQ <= freq_idx) {
-        return "";
-    }
-    return obsdef[freq_idx].codepris;
-}
 /* convert frequency index to frequency number --------------------------------
  * args   : int    sys        I   satellite system
  *          int    freq_idx   I   frequency index (0,1,2,...)

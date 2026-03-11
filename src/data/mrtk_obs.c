@@ -98,17 +98,6 @@ static char* obscodes[] = {
     "6E", "7D", "7P", "7Z", "8D", "8P", "4A", "4B", "4X", "6D", /* 60-69 */
     "6P", ""                                                    /* 70-   */
 };
-static char codepris[7][MAXFREQ][16] = {
-    /* code priority (obsdef order) */
-    /*    0         1          2          3         4         5     */
-    {"C", "PYWCMNDLXS", "QXI", "", "", "", ""},      /* GPS: L1,L2,L5 */
-    {"CP", "CP", "", "", "", "", ""},                /* GLO: G1,G2 */
-    {"CABXZ", "QXI", "QXI", "CXE", "QXI", "", ""},   /* GAL: E1,E5a,E5b,E6,E5ab */
-    {"LXSCE", "QXI", "LXS", "SEZ", "", "", ""},      /* QZS: L1,L5,L2,L6 */
-    {"C", "IQX", "", "", "", "", ""},                /* SBS: L1,L5 */
-    {"IQX", "IQX", "DIQX", "DPX", "DPX", "PXD", ""}, /* BDS: B1I,B3I,B2I,B1C,B2a,B2 */
-    {"ABCX", "ABCX", "", "", "", "", ""}             /* IRN: L5,S */
-};
 
 /*============================================================================
  * Private Functions
@@ -453,42 +442,6 @@ extern double sat2freq(int sat, uint8_t code, const nav_t* nav) {
         }
     }
     return code2freq(sys, code, fcn);
-}
-/* set code priority -----------------------------------------------------------
- * set code priority for multiple codes in a frequency
- * args   : int    sys       I   system (or of SYS_???)
- *          int    idx       I   frequency index (0- )
- *          char   *pri      I   priority of codes (series of code characters)
- *                               (higher priority precedes lower)
- * return : none
- *-----------------------------------------------------------------------------*/
-extern void setcodepri(int sys, int idx, const char* pri) {
-    trace(NULL, 3, "setcodepri:sys=%d idx=%d pri=%s\n", sys, idx, pri);
-
-    if (idx < 0 || idx >= MAXFREQ) {
-        return;
-    }
-    if (sys & SYS_GPS) {
-        strcpy(codepris[0][idx], pri);
-    }
-    if (sys & SYS_GLO) {
-        strcpy(codepris[1][idx], pri);
-    }
-    if (sys & SYS_GAL) {
-        strcpy(codepris[2][idx], pri);
-    }
-    if (sys & SYS_QZS) {
-        strcpy(codepris[3][idx], pri);
-    }
-    if (sys & SYS_SBS) {
-        strcpy(codepris[4][idx], pri);
-    }
-    if (sys & SYS_CMP) {
-        strcpy(codepris[5][idx], pri);
-    }
-    if (sys & SYS_IRN) {
-        strcpy(codepris[6][idx], pri);
-    }
 }
 /* get code priority -----------------------------------------------------------
  * get code priority for multiple codes in a frequency
