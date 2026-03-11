@@ -29,6 +29,7 @@
 #include <string.h>
 
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_opt.h"
 #include "mrtklib/mrtk_trace.h"
 
 /*============================================================================
@@ -97,163 +98,13 @@ static char* obscodes[] = {
     "6E", "7D", "7P", "7Z", "8D", "8P", "4A", "4B", "4X", "6D", /* 60-69 */
     "6P", ""                                                    /* 70-   */
 };
-static char codepris[7][MAXFREQ][16] = {
-    /* code priority (obsdef order) */
-    /*    0         1          2          3         4         5     */
-    {"C", "PYWCMNDLXS", "QXI", "", "", "", ""},      /* GPS: L1,L2,L5 */
-    {"CP", "CP", "", "", "", "", ""},                /* GLO: G1,G2 */
-    {"CABXZ", "QXI", "QXI", "CXE", "QXI", "", ""},   /* GAL: E1,E5a,E5b,E6,E5ab */
-    {"LXSCE", "QXI", "LXS", "SEZ", "", "", ""},      /* QZS: L1,L5,L2,L6 */
-    {"C", "IQX", "", "", "", "", ""},                /* SBS: L1,L5 */
-    {"IQX", "IQX", "DIQX", "DPX", "DPX", "PXD", ""}, /* BDS: B1I,B3I,B2I,B1C,B2a,B2 */
-    {"ABCX", "ABCX", "", "", "", "", ""}             /* IRN: L5,S */
-};
 
 /*============================================================================
  * Private Functions
  *===========================================================================*/
 
-/* GPS obs code to frequency -------------------------------------------------*/
-static int code2freq_GPS(uint8_t code, double* freq) {
-    char* obs = code2obs(code);
+static int band2idx_fixed(mrtk_band_t band); /* forward declaration */
 
-    switch (obs[0]) {
-        case '1':
-            *freq = FREQ1;
-            return 0; /* L1 */
-        case '2':
-            *freq = FREQ2;
-            return 1; /* L2 */
-        case '5':
-            *freq = FREQ5;
-            return 2; /* L5 */
-    }
-    return -1;
-}
-/* GLONASS obs code to frequency ---------------------------------------------*/
-static int code2freq_GLO(uint8_t code, int fcn, double* freq) {
-    char* obs = code2obs(code);
-
-    if (fcn < -7 || fcn > 6) {
-        return -1;
-    }
-
-    switch (obs[0]) {
-        case '1':
-            *freq = FREQ1_GLO + DFRQ1_GLO * fcn;
-            return 0; /* G1 */
-        case '2':
-            *freq = FREQ2_GLO + DFRQ2_GLO * fcn;
-            return 1; /* G2 */
-        case '3':
-            *freq = FREQ3_GLO;
-            return 2; /* G3 */
-        case '4':
-            *freq = FREQ1a_GLO;
-            return 0; /* G1a */
-        case '6':
-            *freq = FREQ2a_GLO;
-            return 1; /* G2a */
-    }
-    return -1;
-}
-/* Galileo obs code to frequency ---------------------------------------------*/
-static int code2freq_GAL(uint8_t code, double* freq) {
-    char* obs = code2obs(code);
-
-    switch (obs[0]) {
-        case '1':
-            *freq = FREQ1;
-            return 0; /* E1 */
-        case '7':
-            *freq = FREQ7;
-            return 1; /* E5b */
-        case '5':
-            *freq = FREQ5;
-            return 2; /* E5a */
-        case '6':
-            *freq = FREQ6;
-            return 3; /* E6 */
-        case '8':
-            *freq = FREQ8;
-            return 4; /* E5a+b */
-    }
-    return -1;
-}
-/* QZSS obs code to frequency ------------------------------------------------*/
-static int code2freq_QZS(uint8_t code, double* freq) {
-    char* obs = code2obs(code);
-
-    switch (obs[0]) {
-        case '1':
-            *freq = FREQ1;
-            return 0; /* L1 */
-        case '2':
-            *freq = FREQ2;
-            return 1; /* L2 */
-        case '5':
-            *freq = FREQ5;
-            return 2; /* L5 */
-        case '6':
-            *freq = FREQ6;
-            return 3; /* L6 */
-    }
-    return -1;
-}
-/* SBAS obs code to frequency ------------------------------------------------*/
-static int code2freq_SBS(uint8_t code, double* freq) {
-    char* obs = code2obs(code);
-
-    switch (obs[0]) {
-        case '1':
-            *freq = FREQ1;
-            return 0; /* L1 */
-        case '5':
-            *freq = FREQ5;
-            return 1; /* L5 */
-    }
-    return -1;
-}
-/* BDS obs code to frequency -------------------------------------------------*/
-static int code2freq_BDS(uint8_t code, double* freq) {
-    char* obs = code2obs(code);
-
-    switch (obs[0]) {
-        case '1':
-            *freq = FREQ1;
-            return 0; /* B1C/B1A */
-        case '2':
-            *freq = FREQ1_CMP;
-            return 0; /* B1 */
-        case '7':
-            *freq = FREQ2_CMP;
-            return 1; /* B2/B2b */
-        case '5':
-            *freq = FREQ5;
-            return 2; /* B2a */
-        case '6':
-            *freq = FREQ3_CMP;
-            return 3; /* B3/B3A */
-        case '8':
-            *freq = FREQ8;
-            return 4; /* B2a+b */
-    }
-    return -1;
-}
-/* NavIC obs code to frequency -----------------------------------------------*/
-static int code2freq_IRN(uint8_t code, double* freq) {
-    char* obs = code2obs(code);
-
-    switch (obs[0]) {
-        case '5':
-            *freq = FREQ5;
-            return 0; /* L5 */
-        case '9':
-            *freq = FREQ9;
-            return 1; /* S */
-    }
-    return -1;
-}
 /* compare observation data -------------------------------------------------*/
 static int cmpobs(const void* p1, const void* p2) {
     obsd_t *q1 = (obsd_t*)p1, *q2 = (obsd_t*)p2;
@@ -361,25 +212,13 @@ extern char* code2obs(uint8_t code) {
  *            NavIC        L5        S       -         -        -
  *-----------------------------------------------------------------------------*/
 extern int code2idx(int sys, uint8_t code) {
-    double freq;
-
-    switch (sys) {
-        case SYS_GPS:
-            return code2freq_GPS(code, &freq);
-        case SYS_GLO:
-            return code2freq_GLO(code, 0, &freq);
-        case SYS_GAL:
-            return code2freq_GAL(code, &freq);
-        case SYS_QZS:
-            return code2freq_QZS(code, &freq);
-        case SYS_SBS:
-            return code2freq_SBS(code, &freq);
-        case SYS_CMP:
-            return code2freq_BDS(code, &freq);
-        case SYS_IRN:
-            return code2freq_IRN(code, &freq);
+    int freq_num = code2freq_num(code);
+    mrtk_band_t band;
+    if (sys == SYS_BD2) {
+        sys = SYS_CMP;
     }
-    return -1;
+    band = mrtk_rinex_freq_to_band(sys, freq_num);
+    return band2idx_fixed(band);
 }
 /* obs code to frequency number ------------------------------------------------
  * extract frequency number from obs code
@@ -453,44 +292,9 @@ extern double sat2freq(int sat, uint8_t code, const nav_t* nav) {
     }
     return code2freq(sys, code, fcn);
 }
-/* set code priority -----------------------------------------------------------
- * set code priority for multiple codes in a frequency
- * args   : int    sys       I   system (or of SYS_???)
- *          int    idx       I   frequency index (0- )
- *          char   *pri      I   priority of codes (series of code characters)
- *                               (higher priority precedes lower)
- * return : none
- *-----------------------------------------------------------------------------*/
-extern void setcodepri(int sys, int idx, const char* pri) {
-    trace(NULL, 3, "setcodepri:sys=%d idx=%d pri=%s\n", sys, idx, pri);
-
-    if (idx < 0 || idx >= MAXFREQ) {
-        return;
-    }
-    if (sys & SYS_GPS) {
-        strcpy(codepris[0][idx], pri);
-    }
-    if (sys & SYS_GLO) {
-        strcpy(codepris[1][idx], pri);
-    }
-    if (sys & SYS_GAL) {
-        strcpy(codepris[2][idx], pri);
-    }
-    if (sys & SYS_QZS) {
-        strcpy(codepris[3][idx], pri);
-    }
-    if (sys & SYS_SBS) {
-        strcpy(codepris[4][idx], pri);
-    }
-    if (sys & SYS_CMP) {
-        strcpy(codepris[5][idx], pri);
-    }
-    if (sys & SYS_IRN) {
-        strcpy(codepris[6][idx], pri);
-    }
-}
 /* get code priority -----------------------------------------------------------
  * get code priority for multiple codes in a frequency
+ * uses structured SIG_PRIORITY_TABLE via mrtk_get_signal_priority()
  * args   : int    sys       I   system (SYS_???)
  *          uint8_t code     I   obs code (CODE_???)
  *          char   *opt      I   code options (NULL:no option)
@@ -498,63 +302,72 @@ extern void setcodepri(int sys, int idx, const char* pri) {
  *-----------------------------------------------------------------------------*/
 extern int getcodepri(int sys, uint8_t code, const char* opt) {
     const char *p, *optstr;
+    const uint8_t* plist;
+    mrtk_band_t band;
     char *obs, str[8] = "";
-    int i, j;
+    int freq_num, i;
+
+    if (sys == SYS_BD2) {
+        sys = SYS_CMP;
+    }
 
     switch (sys) {
         case SYS_GPS:
-            i = 0;
             optstr = "-GL%2s";
             break;
         case SYS_GLO:
-            i = 1;
             optstr = "-RL%2s";
             break;
         case SYS_GAL:
-            i = 2;
             optstr = "-EL%2s";
             break;
         case SYS_QZS:
-            i = 3;
             optstr = "-JL%2s";
             break;
         case SYS_SBS:
-            i = 4;
             optstr = "-SL%2s";
             break;
         case SYS_CMP:
-            i = 5;
             optstr = "-CL%2s";
             break;
         case SYS_IRN:
-            i = 6;
             optstr = "-IL%2s";
-            break;
-        case SYS_BD2:
-            i = 5;
-            optstr = "-CL%2s";
             break;
         default:
             return 0;
     }
-    if ((j = code2freq_idx(sys, code)) < 0) {
+    obs = code2obs(code);
+    if (!obs[0]) {
         return 0;
     }
-    obs = code2obs(code);
 
-    /* parse code options */
+    /* parse code options (opt override: exact match = 15, mismatch = 0) */
     for (p = opt; p && (p = strchr(p, '-')); p++) {
         if (sscanf(p, optstr, str) < 1 || str[0] != obs[0]) {
             continue;
         }
         return str[1] == obs[1] ? 15 : 0;
     }
-    /* search code priority (use obsdef table for current frequency order) */
-    {
-        const char* pri = get_codepris(sys, j);
-        p = strchr(pri, obs[1]);
-        return p ? 14 - (int)(p - pri) : 0;
+
+    /* look up priority from structured table */
+    freq_num = code2freq_num(code);
+    band = mrtk_rinex_freq_to_band(sys, freq_num);
+    if (band == MRTK_BAND_UNKNOWN) {
+        return 0;
     }
+    plist = mrtk_get_signal_priority(sys, band);
+    if (!plist) {
+        return 0;
+    }
+    for (i = 0; i < MRTK_MAX_SIG_PRIORITY; i++) {
+        if (plist[i] == 0) {
+            break;
+        }
+        if (plist[i] == code) {
+            return 14 - i; /* 14=highest .. 1=lowest, matching legacy range */
+        }
+    }
+    return 0;
 }
 /* sort and unique observation data --------------------------------------------
  * sort and unique observation data by time, rcv, sat
@@ -648,4 +461,811 @@ extern void freeobs(obs_t* obs) {
     free(obs->data);
     obs->data = NULL;
     obs->n = obs->nmax = 0;
+}
+
+/*============================================================================
+ * Structured Signal Priority Table
+ *
+ * Derived from RTKLIB 2.4.3 b34 codepris[] (rinex.c), matched to MRTKLIB's
+ * obsdef tables (mrtk_nav.c). Each codes[] array lists observation codes in
+ * descending priority order; remaining slots are zero-initialized.
+ *===========================================================================*/
+
+typedef struct {
+    int sys;
+    mrtk_sig_priority_t priority;
+} sig_priority_entry_t;
+
+/* clang-format off */
+static const sig_priority_entry_t SIG_PRIORITY_TABLE[] = {
+    /* GPS — obsdef: "CPYWMNSL", "PYWCMNDLSX", "QXI" */
+    {
+        .sys = SYS_GPS,
+        .priority = {
+            .band = MRTK_BAND_GPS_L1,
+            .codes = {
+                CODE_L1C,
+                CODE_L1P,
+                CODE_L1Y,
+                CODE_L1W,
+                CODE_L1M,
+                CODE_L1N,
+                CODE_L1S,
+                CODE_L1L,
+            },
+        },
+    },
+    {
+        .sys = SYS_GPS,
+        .priority = {
+            .band = MRTK_BAND_GPS_L2,
+            .codes = {
+                CODE_L2P,
+                CODE_L2Y,
+                CODE_L2W,
+                CODE_L2C,
+                CODE_L2M,
+                CODE_L2N,
+                CODE_L2D,
+                CODE_L2L,
+                CODE_L2S,
+                CODE_L2X,
+            },
+        },
+    },
+    {
+        .sys = SYS_GPS,
+        .priority = {
+            .band = MRTK_BAND_GPS_L5,
+            .codes = {
+                CODE_L5Q,
+                CODE_L5X,
+                CODE_L5I,
+            },
+        },
+    },
+
+    /* GLONASS — obsdef: "CP", "CP", (G3 not in obsdef but kept for completeness) */
+    {
+        .sys = SYS_GLO,
+        .priority = {
+            .band = MRTK_BAND_GLO_G1,
+            .codes = {
+                CODE_L1C,
+                CODE_L1P,
+            },
+        },
+    },
+    {
+        .sys = SYS_GLO,
+        .priority = {
+            .band = MRTK_BAND_GLO_G2,
+            .codes = {
+                CODE_L2C,
+                CODE_L2P,
+            },
+        },
+    },
+    {
+        .sys = SYS_GLO,
+        .priority = {
+            .band = MRTK_BAND_GLO_G3,
+            .codes = {
+                CODE_L3I,
+                CODE_L3Q,
+                CODE_L3X,
+            },
+        },
+    },
+
+    /* Galileo — obsdef: "CABXZ", "QXI", "QXI", "CXE", "QXI" */
+    {
+        .sys = SYS_GAL,
+        .priority = {
+            .band = MRTK_BAND_GAL_E1,
+            .codes = {
+                CODE_L1C,
+                CODE_L1A,
+                CODE_L1B,
+                CODE_L1X,
+                CODE_L1Z,
+            },
+        },
+    },
+    {
+        .sys = SYS_GAL,
+        .priority = {
+            .band = MRTK_BAND_GAL_E5a,
+            .codes = {
+                CODE_L5Q,
+                CODE_L5X,
+                CODE_L5I,
+            },
+        },
+    },
+    {
+        .sys = SYS_GAL,
+        .priority = {
+            .band = MRTK_BAND_GAL_E5b,
+            .codes = {
+                CODE_L7Q,
+                CODE_L7X,
+                CODE_L7I,
+            },
+        },
+    },
+    {
+        .sys = SYS_GAL,
+        .priority = {
+            .band = MRTK_BAND_GAL_E6,
+            .codes = {
+                CODE_L6C,
+                CODE_L6X,
+                CODE_L6E,
+            },
+        },
+    },
+    {
+        .sys = SYS_GAL,
+        .priority = {
+            .band = MRTK_BAND_GAL_E5ab,
+            .codes = {
+                CODE_L8Q,
+                CODE_L8X,
+                CODE_L8I,
+            },
+        },
+    },
+
+    /* QZSS — obsdef: "LXSCE", "QXI", "LXS", "SEZ" */
+    {
+        .sys = SYS_QZS,
+        .priority = {
+            .band = MRTK_BAND_QZS_L1,
+            .codes = {
+                CODE_L1L,
+                CODE_L1X,
+                CODE_L1S,
+                CODE_L1C,
+                CODE_L1E,
+            },
+        },
+    },
+    {
+        .sys = SYS_QZS,
+        .priority = {
+            .band = MRTK_BAND_QZS_L5,
+            .codes = {
+                CODE_L5Q,
+                CODE_L5X,
+                CODE_L5I,
+            },
+        },
+    },
+    {
+        .sys = SYS_QZS,
+        .priority = {
+            .band = MRTK_BAND_QZS_L2,
+            .codes = {
+                CODE_L2L,
+                CODE_L2X,
+                CODE_L2S,
+            },
+        },
+    },
+    {
+        .sys = SYS_QZS,
+        .priority = {
+            .band = MRTK_BAND_QZS_L6,
+            .codes = {
+                CODE_L6S,
+                CODE_L6E,
+                CODE_L6Z,
+            },
+        },
+    },
+
+    /* SBAS — obsdef: "C", "IQX" */
+    {
+        .sys = SYS_SBS,
+        .priority = {
+            .band = MRTK_BAND_SBS_L1,
+            .codes = {
+                CODE_L1C,
+            },
+        },
+    },
+    {
+        .sys = SYS_SBS,
+        .priority = {
+            .band = MRTK_BAND_SBS_L5,
+            .codes = {
+                CODE_L5I,
+                CODE_L5Q,
+                CODE_L5X,
+            },
+        },
+    },
+
+    /* BDS — obsdef: "IQX"(B1I), "IQX"(B3), "DIQX"(B2b), "PXD"(B1C), "PXD"(B2a), "PXD"(B2ab) */
+    {
+        .sys = SYS_CMP,
+        .priority = {
+            .band = MRTK_BAND_BDS_B1I,
+            .codes = {
+                CODE_L2I,
+                CODE_L2Q,
+                CODE_L2X,
+            },
+        },
+    },
+    {
+        .sys = SYS_CMP,
+        .priority = {
+            .band = MRTK_BAND_BDS_B3,
+            .codes = {
+                CODE_L6I,
+                CODE_L6Q,
+                CODE_L6X,
+            },
+        },
+    },
+    {
+        .sys = SYS_CMP,
+        .priority = {
+            .band = MRTK_BAND_BDS_B2b,
+            .codes = {
+                CODE_L7D,
+                CODE_L7I,
+                CODE_L7Q,
+                CODE_L7X,
+            },
+        },
+    },
+    {
+        .sys = SYS_CMP,
+        .priority = {
+            .band = MRTK_BAND_BDS_B1C,
+            .codes = {
+                CODE_L1P,
+                CODE_L1X,
+                CODE_L1D,
+            },
+        },
+    },
+    {
+        .sys = SYS_CMP,
+        .priority = {
+            .band = MRTK_BAND_BDS_B2a,
+            .codes = {
+                CODE_L5P,
+                CODE_L5X,
+                CODE_L5D,
+            },
+        },
+    },
+    {
+        .sys = SYS_CMP,
+        .priority = {
+            .band = MRTK_BAND_BDS_B2ab,
+            .codes = {
+                CODE_L8P,
+                CODE_L8X,
+                CODE_L8D,
+            },
+        },
+    },
+
+    /* NavIC/IRNSS — obsdef: "ABCX", "ABCX" */
+    {
+        .sys = SYS_IRN,
+        .priority = {
+            .band = MRTK_BAND_IRN_L5,
+            .codes = {
+                CODE_L5A,
+                CODE_L5B,
+                CODE_L5C,
+                CODE_L5X,
+            },
+        },
+    },
+    {
+        .sys = SYS_IRN,
+        .priority = {
+            .band = MRTK_BAND_IRN_S,
+            .codes = {
+                CODE_L9A,
+                CODE_L9B,
+                CODE_L9C,
+                CODE_L9X,
+            },
+        },
+    },
+};
+/* clang-format on */
+
+/* mrtk_band2freq_hz: physical band -> base carrier frequency -----------------
+ * convert mrtk_band_t to base carrier frequency in Hz.
+ * for GLONASS G1/G2, returns the base frequency without FDMA offset.
+ * args   : mrtk_band_t band  I  physical frequency band
+ * return : base carrier frequency (Hz), 0.0 on error
+ *----------------------------------------------------------------------------*/
+extern double mrtk_band2freq_hz(mrtk_band_t band) {
+    /* clang-format off */
+    switch (band) {
+        case MRTK_BAND_GPS_L1:  return FREQ1;
+        case MRTK_BAND_GPS_L2:  return FREQ2;
+        case MRTK_BAND_GPS_L5:  return FREQ5;
+        case MRTK_BAND_GLO_G1:  return FREQ1_GLO;
+        case MRTK_BAND_GLO_G2:  return FREQ2_GLO;
+        case MRTK_BAND_GLO_G3:  return FREQ3_GLO;
+        case MRTK_BAND_GAL_E1:  return FREQ1;
+        case MRTK_BAND_GAL_E5a: return FREQ5;
+        case MRTK_BAND_GAL_E5b: return FREQ7;
+        case MRTK_BAND_GAL_E6:  return FREQ6;
+        case MRTK_BAND_GAL_E5ab:return FREQ8;
+        case MRTK_BAND_QZS_L1:  return FREQ1;
+        case MRTK_BAND_QZS_L2:  return FREQ2;
+        case MRTK_BAND_QZS_L5:  return FREQ5;
+        case MRTK_BAND_QZS_L6:  return FREQ6;
+        case MRTK_BAND_SBS_L1:  return FREQ1;
+        case MRTK_BAND_SBS_L5:  return FREQ5;
+        case MRTK_BAND_BDS_B1I: return FREQ1_CMP;
+        case MRTK_BAND_BDS_B1C: return FREQ1;
+        case MRTK_BAND_BDS_B2a: return FREQ5;
+        case MRTK_BAND_BDS_B2b: return FREQ2_CMP;
+        case MRTK_BAND_BDS_B2ab:return FREQ8;
+        case MRTK_BAND_BDS_B3:  return FREQ3_CMP;
+        case MRTK_BAND_IRN_L5:  return FREQ5;
+        case MRTK_BAND_IRN_S:   return FREQ9;
+        default:                return 0.0;
+    }
+    /* clang-format on */
+}
+
+/* band2idx_fixed: physical band -> fixed frequency index ---------------------
+ * convert mrtk_band_t to the fixed per-system frequency index used by code2idx().
+ * this is the "Layer A" mapping that does NOT depend on obsdef table ordering.
+ * args   : mrtk_band_t band  I  physical frequency band
+ * return : fixed frequency index (0,1,2,...), -1 on error
+ *----------------------------------------------------------------------------*/
+static int band2idx_fixed(mrtk_band_t band) {
+    /* clang-format off */
+    switch (band) {
+        /* GPS: L1=0, L2=1, L5=2 */
+        case MRTK_BAND_GPS_L1:  return 0;
+        case MRTK_BAND_GPS_L2:  return 1;
+        case MRTK_BAND_GPS_L5:  return 2;
+        /* GLO: G1=0, G2=1, G3=2 */
+        case MRTK_BAND_GLO_G1:  return 0;
+        case MRTK_BAND_GLO_G2:  return 1;
+        case MRTK_BAND_GLO_G3:  return 2;
+        /* GAL: E1=0, E5b=1, E5a=2, E6=3, E5ab=4 */
+        case MRTK_BAND_GAL_E1:  return 0;
+        case MRTK_BAND_GAL_E5b: return 1;
+        case MRTK_BAND_GAL_E5a: return 2;
+        case MRTK_BAND_GAL_E6:  return 3;
+        case MRTK_BAND_GAL_E5ab:return 4;
+        /* QZS: L1=0, L2=1, L5=2, L6=3 */
+        case MRTK_BAND_QZS_L1:  return 0;
+        case MRTK_BAND_QZS_L2:  return 1;
+        case MRTK_BAND_QZS_L5:  return 2;
+        case MRTK_BAND_QZS_L6:  return 3;
+        /* SBS: L1=0, L5=1 */
+        case MRTK_BAND_SBS_L1:  return 0;
+        case MRTK_BAND_SBS_L5:  return 1;
+        /* BDS: B1C/B1I=0, B2b=1, B2a=2, B3=3, B2ab=4 */
+        case MRTK_BAND_BDS_B1C: return 0;
+        case MRTK_BAND_BDS_B1I: return 0;
+        case MRTK_BAND_BDS_B2b: return 1;
+        case MRTK_BAND_BDS_B2a: return 2;
+        case MRTK_BAND_BDS_B3:  return 3;
+        case MRTK_BAND_BDS_B2ab:return 4;
+        /* IRN: L5=0, S=1 */
+        case MRTK_BAND_IRN_L5:  return 0;
+        case MRTK_BAND_IRN_S:   return 1;
+        default:                return -1;
+    }
+    /* clang-format on */
+}
+
+/* mrtk_rinex_freq_to_band: RINEX frequency digit -> physical band -----------
+ * convert RINEX frequency digit (1,2,3,...,9) to mrtk_band_t for a given
+ * satellite system.
+ * args   : int sys            I  satellite system (SYS_???)
+ *          int rinex_freq_id  I  RINEX frequency digit
+ * return : mrtk_band_t (MRTK_BAND_UNKNOWN on error)
+ *----------------------------------------------------------------------------*/
+extern mrtk_band_t mrtk_rinex_freq_to_band(int sys, int rinex_freq_id) {
+    switch (sys) {
+        case SYS_GPS:
+            switch (rinex_freq_id) {
+                case 1:
+                    return MRTK_BAND_GPS_L1;
+                case 2:
+                    return MRTK_BAND_GPS_L2;
+                case 5:
+                    return MRTK_BAND_GPS_L5;
+            }
+            break;
+        case SYS_GLO:
+            switch (rinex_freq_id) {
+                case 1:
+                case 4:
+                    return MRTK_BAND_GLO_G1; /* G1 FDMA + G1a CDMA */
+                case 2:
+                case 6:
+                    return MRTK_BAND_GLO_G2; /* G2 FDMA + G2a CDMA */
+                case 3:
+                    return MRTK_BAND_GLO_G3;
+            }
+            break;
+        case SYS_GAL:
+            switch (rinex_freq_id) {
+                case 1:
+                    return MRTK_BAND_GAL_E1;
+                case 5:
+                    return MRTK_BAND_GAL_E5a;
+                case 7:
+                    return MRTK_BAND_GAL_E5b;
+                case 8:
+                    return MRTK_BAND_GAL_E5ab;
+                case 6:
+                    return MRTK_BAND_GAL_E6;
+            }
+            break;
+        case SYS_QZS:
+            switch (rinex_freq_id) {
+                case 1:
+                    return MRTK_BAND_QZS_L1;
+                case 2:
+                    return MRTK_BAND_QZS_L2;
+                case 5:
+                    return MRTK_BAND_QZS_L5;
+                case 6:
+                    return MRTK_BAND_QZS_L6;
+            }
+            break;
+        case SYS_SBS:
+            switch (rinex_freq_id) {
+                case 1:
+                    return MRTK_BAND_SBS_L1;
+                case 5:
+                    return MRTK_BAND_SBS_L5;
+            }
+            break;
+        case SYS_CMP:
+            switch (rinex_freq_id) {
+                case 1:
+                    return MRTK_BAND_BDS_B1C;
+                case 2:
+                    return MRTK_BAND_BDS_B1I;
+                case 5:
+                    return MRTK_BAND_BDS_B2a;
+                case 7:
+                    return MRTK_BAND_BDS_B2b;
+                case 8:
+                    return MRTK_BAND_BDS_B2ab;
+                case 6:
+                    return MRTK_BAND_BDS_B3;
+            }
+            break;
+        case SYS_IRN:
+            switch (rinex_freq_id) {
+                case 5:
+                    return MRTK_BAND_IRN_L5;
+                case 9:
+                    return MRTK_BAND_IRN_S;
+            }
+            break;
+        default:
+            break;
+    }
+    return MRTK_BAND_UNKNOWN;
+}
+
+/* mrtk_get_signal_priority: get priority-ordered code list -------------------
+ * look up the priority-ordered observation code list for a (system, band) pair
+ * args   : int         sys   I  satellite system (SYS_???)
+ *          mrtk_band_t band  I  physical frequency band
+ * return : pointer to code array (MRTK_MAX_SIG_PRIORITY elements), or NULL
+ *----------------------------------------------------------------------------*/
+extern const uint8_t* mrtk_get_signal_priority(int sys, mrtk_band_t band) {
+    int i;
+
+    if (band == MRTK_BAND_UNKNOWN || band >= MRTK_BAND_MAX) {
+        return NULL;
+    }
+    for (i = 0; i < (int)(sizeof(SIG_PRIORITY_TABLE) / sizeof(SIG_PRIORITY_TABLE[0])); i++) {
+        if (SIG_PRIORITY_TABLE[i].sys == sys && SIG_PRIORITY_TABLE[i].priority.band == band) {
+            return SIG_PRIORITY_TABLE[i].priority.codes;
+        }
+    }
+    return NULL;
+}
+
+/* mrtk_band_to_freq_num: physical band -> RINEX frequency number ------------
+ * reverse of mrtk_rinex_freq_to_band(). Converts mrtk_band_t back to the
+ * RINEX frequency digit for a given satellite system.
+ * args   : int         sys   I  satellite system (SYS_???)
+ *          mrtk_band_t band  I  physical frequency band
+ * return : RINEX frequency number (1,2,5,...) or 0 on error
+ *----------------------------------------------------------------------------*/
+extern int mrtk_band_to_freq_num(int sys, mrtk_band_t band) {
+    switch (sys) {
+        case SYS_GPS:
+            switch (band) {
+                case MRTK_BAND_GPS_L1:
+                    return 1;
+                case MRTK_BAND_GPS_L2:
+                    return 2;
+                case MRTK_BAND_GPS_L5:
+                    return 5;
+                default:
+                    return 0;
+            }
+        case SYS_GLO:
+            switch (band) {
+                case MRTK_BAND_GLO_G1:
+                    return 1;
+                case MRTK_BAND_GLO_G2:
+                    return 2;
+                case MRTK_BAND_GLO_G3:
+                    return 3;
+                default:
+                    return 0;
+            }
+        case SYS_GAL:
+            switch (band) {
+                case MRTK_BAND_GAL_E1:
+                    return 1;
+                case MRTK_BAND_GAL_E5a:
+                    return 5;
+                case MRTK_BAND_GAL_E5b:
+                    return 7;
+                case MRTK_BAND_GAL_E6:
+                    return 6;
+                case MRTK_BAND_GAL_E5ab:
+                    return 8;
+                default:
+                    return 0;
+            }
+        case SYS_QZS:
+            switch (band) {
+                case MRTK_BAND_QZS_L1:
+                    return 1;
+                case MRTK_BAND_QZS_L2:
+                    return 2;
+                case MRTK_BAND_QZS_L5:
+                    return 5;
+                case MRTK_BAND_QZS_L6:
+                    return 6;
+                default:
+                    return 0;
+            }
+        case SYS_SBS:
+            switch (band) {
+                case MRTK_BAND_SBS_L1:
+                    return 1;
+                case MRTK_BAND_SBS_L5:
+                    return 5;
+                default:
+                    return 0;
+            }
+        case SYS_CMP:
+            switch (band) {
+                case MRTK_BAND_BDS_B1C:
+                    return 1;
+                case MRTK_BAND_BDS_B1I:
+                    return 2;
+                case MRTK_BAND_BDS_B2a:
+                    return 5;
+                case MRTK_BAND_BDS_B3:
+                    return 6;
+                case MRTK_BAND_BDS_B2b:
+                    return 7;
+                case MRTK_BAND_BDS_B2ab:
+                    return 8;
+                default:
+                    return 0;
+            }
+        case SYS_IRN:
+            switch (band) {
+                case MRTK_BAND_IRN_L5:
+                    return 5;
+                case MRTK_BAND_IRN_S:
+                    return 9;
+                default:
+                    return 0;
+            }
+        default:
+            return 0;
+    }
+}
+
+/* mrtk_parse_signal_str: parse RINEX3-style signal string -------------------
+ * parse a signal string like "G1C" into (system, band, code) components.
+ * format: {sys_char}{freq_digit}{attr_char} (3 chars)
+ * args   : const char *str   I  signal string (e.g., "G1C", "E5Q", "J2X")
+ *          int        *sys   O  satellite system (SYS_???)
+ *          mrtk_band_t *band O  physical frequency band
+ *          uint8_t    *code  O  observation code (CODE_???)
+ * return : 0: success, -1: error
+ *----------------------------------------------------------------------------*/
+extern int mrtk_parse_signal_str(const char* str, int* sys, mrtk_band_t* band, uint8_t* code) {
+    char obs_str[3];
+    int freq_digit;
+
+    if (!str || strlen(str) < 3) {
+        return -1;
+    }
+
+    /* parse system character */
+    switch (str[0]) {
+        case 'G':
+            *sys = SYS_GPS;
+            break;
+        case 'R':
+            *sys = SYS_GLO;
+            break;
+        case 'E':
+            *sys = SYS_GAL;
+            break;
+        case 'J':
+            *sys = SYS_QZS;
+            break;
+        case 'S':
+            *sys = SYS_SBS;
+            break;
+        case 'C':
+            *sys = SYS_CMP;
+            break;
+        case 'I':
+            *sys = SYS_IRN;
+            break;
+        default:
+            return -1;
+    }
+
+    /* parse frequency digit */
+    freq_digit = str[1] - '0';
+    if (freq_digit < 1 || freq_digit > 9) {
+        return -1;
+    }
+    *band = mrtk_rinex_freq_to_band(*sys, freq_digit);
+    if (*band == MRTK_BAND_UNKNOWN) {
+        return -1;
+    }
+
+    /* parse observation code: freq_digit + attribute char → obs code string */
+    obs_str[0] = str[1]; /* freq digit */
+    obs_str[1] = str[2]; /* attribute char */
+    obs_str[2] = '\0';
+    *code = obs2code(obs_str);
+    if (*code == CODE_NONE) {
+        return -1;
+    }
+
+    return 0;
+}
+
+/* sys index for sigcfg array ------------------------------------------------*/
+static int sys2sigcfg_idx(int sys) {
+    switch (sys) {
+        case SYS_GPS:
+            return 0;
+        case SYS_GLO:
+            return 1;
+        case SYS_GAL:
+            return 2;
+        case SYS_QZS:
+            return 3;
+        case SYS_SBS:
+            return 4;
+        case SYS_CMP:
+            return 5;
+        case SYS_IRN:
+            return 6;
+        default:
+            return -1;
+    }
+}
+
+/* mrtk_sigcfg_from_signals: build sigcfg from signal string array -----------
+ * parse an array of RINEX3-style signal strings (e.g., "G1C", "E5Q") and
+ * populate per-constellation sigcfg arrays. Also derives nf as the maximum
+ * number of signals configured for any single constellation.
+ * args   : const char **sigs  I  array of signal strings
+ *          int         nsig   I  number of signal strings
+ *          mrtk_sigcfg_t *cfg O  per-constellation signal config [MRTK_NSYS]
+ *          int         *nf    O  derived number of frequencies
+ * return : 0: success, -1: error
+ *----------------------------------------------------------------------------*/
+extern int mrtk_sigcfg_from_signals(const char** sigs, int nsig, mrtk_sigcfg_t* cfg, int* nf) {
+    int i, j, sys_idx, max_nf = 0;
+    int sys;
+    mrtk_band_t band;
+    uint8_t code;
+
+    if (!sigs || !cfg || !nf || nsig <= 0) {
+        return -1;
+    }
+
+    /* zero-initialize all configs */
+    memset(cfg, 0, sizeof(mrtk_sigcfg_t) * MRTK_NSYS);
+
+    for (i = 0; i < nsig; i++) {
+        if (mrtk_parse_signal_str(sigs[i], &sys, &band, &code) != 0) {
+            trace(NULL, 2, "mrtk_sigcfg_from_signals: invalid signal '%s'\n", sigs[i]);
+            return -1;
+        }
+
+        sys_idx = sys2sigcfg_idx(sys);
+        if (sys_idx < 0) {
+            return -1;
+        }
+
+        if (cfg[sys_idx].nsig >= MRTK_MAXSIG_PER_SYS) {
+            trace(NULL, 2, "mrtk_sigcfg_from_signals: too many signals for sys=%d\n", sys);
+            return -1;
+        }
+
+        /* reject duplicate bands within the same constellation */
+        for (j = 0; j < cfg[sys_idx].nsig; j++) {
+            if (cfg[sys_idx].sig[j].band == band) {
+                trace(NULL, 2, "mrtk_sigcfg_from_signals: duplicate band for '%s'\n", sigs[i]);
+                return -1;
+            }
+        }
+
+        cfg[sys_idx].sig[cfg[sys_idx].nsig].band = band;
+        cfg[sys_idx].sig[cfg[sys_idx].nsig].preferred_code = code; /* reserved for future use */
+        cfg[sys_idx].nsig++;
+    }
+
+    /* derive nf as max signals across all constellations */
+    for (i = 0; i < MRTK_NSYS; i++) {
+        if (cfg[i].nsig > max_nf) {
+            max_nf = cfg[i].nsig;
+        }
+    }
+    *nf = max_nf;
+
+    return 0;
+}
+
+/* mrtk_sigcfg_to_obsdef: bridge sigcfg to existing obsdef tables ------------
+ * for each constellation with nsig > 0, convert sigcfg bands to RINEX
+ * frequency numbers and call set_obsdef() to rearrange the obsdef table.
+ * args   : const mrtk_sigcfg_t *cfg  I  per-constellation signal config [MRTK_NSYS]
+ * return : 0: success, -1: error
+ *----------------------------------------------------------------------------*/
+extern int mrtk_sigcfg_to_obsdef(const mrtk_sigcfg_t* cfg) {
+    static const int sys_list[MRTK_NSYS] = {SYS_GPS, SYS_GLO, SYS_GAL, SYS_QZS, SYS_SBS, SYS_CMP, SYS_IRN};
+    int freq_nums[MAXFREQ];
+    int i, j;
+
+    if (!cfg) {
+        return -1;
+    }
+
+    for (i = 0; i < MRTK_NSYS; i++) {
+        if (cfg[i].nsig <= 0) {
+            continue;
+        }
+
+        /* build freq_num array from sigcfg bands */
+        memset(freq_nums, 0, sizeof(freq_nums));
+        for (j = 0; j < cfg[i].nsig && j < MAXFREQ; j++) {
+            freq_nums[j] = mrtk_band_to_freq_num(sys_list[i], cfg[i].sig[j].band);
+            if (freq_nums[j] == 0) {
+                trace(NULL, 2, "mrtk_sigcfg_to_obsdef: invalid band %d for sys=%02x\n", cfg[i].sig[j].band,
+                      sys_list[i]);
+                return -1;
+            }
+        }
+
+        set_obsdef(sys_list[i], freq_nums);
+    }
+    return 0;
 }

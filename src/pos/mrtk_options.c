@@ -23,6 +23,7 @@
 
 #include "mrtklib/mrtk_coords.h"
 #include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_obs.h"
 #include "mrtklib/mrtk_toml.h"
 #include "mrtklib/mrtk_trace.h"
 
@@ -41,6 +42,7 @@ static double elmask_, elmaskar_, elmaskhold_;
 static double antpos_[2][3];
 static char exsats_[1024];
 static char snrmask_[NFREQ][1024];
+static char signals_[1024];
 
 /* system options table ------------------------------------------------------*/
 #define SWTOPT "0:off,1:on"
@@ -112,6 +114,7 @@ opt_t sysopts[] = {
     {"pos1-rux", 1, (void*)&prcopt_.ru[0], ""},
     {"pos1-ruy", 1, (void*)&prcopt_.ru[1], ""},
     {"pos1-ruz", 1, (void*)&prcopt_.ru[2], ""},
+    {"pos1-signals", 2, (void*)signals_, ""},
 
     {"pos2-armode", 3, (void*)&prcopt_.modear, ARMOPT},
     {"pos2-gloarmode", 3, (void*)&prcopt_.glomodear, GAROPT},
@@ -572,6 +575,42 @@ static void buff2sysopts(void) {
             prcopt_.snrmask.mask[i][j++] = atof(p);
         }
     }
+    /* explicit signal configuration */
+    if (signals_[0] != '\0') {
+        const char* sigs[64];
+        int nsig = 0, nf = 0;
+
+        strcpy(buff, signals_);
+        for (p = strtok(buff, ","); p && nsig < 64; p = strtok(NULL, ",")) {
+            char* end;
+            /* trim leading whitespace */
+            while (*p == ' ' || *p == '\t') {
+                p++;
+            }
+            /* trim trailing whitespace */
+            end = p + strlen(p) - 1;
+            while (end > p && (*end == ' ' || *end == '\t')) {
+                *end-- = '\0';
+            }
+            if (*p) {
+                sigs[nsig++] = p;
+            }
+        }
+        if (nsig > 0 && mrtk_sigcfg_from_signals(sigs, nsig, prcopt_.sigcfg, &nf) == 0) {
+            if (nf > 0 && nf <= NFREQ) {
+                prcopt_.sigcfg_set = 1;
+                prcopt_.nf = nf;
+                mrtk_sigcfg_to_obsdef(prcopt_.sigcfg);
+                trace(NULL, 3, "buff2sysopts: signals configured (%d signals, nf=%d)\n", nsig, nf);
+            } else {
+                trace(NULL, 1,
+                      "buff2sysopts: nf=%d exceeds NFREQ=%d for signals '%s'\n", nf, NFREQ,
+                      signals_);
+            }
+        } else {
+            trace(NULL, 1, "buff2sysopts: invalid signals string '%s'\n", signals_);
+        }
+    }
 }
 /* options to system options buffer ------------------------------------------*/
 static void sysopts2buff(void) {
@@ -646,6 +685,7 @@ extern void resetsysopts(void) {
         }
     }
     exsats_[0] = '\0';
+    signals_[0] = '\0';
 }
 /* get system options ----------------------------------------------------------
  * get system options
