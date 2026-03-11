@@ -191,6 +191,41 @@ int testelmask(const double* azel, const int16_t* elmask);
  */
 void freeobs(obs_t* obs);
 
+/*============================================================================
+ * Structured Signal Priority
+ *===========================================================================*/
+
+/** @brief Maximum number of codes in a priority list. */
+#define MRTK_MAX_SIG_PRIORITY 15
+
+/**
+ * @brief Signal priority entry: band + priority-ordered code list.
+ *
+ * codes[] lists observation codes in descending priority order.
+ * Remaining slots are zero-terminated (0 = no more codes).
+ */
+typedef struct {
+    mrtk_band_t band;                       /* physical frequency band */
+    uint8_t codes[MRTK_MAX_SIG_PRIORITY];   /* CODE_* in priority order, 0=end */
+} mrtk_sig_priority_t;
+
+/**
+ * @brief Convert RINEX frequency digit to physical band for a given system.
+ * @param[in] sys            Satellite system (SYS_???)
+ * @param[in] rinex_freq_id  RINEX frequency digit (1,2,3,4,5,6,7,8,9)
+ * @return Physical band (MRTK_BAND_UNKNOWN on error)
+ */
+mrtk_band_t mrtk_rinex_freq_to_band(int sys, int rinex_freq_id);
+
+/**
+ * @brief Get priority-ordered code list for a (system, band) pair.
+ * @param[in] sys   Satellite system (SYS_???)
+ * @param[in] band  Physical frequency band
+ * @return Pointer to priority-ordered code array (MRTK_MAX_SIG_PRIORITY elements),
+ *         or NULL if no match
+ */
+const uint8_t* mrtk_get_signal_priority(int sys, mrtk_band_t band);
+
 #ifdef __cplusplus
 }
 #endif

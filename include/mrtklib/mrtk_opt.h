@@ -154,6 +154,29 @@ typedef struct {               /* extended receiver error model */
 } exterr_t;
 
 /*============================================================================
+ * Signal Configuration Types
+ *===========================================================================*/
+
+/**
+ * @brief Signal specification: physical band + optional preferred code.
+ */
+typedef struct {
+    mrtk_band_t band;          /* physical frequency band */
+    uint8_t preferred_code;    /* preferred obs code (CODE_???, 0=auto) */
+} mrtk_signal_t;
+
+/**
+ * @brief Per-constellation signal configuration.
+ */
+#define MRTK_MAXSIG_PER_SYS 7 /* max signals per constellation */
+#define MRTK_NSYS 7                 /* number of constellations */
+
+typedef struct {
+    int nsig;                                   /* number of configured signals */
+    mrtk_signal_t sig[MRTK_MAXSIG_PER_SYS];    /* configured signals */
+} mrtk_sigcfg_t;
+
+/*============================================================================
  * Processing Options Type
  *===========================================================================*/
 
@@ -277,6 +300,10 @@ typedef struct prcopt_t {         /* processing options type */
     int arfilter;       /* AR filter: exclude newly-locked sats degrading ratio (0:off,1:on) */
     int gpsmodear;      /* GPS AR mode for GLO fix-and-hold second pass (0:off,1:on) */
     double gainholdamb; /* gain for fractional GLO/SBAS inter-channel bias update */
+
+    /* Signal configuration (explicit band/code specification) */
+    mrtk_sigcfg_t sigcfg[MRTK_NSYS]; /* per-constellation signal config */
+    int sigcfg_set;                   /* 1: sigcfg explicitly configured (overrides nf/pppsig) */
 } prcopt_t;
 
 /*============================================================================
