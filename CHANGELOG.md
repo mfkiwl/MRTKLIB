@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Signals architecture redesign** — Introduces `mrtk_band_t` enum (26 physical
 frequency bands), structured signal priority table (`SIG_PRIORITY_TABLE`), and
-explicit `signals = ["GL1C", "GL2W", ...]` TOML configuration.  Replaces the
+explicit `signals = ["G1C", "G2W", ...]` TOML configuration.  Replaces the
 legacy string-based `codepris[]` system with a single, structured source of truth
 for signal priority.  No algorithmic changes; all positioning output is identical.
 
@@ -29,7 +29,7 @@ for signal priority.  No algorithmic changes; all positioning output is identica
 - **`mrtk_band2freq_hz()`** — Physical band → base carrier frequency (Hz).
 - **`mrtk_band_to_freq_num()`** — Reverse mapping: band → RINEX frequency number.
 - **`mrtk_parse_signal_str()`** — Parse RINEX3-style signal strings (e.g.,
-  "GL1C" → `SYS_GPS`, `MRTK_BAND_GPS_L1`, `CODE_L1C`).
+  "G1C" → `SYS_GPS`, `MRTK_BAND_GPS_L1`, `CODE_L1C`).
 - **`mrtk_sigcfg_from_signals()`** — Build per-system signal config from a string
   array, auto-deriving `nf` (number of frequencies).
 - **`mrtk_sigcfg_to_obsdef()`** — Bridge signal config to existing obsdef tables
@@ -39,7 +39,7 @@ for signal priority.  No algorithmic changes; all positioning output is identica
 - **`prcopt_t.sigcfg[7]` / `sigcfg_set`** (`mrtk_opt.h`) — Processing option
   fields for explicit signal configuration.
 - **TOML `signals` array support** (`mrtk_toml.c`) — `[positioning] signals`
-  key accepts TOML string arrays (e.g., `["GL1C", "GL2W", "EL1C", "EL5Q"]`),
+  key accepts TOML string arrays (e.g., `["G1C", "G2W", "E1C", "E5Q"]`),
   converted to CSV for the existing opt_t pipeline.  When present, overrides
   `frequency` setting and auto-derives `nf`.
 

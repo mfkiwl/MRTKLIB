@@ -48,7 +48,7 @@ incrementally back-ported to each engine:
 | **v0.5.1** | PPP-RTK | Bug fix: dual-channel CLAS RT fix rate degradation ([#35](https://github.com/h-shiono/MRTKLIB/issues/35)); `gen_l6_tag.py` tick_scale fix | ✅ Released |
 | **v0.5.2** | All | Code quality: mandatory braces on control flow, nested/complex ternary elimination (67 files) | ✅ Released |
 | **v0.5.3** | All | Code quality: full `clang-format` application (116 files, Google style) | ✅ Released |
-| **v0.5.4** | All | Signals update: frequency / physical band separation and structuring | 🚧 Ongoing |
+| **v0.5.4** | All | Signals update: frequency / physical band separation and structuring | ✅ Released |
 | **v0.5.5** | PPP-RTK | Bug fix: CLAS real-time positioning does not work properly ([#31](https://github.com/h-shiono/MRTKLIB/issues/31)) | 🔜 Next |
 | **v0.5.6** | All | Support RINEX 4.0 (OBS reading & basic data structures) | 🔜 Planned |
 | **v0.5.x** | — | Port remaining RTKLIB console apps: `convbin`, `str2str` | 💭 Backlog |
