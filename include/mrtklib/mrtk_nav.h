@@ -496,13 +496,6 @@ double sat2freq(int sat, uint8_t code, const nav_t* nav);
  */
 int satsys_bd2(int sat, int* prn);
 
-/**
- * @brief Get code priority string for system and frequency index.
- * @param[in] sys       Satellite system (SYS_???)
- * @param[in] freq_idx  Frequency index (0,1,2,...)
- * @return Code priority string from obsdef table ("" on error)
- */
-const char* get_codepris(int sys, int freq_idx);
 
 /**
  * @brief Convert frequency index to frequency number using obsdef table.

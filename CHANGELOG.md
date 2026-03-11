@@ -5,6 +5,80 @@ All notable changes to MRTKLIB are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.4] - 2026-03-11
+
+**Signals architecture redesign** — Introduces `mrtk_band_t` enum (26 physical
+frequency bands), structured signal priority table (`SIG_PRIORITY_TABLE`), and
+explicit `signals = ["GL1C", "GL2W", ...]` TOML configuration.  Replaces the
+legacy string-based `codepris[]` system with a single, structured source of truth
+for signal priority.  No algorithmic changes; all positioning output is identical.
+
+### Added
+
+- **`mrtk_band_t` enum** (`mrtk_foundation.h`) — 26 per-constellation physical
+  frequency bands (GPS L1/L2/L5, GLO G1/G2/G3, GAL E1/E5a/E5b/E6/E5ab, QZS
+  L1/L2/L5/L6, SBS L1/L5, BDS B1I/B1C/B2a/B2b/B2ab/B3, IRN L5/S) plus
+  `MRTK_BAND_UNKNOWN` and `MRTK_BAND_MAX` sentinels.
+- **`SIG_PRIORITY_TABLE`** (`mrtk_obs.c`) — 26-entry structured priority table
+  using C99 designated initializers and `CODE_*` constants, replacing the opaque
+  `codepris[7][MAXFREQ][16]` string arrays.
+- **`mrtk_rinex_freq_to_band()`** — RINEX frequency digit → `mrtk_band_t`
+  conversion, including GLONASS CDMA aliases (freq 4→G1, freq 6→G2).
+- **`mrtk_get_signal_priority()`** — Structured (sys, band) → priority-ordered
+  code array lookup.
+- **`mrtk_band2freq_hz()`** — Physical band → base carrier frequency (Hz).
+- **`mrtk_band_to_freq_num()`** — Reverse mapping: band → RINEX frequency number.
+- **`mrtk_parse_signal_str()`** — Parse RINEX3-style signal strings (e.g.,
+  "GL1C" → `SYS_GPS`, `MRTK_BAND_GPS_L1`, `CODE_L1C`).
+- **`mrtk_sigcfg_from_signals()`** — Build per-system signal config from a string
+  array, auto-deriving `nf` (number of frequencies).
+- **`mrtk_sigcfg_to_obsdef()`** — Bridge signal config to existing obsdef tables
+  via `set_obsdef()`.
+- **`mrtk_signal_t` / `mrtk_sigcfg_t` types** (`mrtk_obs.h`) — Signal
+  configuration structures for per-constellation band + preferred code settings.
+- **`prcopt_t.sigcfg[7]` / `sigcfg_set`** (`mrtk_opt.h`) — Processing option
+  fields for explicit signal configuration.
+- **TOML `signals` array support** (`mrtk_toml.c`) — `[positioning] signals`
+  key accepts TOML string arrays (e.g., `["GL1C", "GL2W", "EL1C", "EL5Q"]`),
+  converted to CSV for the existing opt_t pipeline.  When present, overrides
+  `frequency` setting and auto-derives `nf`.
+
+### Changed
+
+- **`getcodepri()`** — Rewritten to use `mrtk_rinex_freq_to_band()` +
+  `mrtk_get_signal_priority()` instead of the legacy `codepris[]` string scan.
+- **`code2idx()`** — Rewritten as `code2freq_num()` → `mrtk_rinex_freq_to_band()`
+  → `band2idx_fixed()` pipeline, replacing 7 per-system `code2freq_*()` static
+  functions (~140 lines removed).
+- **obsdef tables** (`mrtk_nav.c`) — Annotated with `mrtk_band_t` names in
+  comments for readability (e.g., `/* 0:L1 (MRTK_BAND_GPS_L1) */`).
+
+### Removed
+
+- **`codepris[7][MAXFREQ][16]`** — Legacy string-based signal priority array.
+- **`setcodepri()`** — Legacy function to modify string priority table.
+- **`get_codepris()`** — Legacy function to read obsdef codepris strings.
+- **`obsdef_t.codepris` field** — Removed from struct and all 8 obsdef table
+  initializers; signal priority now served exclusively from `SIG_PRIORITY_TABLE`.
+- **7 × `code2freq_*()` functions** — `code2freq_GPS/GLO/GAL/QZS/SBS/BDS/IRN`
+  replaced by band-based lookup pipeline.
+
+### Known Limitations
+
+- **`positioning.signals` and `[signals]` section conflict** — Configs that use
+  the MADOCALIB per-system signal selection (`[signals] gps`, `galileo`, `bds2`,
+  `bds3`, etc., mapped to `pos2-sig*`) cannot use `positioning.signals` at the
+  same time.  Both mechanisms call `set_obsdef()`, and the `[signals]` section
+  overrides the obsdef ordering set by `positioning.signals`, causing incorrect
+  frequency assignment.  Affected configs (MADOCALIB, MALIB, benchmark/madoca)
+  retain `frequency` for now.  A future release will unify these two mechanisms.
+
+### Test Results
+
+56/56 non-realtime tests pass — unchanged from v0.5.3.
+
+---
+
 ## [v0.5.3] - 2026-03-11
 
 **Full clang-format release** — Applies `clang-format` (Google style, 4-space
@@ -763,6 +837,7 @@ Initial release — MALIB structural migration complete.
 - **MALIB integration** — Structural base from JAXA MALIB feature/1.2.0
   (directory layout, threading, stream I/O).
 
+[v0.5.4]: https://github.com/h-shiono/MRTKLIB/compare/v0.5.3...v0.5.4
 [v0.5.3]: https://github.com/h-shiono/MRTKLIB/compare/v0.5.2...v0.5.3
 [v0.5.2]: https://github.com/h-shiono/MRTKLIB/compare/v0.5.1...v0.5.2
 [v0.5.1]: https://github.com/h-shiono/MRTKLIB/compare/v0.5.0...v0.5.1
