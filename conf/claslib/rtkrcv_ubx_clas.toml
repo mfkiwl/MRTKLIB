@@ -138,7 +138,7 @@ position_type      = "llh"
 position_1         = 0.0
 position_2         = 0.0
 position_3         = 0.0
-type               = "*"
+type               = ""
 delta_e            = 0.0
 delta_n            = 0.0
 delta_u            = 0.0
@@ -196,20 +196,20 @@ float_count        = 15
 # ── Input streams ─────────────────────────────────────────────────────────────
 # Edit these sections to match your local setup.
 #
-# Example: u-blox F9P (obs) on TCP port 20000, D9C (L6D) on TCP port 20001
+# Example: u-blox F9P (obs) on TCP port 20001, D9C (L6D) on TCP port 20002
 #   [streams.input.rover]
 #   type   = "tcpcli"
-#   path   = "localhost:20000"
+#   path   = "localhost:20001"
 #   format = "ubx"
 #
 #   [streams.input.correction]
 #   type   = "tcpcli"
-#   path   = "localhost:20001"
+#   path   = "localhost:20002"
 #   format = "ubx"
 
 [streams.input.rover]
 type   = "tcpcli"
-path   = "localhost:20000"
+path   = "localhost:20001"
 format = "ubx"
 
 [streams.input.base]
@@ -222,7 +222,7 @@ nmealon = 0.0
 
 [streams.input.correction]
 type   = "tcpcli"
-path   = "localhost:20001"
+path   = "localhost:20002"
 format = "ubx"  # UBX-RXM-QZSSL6 carrying L6D (CLAS)
 
 # ── Output streams ────────────────────────────────────────────────────────────
