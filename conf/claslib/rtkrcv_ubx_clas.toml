@@ -1,4 +1,4 @@
-# MRTKLIB Configuration: CLAS PPP-RTK via UBX streams
+# MRTKLIB Configuration (TOML v1.0.0)
 #
 # Template for real-time CLAS PPP-RTK using u-blox receivers.
 # Rover observations and L6D corrections are both received as UBX format.

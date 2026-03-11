@@ -469,8 +469,9 @@ static int decoderaw(rtksvr_t* svr, int index) {
                   time_str(obs->data[0].time,0),obs->n);
         }
 #endif
-        /* update rtk server */
-        if (ret > 0) {
+        /* update rtk server (skip update_ssr for UBX L6D: ret=10 means
+         * "L6 payload ready for CLAS redirect", not "SSR message decoded") */
+        if (ret > 0 && !(ret == 10 && svr->format[index] == STRFMT_UBX)) {
             update_svr(svr, ret, obs, nav, ephsat, ephset, sbsmsg, index, fobs);
         }
         /* redirect L6 payload to CLAS decoder (UBX/L6E → CLAS path) */
