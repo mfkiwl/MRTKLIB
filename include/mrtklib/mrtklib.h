@@ -95,8 +95,7 @@ typedef enum {
  *       Copy the string if you need to retain it.
  * @note The callback is invoked synchronously from the calling thread.
  */
-typedef void (*mrtk_log_cb_t)(mrtk_context_t* ctx, mrtk_log_level_t level,
-                               const char* msg);
+typedef void (*mrtk_log_cb_t)(mrtk_context_t* ctx, mrtk_log_level_t level, const char* msg);
 
 /*============================================================================
  * Lifecycle Management
@@ -194,8 +193,7 @@ void mrtk_log(mrtk_context_t* ctx, mrtk_log_level_t level, const char* fmt, ...)
  * @param fmt   printf-style format string
  * @param args  Pre-initialized va_list
  */
-void mrtk_log_v(mrtk_context_t* ctx, mrtk_log_level_t level, const char* fmt,
-                va_list args);
+void mrtk_log_v(mrtk_context_t* ctx, mrtk_log_level_t level, const char* fmt, va_list args);
 
 /*============================================================================
  * Legacy Migration Support

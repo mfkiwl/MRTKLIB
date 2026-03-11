@@ -53,8 +53,7 @@ extern "C" {
  * @return Status (0: ok, other: error)
  * @note Matrix stored by column-major order (Fortran convention).
  */
-int lambda(int n, int m, const double *a, const double *Q, double *F,
-           double *s);
+int lambda(int n, int m, const double* a, const double* Q, double* F, double* s);
 
 /**
  * @brief LAMBDA reduction for integer least-squares.
@@ -67,7 +66,7 @@ int lambda(int n, int m, const double *a, const double *Q, double *F,
  * @param[out] Z  LAMBDA reduction matrix (n x n)
  * @return Status (0: ok, other: error)
  */
-int lambda_reduction(int n, const double *Q, double *Z);
+int lambda_reduction(int n, const double* Q, double* Z);
 
 /**
  * @brief MLAMBDA search for integer least-squares.
@@ -83,8 +82,7 @@ int lambda_reduction(int n, const double *Q, double *Z);
  * @param[out] s  Sum of squared residuals of fixed solutions (1 x m)
  * @return Status (0: ok, other: error)
  */
-int lambda_search(int n, int m, const double *a, const double *Q, double *F,
-                  double *s);
+int lambda_search(int n, int m, const double* a, const double* Q, double* F, double* s);
 
 #ifdef __cplusplus
 }

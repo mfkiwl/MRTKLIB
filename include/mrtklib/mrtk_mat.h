@@ -31,21 +31,22 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_foundation.h"
 #include <stdio.h>
+
+#include "mrtklib/mrtk_foundation.h"
 
 /*============================================================================
  * Fatal Callback
  *===========================================================================*/
 
 /** @brief Fatal callback function type for allocation failures. */
-typedef void fatalfunc_t(const char *);
+typedef void fatalfunc_t(const char*);
 
 /**
  * @brief Add fatal callback function for mat(), zeros(), imat().
  * @param[in] func  Callback function
  */
-void add_fatal(fatalfunc_t *func);
+void add_fatal(fatalfunc_t* func);
 
 /*============================================================================
  * Matrix Allocation
@@ -57,7 +58,7 @@ void add_fatal(fatalfunc_t *func);
  * @param[in] m  Number of columns
  * @return Matrix pointer (NULL if n<=0 or m<=0)
  */
-double *mat(int n, int m);
+double* mat(int n, int m);
 
 /**
  * @brief Allocate memory for an integer matrix.
@@ -65,7 +66,7 @@ double *mat(int n, int m);
  * @param[in] m  Number of columns
  * @return Matrix pointer (NULL if n<=0 or m<=0)
  */
-int *imat(int n, int m);
+int* imat(int n, int m);
 
 /**
  * @brief Allocate a new zero matrix.
@@ -73,14 +74,14 @@ int *imat(int n, int m);
  * @param[in] m  Number of columns
  * @return Matrix pointer (NULL if n<=0 or m<=0)
  */
-double *zeros(int n, int m);
+double* zeros(int n, int m);
 
 /**
  * @brief Generate a new identity matrix.
  * @param[in] n  Number of rows and columns
  * @return Matrix pointer (NULL if n<=0)
  */
-double *eye(int n);
+double* eye(int n);
 
 /*============================================================================
  * Vector Operations
@@ -93,7 +94,7 @@ double *eye(int n);
  * @param[in] n  Size of vectors
  * @return a' * b
  */
-double dot(const double *a, const double *b, int n);
+double dot(const double* a, const double* b, int n);
 
 /**
  * @brief Euclidean norm of vector.
@@ -101,7 +102,7 @@ double dot(const double *a, const double *b, int n);
  * @param[in] n  Size of vector
  * @return || a ||
  */
-double norm(const double *a, int n);
+double norm(const double* a, int n);
 
 /**
  * @brief Cross product of 3D vectors.
@@ -109,7 +110,7 @@ double norm(const double *a, int n);
  * @param[in]  b  Vector b (3 x 1)
  * @param[out] c  Cross product a x b (3 x 1)
  */
-void cross3(const double *a, const double *b, double *c);
+void cross3(const double* a, const double* b, double* c);
 
 /**
  * @brief Normalize 3D vector.
@@ -117,7 +118,7 @@ void cross3(const double *a, const double *b, double *c);
  * @param[out] b  Normalized vector (3 x 1), || b || = 1
  * @return Status (1:ok, 0:error)
  */
-int normv3(const double *a, double *b);
+int normv3(const double* a, double* b);
 
 /*============================================================================
  * Matrix Operations
@@ -130,7 +131,7 @@ int normv3(const double *a, double *b);
  * @param[in]  n  Number of rows
  * @param[in]  m  Number of columns
  */
-void matcpy(double *A, const double *B, int n, int m);
+void matcpy(double* A, const double* B, int n, int m);
 
 /**
  * @brief Multiply matrix by matrix (C = alpha*A*B + beta*C).
@@ -141,8 +142,8 @@ void matcpy(double *A, const double *B, int n, int m);
  * @param[in]    beta   Beta coefficient
  * @param[in,out] C     Matrix C (n x k)
  */
-void matmul(const char *tr, int n, int k, int m, double alpha,
-            const double *A, const double *B, double beta, double *C);
+void matmul(const char* tr, int n, int k, int m, double alpha, const double* A, const double* B, double beta,
+            double* C);
 
 /**
  * @brief Inverse of matrix (A = A^-1).
@@ -150,7 +151,7 @@ void matmul(const char *tr, int n, int k, int m, double alpha,
  * @param[in]     n  Size of matrix
  * @return Status (0:ok, <0:error)
  */
-int matinv(double *A, int n);
+int matinv(double* A, int n);
 
 /**
  * @brief Solve linear equation (X = A\Y or X = A'\Y).
@@ -163,8 +164,7 @@ int matinv(double *A, int n);
  * @note Matrix stored by column-major order (Fortran convention).
  *       X can be same as Y.
  */
-int solve(const char *tr, const double *A, const double *Y, int n,
-          int m, double *X);
+int solve(const char* tr, const double* A, const double* Y, int n, int m, double* X);
 
 /*============================================================================
  * Estimation Algorithms
@@ -185,8 +185,7 @@ int solve(const char *tr, const double *A, const double *Y, int n,
  * @note For weighted least square, replace A and y by A*w and w*y (w=W^(1/2)).
  *       Matrix stored by column-major order (Fortran convention).
  */
-int lsq(const double *A, const double *y, int n, int m, double *x,
-        double *Q);
+int lsq(const double* A, const double* y, int n, int m, double* x, double* Q);
 
 /**
  * @brief Kalman filter state update.
@@ -204,8 +203,7 @@ int lsq(const double *A, const double *y, int n, int m, double *x,
  * @note Matrix stored by column-major order (Fortran convention).
  *       If state x[i]==0.0, does not update state x[i]/P[i+i*n].
  */
-int filter(double *x, double *P, const double *H, const double *v,
-           const double *R, int n, int m);
+int filter(double* x, double* P, const double* H, const double* v, const double* R, int n, int m);
 
 /**
  * @brief Combine forward and backward filters by fixed-interval smoother.
@@ -222,8 +220,7 @@ int filter(double *x, double *P, const double *H, const double *v,
  * @return Status (0:ok, <0:error)
  * @note Matrix stored by column-major order (Fortran convention).
  */
-int smoother(const double *xf, const double *Qf, const double *xb,
-             const double *Qb, int n, double *xs, double *Qs);
+int smoother(const double* xf, const double* Qf, const double* xb, const double* Qb, int n, double* xs, double* Qs);
 
 /*============================================================================
  * Matrix Output
@@ -237,7 +234,7 @@ int smoother(const double *xf, const double *Qf, const double *xb,
  * @param[in] fp    Output file pointer
  * @note Matrix stored by column-major order (Fortran convention).
  */
-void matfprint(const double *A, int n, int m, int p, int q, FILE *fp);
+void matfprint(const double* A, int n, int m, int p, int q, FILE* fp);
 
 /**
  * @brief Print matrix to stdout.
@@ -245,7 +242,7 @@ void matfprint(const double *A, int n, int m, int p, int q, FILE *fp);
  * @param[in] n,m  Number of rows and columns
  * @param[in] p,q  Total columns, columns under decimal point
  */
-void matprint(const double *A, int n, int m, int p, int q);
+void matprint(const double* A, int n, int m, int p, int q);
 
 #ifdef __cplusplus
 }

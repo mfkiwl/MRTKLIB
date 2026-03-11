@@ -24,21 +24,21 @@
  *   - ISB corrects inter-system receiver biases between GPS/GLO/GAL/QZS.
  *   - L2C corrects 1/4 cycle phase shift on certain GPS L2C satellites.
  */
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
-#include "mrtklib/mrtk_foundation.h"
+#include "mrtklib/mrtk_clas.h"
 #include "mrtklib/mrtk_const.h"
+#include "mrtklib/mrtk_foundation.h"
+#include "mrtklib/mrtk_nav.h"
+#include "mrtklib/mrtk_obs.h"
+#include "mrtklib/mrtk_opt.h"
 #include "mrtklib/mrtk_sys.h"
 #include "mrtklib/mrtk_trace.h"
-#include "mrtklib/mrtk_nav.h"
-#include "mrtklib/mrtk_opt.h"
-#include "mrtklib/mrtk_obs.h"
-#include "mrtklib/mrtk_clas.h"
 
-#define NINCISB     256     /* ISB data realloc increment */
+#define NINCISB 256 /* ISB data realloc increment */
 
 /* strip leading/trailing spaces from a string ---------------------------------
  * copy src to dst, stripping leading and trailing spaces.
@@ -46,13 +46,15 @@
  *          const char *src  I   source string
  *          int    n         I   max chars to copy from src
  *-----------------------------------------------------------------------------*/
-static void setstr(char *dst, const char *src, int n)
-{
-    char *p = dst;
-    const char *q = src;
+static void setstr(char* dst, const char* src, int n) {
+    char* p = dst;
+    const char* q = src;
 
     while (*q && q < src + n) {
-        if (p == dst && *q == ' ') { q++; continue; }
+        if (p == dst && *q == ' ') {
+            q++;
+            continue;
+        }
         *p++ = *q++;
     }
     *p = '\0';
@@ -66,8 +68,7 @@ static void setstr(char *dst, const char *src, int n)
 }
 
 /* satellite code character to system ------------------------------------------*/
-static int code2sys(char code)
-{
+static int code2sys(char code) {
     if (code == 'G' || code == ' ') {
         return SYS_GPS;
     }
@@ -90,30 +91,33 @@ static int code2sys(char code)
  * maps satellite system to index in gsb[NSYS][NFREQ][2] array.
  * GPS→0, GLO→1, GAL→2, QZS→3, CMP→4
  *-----------------------------------------------------------------------------*/
-static int sys2isbidx(int sys)
-{
+static int sys2isbidx(int sys) {
     switch (sys) {
-        case SYS_GPS: return NSYSGPS - 1;
+        case SYS_GPS:
+            return NSYSGPS - 1;
 #ifdef ENAGLO
-        case SYS_GLO: return NSYSGPS + NSYSGLO - 1;
+        case SYS_GLO:
+            return NSYSGPS + NSYSGLO - 1;
 #endif
 #ifdef ENAGAL
-        case SYS_GAL: return NSYSGPS + NSYSGLO + NSYSGAL - 1;
+        case SYS_GAL:
+            return NSYSGPS + NSYSGLO + NSYSGAL - 1;
 #endif
 #ifdef ENAQZS
-        case SYS_QZS: return NSYSGPS + NSYSGLO + NSYSGAL + NSYSQZS - 1;
+        case SYS_QZS:
+            return NSYSGPS + NSYSGLO + NSYSGAL + NSYSQZS - 1;
 #endif
 #ifdef ENACMP
-        case SYS_CMP: return NSYSGPS + NSYSGLO + NSYSGAL + NSYSQZS + NSYSCMP - 1;
+        case SYS_CMP:
+            return NSYSGPS + NSYSGLO + NSYSGAL + NSYSQZS + NSYSCMP - 1;
 #endif
     }
     return -1;
 }
 
 /* discard trailing spaces and comments ----------------------------------------*/
-static void chop_isb(char *str)
-{
-    char *p;
+static void chop_isb(char* str) {
+    char* p;
     if ((p = strchr(str, '#'))) {
         *p = '\0';
     }
@@ -123,9 +127,8 @@ static void chop_isb(char *str)
 }
 
 /* add ISB data to navigation data ---------------------------------------------*/
-static int addisbdata(nav_t *nav, const isb_t *data)
-{
-    isb_t *isb_data;
+static int addisbdata(nav_t* nav, const isb_t* data) {
+    isb_t* isb_data;
 
     if (nav->nimax <= nav->ni) {
         if (nav->nimax <= 0) {
@@ -133,9 +136,11 @@ static int addisbdata(nav_t *nav, const isb_t *data)
         } else {
             nav->nimax *= 2;
         }
-        if (!(isb_data = (isb_t *)realloc(nav->isb, sizeof(isb_t) * nav->nimax))) {
+        if (!(isb_data = (isb_t*)realloc(nav->isb, sizeof(isb_t) * nav->nimax))) {
             trace(NULL, 1, "addisbdata: memalloc error n=%d\n", nav->nimax);
-            free(nav->isb); nav->isb = NULL; nav->ni = nav->nimax = 0;
+            free(nav->isb);
+            nav->isb = NULL;
+            nav->ni = nav->nimax = 0;
             return -1;
         }
         nav->isb = isb_data;
@@ -145,9 +150,8 @@ static int addisbdata(nav_t *nav, const isb_t *data)
 }
 
 /* read ISB parameters from a single file --------------------------------------*/
-static int readisbf(const char *file, nav_t *nav)
-{
-    FILE *fp;
+static int readisbf(const char* file, nav_t* nav) {
+    FILE* fp;
     double bias;
     char buff[256];
     int sys, i, s_code, res;
@@ -201,10 +205,8 @@ static int readisbf(const char *file, nav_t *nav)
             sys = code2sys(buff[21]);
             s_code = sys2isbidx(sys);
 
-            if (' ' != buff[20] || ' ' != buff[22] || ' ' != buff[24] || ' ' != buff[26]
-                || ('P' != type && 'L' != type)
-                || (1 != freq && 2 != freq && 5 != freq)
-                || -1 == s_code) {
+            if (' ' != buff[20] || ' ' != buff[22] || ' ' != buff[24] || ' ' != buff[26] ||
+                ('P' != type && 'L' != type) || (1 != freq && 2 != freq && 5 != freq) || -1 == s_code) {
                 trace(NULL, 2, "isb parameter error: %s (%s:%d)\n", buff, file, n);
                 continue;
             }
@@ -241,11 +243,8 @@ static int readisbf(const char *file, nav_t *nav)
             sys = code2sys(buff[42]);
             s_code = sys2isbidx(sys);
 
-            if (' ' != buff[20] || ' ' != buff[41] || ' ' != buff[43] ||
-                ' ' != buff[45] || ' ' != buff[47]
-                || ('P' != type && 'L' != type)
-                || (1 != freq && 2 != freq && 5 != freq)
-                || -1 == s_code) {
+            if (' ' != buff[20] || ' ' != buff[41] || ' ' != buff[43] || ' ' != buff[45] || ' ' != buff[47] ||
+                ('P' != type && 'L' != type) || (1 != freq && 2 != freq && 5 != freq) || -1 == s_code) {
                 trace(NULL, 2, "isb parameter error: %s (%s:%d)\n", buff, file, n);
                 continue;
             }
@@ -306,15 +305,14 @@ static int readisbf(const char *file, nav_t *nav)
  *          nav_t  *nav        IO  navigation data
  * return : status (1:ok,0:error)
  *-----------------------------------------------------------------------------*/
-extern int readisb(const char *file, nav_t *nav)
-{
+extern int readisb(const char* file, nav_t* nav) {
     int i, n;
-    char *efiles[MAXEXFILE] = {0};
+    char* efiles[MAXEXFILE] = {0};
 
     trace(NULL, 3, "readisb: file=%s\n", file);
 
     for (i = 0; i < MAXEXFILE; i++) {
-        if (!(efiles[i] = (char *)malloc(1024))) {
+        if (!(efiles[i] = (char*)malloc(1024))) {
             for (i--; i >= 0; i--) {
                 free(efiles[i]);
             }
@@ -339,16 +337,13 @@ extern int readisb(const char *file, nav_t *nav)
 /* set ISB corrections for rover and reference stations ------------------------
  * match receiver types to ISB table and populate sta_t.isb arrays
  *-----------------------------------------------------------------------------*/
-extern void setisb(const nav_t *nav, const char *rectype0, const char *rectype1,
-                   sta_t *sta0, sta_t *sta1)
-{
+extern void setisb(const nav_t* nav, const char* rectype0, const char* rectype1, sta_t* sta0, sta_t* sta1) {
     int i, j, k, m;
     int r = 0;
-    isb_t *pisb[2] = {NULL, NULL};
+    isb_t* pisb[2] = {NULL, NULL};
 
-    trace(NULL, 3, "setisb: rover=%s ref=%s ni=%d\n",
-          rectype0 ? rectype0 : "(null)",
-          rectype1 ? rectype1 : "(null)", nav->ni);
+    trace(NULL, 3, "setisb: rover=%s ref=%s ni=%d\n", rectype0 ? rectype0 : "(null)", rectype1 ? rectype1 : "(null)",
+          nav->ni);
 
     /* clear ISB arrays */
     if (sta0) {
@@ -409,11 +404,9 @@ extern void setisb(const nav_t *nav, const char *rectype0, const char *rectype1,
         }
         /* fallback: single receiver entries (no base) */
         if (r == 0) {
-            if (!strcmp(rectype0, nav->isb[m].sta_name) &&
-                !strcmp(nav->isb[m].sta_name_base, "")) {
+            if (!strcmp(rectype0, nav->isb[m].sta_name) && !strcmp(nav->isb[m].sta_name_base, "")) {
                 pisb[0] = &nav->isb[m];
-            } else if (rectype1 && !strcmp(rectype1, nav->isb[m].sta_name) &&
-                       !strcmp(nav->isb[m].sta_name_base, "")) {
+            } else if (rectype1 && !strcmp(rectype1, nav->isb[m].sta_name) && !strcmp(nav->isb[m].sta_name_base, "")) {
                 pisb[1] = &nav->isb[m];
             }
         }
@@ -444,8 +437,8 @@ extern void setisb(const nav_t *nav, const char *rectype0, const char *rectype1,
         for (i = 0; i < NSYS; ++i) {
             for (j = 0; j < NFREQ; ++j) {
                 if (sta0->isb[i][j][0] != 0.0 || sta0->isb[i][j][1] != 0.0) {
-                    trace(NULL, 3, "setisb: sys=%d freq=%d L=%.6f P=%.6f m\n",
-                          i, j, sta0->isb[i][j][0], sta0->isb[i][j][1]);
+                    trace(NULL, 3, "setisb: sys=%d freq=%d L=%.6f P=%.6f m\n", i, j, sta0->isb[i][j][0],
+                          sta0->isb[i][j][1]);
                 }
             }
         }
@@ -455,9 +448,7 @@ extern void setisb(const nav_t *nav, const char *rectype0, const char *rectype1,
 /* get ISB correction for a satellite system -----------------------------------
  * return ISB correction values for a given satellite system
  *-----------------------------------------------------------------------------*/
-extern void chk_isb(int sysno, const prcopt_t *opt, const sta_t *sta,
-                    double y[NFREQ][2])
-{
+extern void chk_isb(int sysno, const prcopt_t* opt, const sta_t* sta, double y[NFREQ][2]) {
     int i, j;
     int isys = sys2isbidx(sysno);
 
@@ -482,9 +473,8 @@ extern void chk_isb(int sysno, const prcopt_t *opt, const sta_t *sta,
 }
 
 /* trim trailing whitespace ----------------------------------------------------*/
-static void trim_str(char *str)
-{
-    char *p = str + strlen(str) - 1;
+static void trim_str(char* str) {
+    char* p = str + strlen(str) - 1;
     while (p >= str && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) {
         *p-- = '\0';
     }
@@ -496,9 +486,8 @@ static void trim_str(char *str)
  *          nav_t  *nav        IO  navigation data (sfts populated)
  * return : status (0:ok, -1:error)
  *-----------------------------------------------------------------------------*/
-extern int readL2C(const char *file, nav_t *nav)
-{
-    FILE *fp;
+extern int readL2C(const char* file, nav_t* nav) {
+    FILE* fp;
     char buff[1024], ori[33] = "Quarter-Cycle Phase Shifts Table";
     int countheader = 1, nod = 0;
     int lenBuf = 0;
@@ -554,7 +543,4 @@ extern int readL2C(const char *file, nav_t *nav)
 }
 
 /* check if observation code is L2C --------------------------------------------*/
-extern int isL2C(int code)
-{
-    return (code == CODE_L2S || code == CODE_L2L || code == CODE_L2X) ? 1 : 0;
-}
+extern int isL2C(int code) { return (code == CODE_L2S || code == CODE_L2L || code == CODE_L2X) ? 1 : 0; }

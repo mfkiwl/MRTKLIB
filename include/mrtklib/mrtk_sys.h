@@ -44,7 +44,7 @@ extern "C" {
  * @param[in] n  Substring width
  * @return Converted number (0.0 on error)
  */
-double str2num(const char *s, int i, int n);
+double str2num(const char* s, int i, int n);
 
 /*============================================================================
  * Command / Path Functions
@@ -55,7 +55,7 @@ double str2num(const char *s, int i, int n);
  * @param[in] cmd  Command line string
  * @return Execution status (0:ok, >0:error)
  */
-int execcmd(const char *cmd);
+int execcmd(const char* cmd);
 
 /**
  * @brief Expand file path with wild-card (*) in file.
@@ -65,13 +65,13 @@ int execcmd(const char *cmd);
  * @return Number of expanded file paths
  * @note The order of expanded files is alphabetical order
  */
-int expath(const char *path, char *paths[], int nmax);
+int expath(const char* path, char* paths[], int nmax);
 
 /**
  * @brief Create directory if not exists (recursively).
  * @param[in] path  File path to be saved
  */
-void createdir(const char *path);
+void createdir(const char* path);
 
 /**
  * @brief Replace keywords in file path with date, time, rover and base
@@ -86,8 +86,7 @@ void createdir(const char *path);
  *       %S(ss), %n(ddd), %W(wwww), %D(d), %H(h), %ha(hh), %hb(hh),
  *       %hc(hh), %t(mm), %r(rover), %b(base)
  */
-int reppath(const char *path, char *rpath, gtime_t time, const char *rov,
-            const char *base);
+int reppath(const char* path, char* rpath, gtime_t time, const char* rov, const char* base);
 
 /**
  * @brief Replace keywords in file path and generate multiple paths.
@@ -100,8 +99,7 @@ int reppath(const char *path, char *rpath, gtime_t time, const char *rov,
  * @param[in]  base   Base station id string ("": not replaced)
  * @return Number of replaced file paths
  */
-int reppaths(const char *path, char *rpath[], int nmax, gtime_t ts,
-             gtime_t te, const char *rov, const char *base);
+int reppaths(const char* path, char* rpath[], int nmax, gtime_t ts, gtime_t te, const char* rov, const char* base);
 
 /*============================================================================
  * File Compression Functions
@@ -115,7 +113,7 @@ int reppaths(const char *path, char *rpath[], int nmax, gtime_t ts,
  * @note Creates uncompressed file in temporary directory.
  *       gzip, tar and crx2rnx commands must be installed.
  */
-int rtk_uncompress(const char *file, char *uncfile);
+int rtk_uncompress(const char* file, char* uncfile);
 
 #ifdef __cplusplus
 }

@@ -42,30 +42,30 @@ extern "C" {
  * @brief Observation data record.
  */
 typedef struct {
-    gtime_t time;       /* receiver sampling time (GPST) */
-    uint8_t sat,rcv;    /* satellite/receiver number */
-    uint16_t SNR[NFREQ+NEXOBS]; /* signal strength (0.001 dBHz) */
-    uint8_t  LLI[NFREQ+NEXOBS]; /* loss of lock indicator */
-    uint8_t code[NFREQ+NEXOBS]; /* code indicator (CODE_???) */
-    double L[NFREQ+NEXOBS]; /* observation data carrier-phase (cycle) */
-    double P[NFREQ+NEXOBS]; /* observation data pseudorange (m) */
-    float  D[NFREQ+NEXOBS]; /* observation data doppler frequency (Hz) */
-    int    facility;    /* L6 facility ID (for dual-channel VRS) */
+    gtime_t time;                 /* receiver sampling time (GPST) */
+    uint8_t sat, rcv;             /* satellite/receiver number */
+    uint16_t SNR[NFREQ + NEXOBS]; /* signal strength (0.001 dBHz) */
+    uint8_t LLI[NFREQ + NEXOBS];  /* loss of lock indicator */
+    uint8_t code[NFREQ + NEXOBS]; /* code indicator (CODE_???) */
+    double L[NFREQ + NEXOBS];     /* observation data carrier-phase (cycle) */
+    double P[NFREQ + NEXOBS];     /* observation data pseudorange (m) */
+    float D[NFREQ + NEXOBS];      /* observation data doppler frequency (Hz) */
+    int facility;                 /* L6 facility ID (for dual-channel VRS) */
 } obsd_t;
 
 /**
  * @brief Observation data collection.
  */
 typedef struct {
-    int n,nmax;         /* number of obervation data/allocated */
-    obsd_t *data;       /* observation data records */
+    int n, nmax;  /* number of obervation data/allocated */
+    obsd_t* data; /* observation data records */
 } obs_t;
 
 /**
  * @brief SNR mask type.
  */
 typedef struct {
-    int ena[2];         /* enable flag {rover,base} */
+    int ena[2];            /* enable flag {rover,base} */
     double mask[NFREQ][9]; /* mask (dBHz) at 5,10,...85 deg */
 } snrmask_t;
 
@@ -78,14 +78,14 @@ typedef struct {
  * @param[in] obs  Obs code string ("1C","1P","1Y",...)
  * @return Obs code (CODE_???)
  */
-uint8_t obs2code(const char *obs);
+uint8_t obs2code(const char* obs);
 
 /**
  * @brief Convert obs code to obs code string.
  * @param[in] code  Obs code (CODE_???)
  * @return Obs code string ("1C","1P",...)
  */
-char *code2obs(uint8_t code);
+char* code2obs(uint8_t code);
 
 /**
  * @brief Convert system and obs code to frequency index.
@@ -125,7 +125,7 @@ double code2freq(int sys, uint8_t code, int fcn);
  * @param[in] idx  Frequency index (0- )
  * @param[in] pri  Priority of codes (series of code characters)
  */
-void setcodepri(int sys, int idx, const char *pri);
+void setcodepri(int sys, int idx, const char* pri);
 
 /**
  * @brief Get code priority for multiple codes in a frequency.
@@ -134,7 +134,7 @@ void setcodepri(int sys, int idx, const char *pri);
  * @param[in] opt   Code options (NULL:no option)
  * @return Priority (15:highest-1:lowest, 0:error)
  */
-int getcodepri(int sys, uint8_t code, const char *opt);
+int getcodepri(int sys, uint8_t code, const char* opt);
 
 /*============================================================================
  * Observation Utility Functions
@@ -145,7 +145,7 @@ int getcodepri(int sys, uint8_t code, const char *opt);
  * @param[in,out] obs  Observation data to sort
  * @return Number of epochs
  */
-int sortobs(obs_t *obs);
+int sortobs(obs_t* obs);
 
 /**
  * @brief Replace signal type in observation data.
@@ -154,7 +154,7 @@ int sortobs(obs_t *obs);
  * @param[in]     f    Frequency character
  * @param[in,out] c    Signal code string
  */
-void signal_replace(obsd_t *obs, int idx, char f, char *c);
+void signal_replace(obsd_t* obs, int idx, char f, char* c);
 
 /**
  * @brief Screen data by time range and interval.
@@ -175,8 +175,7 @@ int screent(gtime_t time, gtime_t ts, gtime_t te, double tint);
  * @param[in] mask  SNR mask
  * @return Status (1:masked, 0:unmasked)
  */
-int testsnr(int base, int idx, double el, double snr,
-            const snrmask_t *mask);
+int testsnr(int base, int idx, double el, double snr, const snrmask_t* mask);
 
 /**
  * @brief Test elevation mask.
@@ -184,13 +183,13 @@ int testsnr(int base, int idx, double el, double snr,
  * @param[in] elmask  Elevation mask vector (360 x 1) (0.1 deg)
  * @return Status (1:masked, 0:unmasked)
  */
-int testelmask(const double *azel, const int16_t *elmask);
+int testelmask(const double* azel, const int16_t* elmask);
 
 /**
  * @brief Free observation data memory.
  * @param[in,out] obs  Observation data
  */
-void freeobs(obs_t *obs);
+void freeobs(obs_t* obs);
 
 #ifdef __cplusplus
 }

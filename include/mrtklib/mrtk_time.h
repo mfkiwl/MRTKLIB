@@ -32,8 +32,9 @@
 extern "C" {
 #endif
 
-#include "mrtklib/mrtk_foundation.h"
 #include <time.h>
+
+#include "mrtklib/mrtk_foundation.h"
 
 /*============================================================================
  * Time Type
@@ -46,8 +47,8 @@ extern "C" {
  * sub-second fractional part for high-precision timing.
  */
 typedef struct {
-    time_t time;    /**< time (s) expressed by standard time_t */
-    double sec;     /**< fraction of second under 1 s */
+    time_t time; /**< time (s) expressed by standard time_t */
+    double sec;  /**< fraction of second under 1 s */
 } gtime_t;
 
 /*============================================================================
@@ -62,7 +63,7 @@ typedef struct {
  * @param[out] t  Resulting gtime_t struct
  * @return Status (0:ok, <0:error)
  */
-int str2time(const char *s, int i, int n, gtime_t *t);
+int str2time(const char* s, int i, int n, gtime_t* t);
 
 /**
  * @brief Convert gtime_t struct to string.
@@ -70,21 +71,21 @@ int str2time(const char *s, int i, int n, gtime_t *t);
  * @param[out] str  String ("yyyy/mm/dd hh:mm:ss.ssss")
  * @param[in]  n    Number of decimals
  */
-void time2str(gtime_t t, char *str, int n);
+void time2str(gtime_t t, char* str, int n);
 
 /**
  * @brief Convert calendar day/time to gtime_t struct.
  * @param[in] ep  Day/time {year, month, day, hour, min, sec}
  * @return gtime_t struct
  */
-gtime_t epoch2time(const double *ep);
+gtime_t epoch2time(const double* ep);
 
 /**
  * @brief Convert gtime_t struct to calendar day/time.
  * @param[in]  t   gtime_t struct
  * @param[out] ep  Day/time {year, month, day, hour, min, sec}
  */
-void time2epoch(gtime_t t, double *ep);
+void time2epoch(gtime_t t, double* ep);
 
 /**
  * @brief Get time string (not reentrant).
@@ -92,7 +93,7 @@ void time2epoch(gtime_t t, double *ep);
  * @param[in] n  Number of decimals
  * @return Static time string
  */
-char *time_str(gtime_t t, int n);
+char* time_str(gtime_t t, int n);
 
 /*============================================================================
  * GNSS Time System Conversions
@@ -112,7 +113,7 @@ gtime_t gpst2time(int week, double sec);
  * @param[out] week  GPS week number (NULL: no output)
  * @return Time of week in GPS time (s)
  */
-double time2gpst(gtime_t t, int *week);
+double time2gpst(gtime_t t, int* week);
 
 /**
  * @brief Convert Galileo system time week/tow to gtime_t.
@@ -128,7 +129,7 @@ gtime_t gst2time(int week, double sec);
  * @param[out] week  GST week number (NULL: no output)
  * @return Time of week in GST (s)
  */
-double time2gst(gtime_t t, int *week);
+double time2gst(gtime_t t, int* week);
 
 /**
  * @brief Convert BeiDou time week/tow to gtime_t.
@@ -144,7 +145,7 @@ gtime_t bdt2time(int week, double sec);
  * @param[out] week  BDT week number (NULL: no output)
  * @return Time of week in BDT (s)
  */
-double time2bdt(gtime_t t, int *week);
+double time2bdt(gtime_t t, int* week);
 
 /*============================================================================
  * Time Arithmetic
@@ -203,7 +204,7 @@ gtime_t bdt2gpst(gtime_t t);
  * @param[in] file  Leap seconds table file path
  * @return Status (1:ok, 0:error)
  */
-int read_leaps(const char *file);
+int read_leaps(const char* file);
 
 /*============================================================================
  * System Clock and Utilities

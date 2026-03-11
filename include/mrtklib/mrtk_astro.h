@@ -43,7 +43,7 @@ extern "C" {
  * @param[out] rmoon  Moon position in ECI (m) (NULL: not output)
  * @note See reference [4] 5.1.1, 5.2.1
  */
-void sunmoonpos_eci(gtime_t tut, double *rsun, double *rmoon);
+void sunmoonpos_eci(gtime_t tut, double* rsun, double* rmoon);
 
 /**
  * @brief Compute sun and moon position in ECEF.
@@ -53,8 +53,7 @@ void sunmoonpos_eci(gtime_t tut, double *rsun, double *rmoon);
  * @param[out] rmoon  Moon position in ECEF (m) (NULL: not output)
  * @param[out] gmst   GMST (rad) (NULL: not output)
  */
-void sunmoonpos(gtime_t tutc, const double *erpv, double *rsun,
-                double *rmoon, double *gmst);
+void sunmoonpos(gtime_t tutc, const double* erpv, double* rsun, double* rmoon, double* gmst);
 
 #ifdef __cplusplus
 }
