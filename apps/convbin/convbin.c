@@ -495,8 +495,8 @@ static int cmdopts(int argc, char** argv, rnxopt_t* opt, char** ifile, char** of
         } else if (!strcmp(argv[i], "-halfc")) {
             opt->halfcyc = 1;
         } else if (!strcmp(argv[i], "-mask") && i + 1 < argc) {
-            for (j = 0; j < 6; j++)
-                for (k = 0; k < 64; k++) opt->mask[j][k] = '0';
+            for (j = 0; j < 7; j++)
+                for (k = 0; k < MAXCODE; k++) opt->mask[j][k] = '0';
             setmask(argv[++i], opt, 1);
         } else if (!strcmp(argv[i], "-nomask") && i + 1 < argc) {
             setmask(argv[++i], opt, 0);
