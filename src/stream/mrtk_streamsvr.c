@@ -1,7 +1,14 @@
 /*------------------------------------------------------------------------------
- * streamsvr.c : stream server functions
+ * mrtk_streamsvr.c : stream server functions
  *
- *          Copyright (C) 2010-2020 by T.TAKASU, All rights reserved.
+ * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2010-2020 T.TAKASU
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *----------------------------------------------------------------------------*/
+/**
+ * @file mrtk_streamsvr.c
+ * @brief Stream server functions for data relay and format conversion.
  *
  * version : $Revision:$ $Date:$
  * history : 2010/07/18 1.0  moved from stream.c
@@ -29,7 +36,7 @@
  *                           support multiple ephemeris sets (e.g. I/NAV-F/NAV)
  *                           delete API strsvrsetsrctbl()
  *                           use integer types in stdint.h
- *-----------------------------------------------------------------------------*/
+ */
 #include "mrtklib/rtklib.h"
 
 /* test observation data message ---------------------------------------------*/

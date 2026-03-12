@@ -1,7 +1,14 @@
 /*------------------------------------------------------------------------------
  * str2str.c : console version of stream server
  *
- *          Copyright (C) 2007-2020 by T.TAKASU, All rights reserved.
+ * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2007-2020 T.TAKASU
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *----------------------------------------------------------------------------*/
+/**
+ * @file str2str.c
+ * @brief CLI application for stream-to-stream data relay and conversion.
  *
  * version : $Revision: 1.1 $ $Date: 2008/07/17 21:54:53 $
  * history : 2009/06/17  1.0  new
@@ -28,7 +35,7 @@
  *           2016/09/17  1.16 add option -b
  *           2017/05/26  1.17 add input format tersus
  *           2020/11/30  1.18 support api change strsvrstart(),strsvrstat()
- *-----------------------------------------------------------------------------*/
+ */
 #include <signal.h>
 #include <unistd.h>
 

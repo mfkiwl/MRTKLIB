@@ -1,7 +1,14 @@
 /*------------------------------------------------------------------------------
- * convrnx.c : rinex translator for rtcm and receiver raw data log
+ * mrtk_convrnx.c : RINEX translator for RTCM and receiver raw data log
  *
- *          Copyright (C) 2009-2020 by T.TAKASU, All rights reserved.
+ * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2009-2020 T.TAKASU
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *----------------------------------------------------------------------------*/
+/**
+ * @file mrtk_convrnx.c
+ * @brief RINEX translator for RTCM and receiver raw data log.
  *
  * version : $Revision: 1.2 $ $Date: 2008/07/17 21:48:06 $
  * history : 2009/04/10 1.0  new
@@ -43,7 +50,7 @@
  *                           fix bug on screening time in screent_ttol()
  *                           fix bug on screening QZS L1S messages as SBAS
  *                           use integer types in stdint.h
- *-----------------------------------------------------------------------------*/
+ */
 #include "mrtklib/rtklib.h"
 
 #define NOUTFILE 9        /* number of output files */

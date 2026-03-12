@@ -1,8 +1,14 @@
 /*------------------------------------------------------------------------------
- * convbin.c : convert receiver binary log file to rinex obs/nav, sbas messages
+ * convbin.c : convert receiver binary log file to RINEX obs/nav, SBAS messages
  *
- *          Copyright (C) 2007-2020 by T.TAKASU, All rights reserved.
+ * Copyright (C) 2026 H.SHIONO (MRTKLIB Project)
+ * Copyright (C) 2007-2020 T.TAKASU
  *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *----------------------------------------------------------------------------*/
+/**
+ * @file convbin.c
+ * @brief CLI application to convert receiver binary log to RINEX.
  *
  * version : $Revision: 1.1 $ $Date: 2008/07/17 22:13:04 $
  * history : 2008/06/22 1.0 new
@@ -42,7 +48,7 @@
  *                           force option -scan
  *                           delete option -noscan
  *                           surppress warnings
- *-----------------------------------------------------------------------------*/
+ */
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
