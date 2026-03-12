@@ -794,7 +794,8 @@ static void prstatus(vt_t* vt) {
         rt[2] = runtime - rt[1] * 60.0;
     }
     for (i = 0; i < 3; i++) {
-        rtcm[i] = svr->rtcm[i];
+        memcpy(rtcm[i].nmsg2, svr->rtcm[i].nmsg2, sizeof(rtcm[i].nmsg2));
+        memcpy(rtcm[i].nmsg3, svr->rtcm[i].nmsg3, sizeof(rtcm[i].nmsg3));
     }
     rtksvrunlock(svr);
 
@@ -2050,7 +2051,10 @@ int mrtk_run(int argc, char** argv) {
     g_mrtk_legacy_ctx = mrtk_context_new();
     if (!g_mrtk_legacy_ctx) {
         fprintf(stderr, "error: MRTKLIB legacy context allocation failed\n");
+        mrtk_ctx_destroy(ctx);
+        g_mrtk_ctx = NULL;
         free(svr);
+        svr = NULL;
         return -1;
     }
 
