@@ -8,7 +8,8 @@ signals             = ["G1C", "G2W", "G5X", "E1C", "E5Q", "E7Q", "J1C", "J5Q", "
 elevation_mask      = 15.0  # (deg)
 satellite_ephemeris = "brdc+ssrapc"  # (3:brdc+ssrapc)
 excluded_sats       = ""  # (prn ...)
-constellations      = 25  # GPS + Galileo + QZSS; (1:gps+8:gal+16:qzs)
+# constellations    = 25  # deprecated: use systems instead
+systems             = ["GPS", "Galileo", "QZSS"]
 
 [positioning.clas]
 receiver_type = "Trimble NetR9"  # User receiver type

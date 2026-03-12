@@ -10,7 +10,8 @@ elevation_mask      = 15.0  # (deg)
 dynamics            = true  # kinematic
 satellite_ephemeris = "brdc+ssrapc"
 excluded_sats       = ""
-constellations      = 25  # GPS + Galileo + QZSS; GPS+GAL+QZS
+# constellations    = 25  # deprecated: use systems instead
+systems             = ["GPS", "Galileo", "QZSS"]
 
 [positioning.clas]
 grid_selection_radius = 1000  # [m]

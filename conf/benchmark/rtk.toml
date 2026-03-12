@@ -10,7 +10,8 @@ elevation_mask      = 15.0  # (deg)
 dynamics            = true  # kinematic
 satellite_ephemeris = "brdc"
 excluded_sats       = ""
-constellations      = 57  # GPS + Galileo + QZSS + BDS; GPS+SBS+GLO+GAL+QZS (matches rover observation constellations)
+# constellations    = 57  # deprecated: use systems instead
+systems             = ["GPS", "SBAS", "GLONASS", "Galileo", "QZSS", "BeiDou"]
 
 [positioning.snr_mask]
 rover_enabled = true
