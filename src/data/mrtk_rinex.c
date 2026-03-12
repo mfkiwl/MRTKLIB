@@ -1366,10 +1366,10 @@ static int decode_eph_cnav(int ver, int sat, gtime_t toc, const double* data, in
     eph->idot = data[19];
     eph->ndot = data[20]; /* Delta_n0_dot (CNAV-specific) */
 
-    /* orbit 6 */
-    eph->sva = uraindex(data[23]); /* URAI_ED */
-    eph->svh = (int)data[24];     /* SV health */
-    eph->tgd[0] = data[25];       /* TGD */
+    /* orbit 6: URAI_ED, SV health, TGD, URAI_NED2 */
+    eph->sva = (int)data[23]; /* URAI_ED (already an index) */
+    eph->svh = (int)data[24]; /* SV health */
+    eph->tgd[0] = data[25];  /* TGD */
 
     /* orbit 7: ISC corrections */
     eph->tgd[1] = data[27]; /* ISC_L1CA */
@@ -1443,31 +1443,45 @@ static int decode_eph_bds_cnav(int ver, int sat, gtime_t toc, const double* data
     eph->idot = data[19];
     eph->ndot = data[20]; /* Delta_n0_dot */
 
-    if (v4type == 55) {
-        /* BDS CNV3: 8 orbits */
-        eph->svh = (int)data[23];  /* SV health */
-        eph->sva = uraindex(data[24]);
-        eph->tgd[0] = data[25];   /* TGD_B1Cp */
-        eph->tgd[1] = data[26];   /* TGD_B2ap */
-        eph->tgd[2] = data[27];   /* ISC_B1Cd */
-        eph->tgd[3] = data[28];   /* ISC_B2ad */
-        eph->iodc = (int)data[29];
-        eph->ttr = bdt2gpst(bdt2time((int)data[31], data[30]));
-        eph->week = (int)data[31];
-        eph->iode = (int)data[33];
-        eph->type = 4; /* CNAV-3 */
-    } else {
-        /* BDS CNV1/CNV2: 9 orbits */
-        eph->svh = (int)data[23]; /* SV health */
-        eph->sva = uraindex(data[24]);
-        eph->tgd[0] = data[29]; /* TGD_B1Cp */
-        eph->tgd[1] = data[30]; /* TGD_B2ap */
-        eph->tgd[2] = data[27]; /* ISC_B1Cd */
-        eph->iodc = (int)data[34];
-        eph->ttr = bdt2gpst(bdt2time((int)data[36], data[35]));
-        eph->week = (int)data[36];
-        eph->iode = (int)data[37];
-        eph->type = (v4type == 53) ? 2 : 3; /* CNAV-1 or CNAV-2 */
+    /* derive BDT week from Toc (no week field in BDS CNAV records) */
+    {
+        int bdt_week;
+        time2bdt(bdt2gpst(toc), &bdt_week);
+
+        if (v4type == 55) {
+            /* BDS CNV3 (Table A24): 8 orbits
+             * orbit 6: SISAI_oe, SISAI_ocb, SISAI_oc1, SISAI_oc2
+             * orbit 7: SISMAI, Health, IntFlags, TGD_B2bI
+             * orbit 8: t_tm */
+            eph->sva = (int)data[27];  /* SISMAI (index) */
+            eph->svh = (int)data[28];  /* Health */
+            eph->tgd[0] = data[30];   /* TGD_B2bI */
+            eph->week = bdt_week;
+            eph->ttr = bdt2gpst(bdt2time(bdt_week, data[31])); /* t_tm */
+            eph->iode = 0;
+            eph->iodc = 0;
+            eph->type = 4; /* CNAV-3 */
+        } else {
+            /* BDS CNV1 (Table A22) / CNV2 (Table A23): 9 orbits
+             * orbit 6: SISAI_oe, SISAI_ocb, SISAI_oc1, SISAI_oc2
+             * orbit 7: ISC_B1Cd/spare, spare/ISC_B2ad, TGD_B1Cp, TGD_B2ap
+             * orbit 8: SISMAI, Health, IntFlags, IODC
+             * orbit 9: t_tm, spare(x2), IODE */
+            eph->sva = (int)data[31];  /* SISMAI (index) */
+            eph->svh = (int)data[32];  /* Health */
+            eph->tgd[0] = data[29];   /* TGD_B1Cp */
+            eph->tgd[1] = data[30];   /* TGD_B2ap */
+            if (v4type == 53) {
+                eph->tgd[2] = data[27]; /* ISC_B1Cd (CNV1) */
+            } else {
+                eph->tgd[2] = data[28]; /* ISC_B2ad (CNV2) */
+            }
+            eph->iodc = (int)data[34];
+            eph->week = bdt_week;
+            eph->ttr = bdt2gpst(bdt2time(bdt_week, data[35])); /* t_tm */
+            eph->iode = (int)data[38]; /* IODE */
+            eph->type = (v4type == 53) ? 2 : 3; /* CNAV-1 or CNAV-2 */
+        }
     }
     eph->toe = bdt2gpst(bdt2time(eph->week, eph->toes));
     eph->toe = adjweek(eph->toe, eph->toc);
@@ -1803,6 +1817,12 @@ static int readrnxnavb(FILE* fp, const char* opt, int ver, int sys, int* type, e
                     v4type = 151;
                 } else if (!strncmp(buff + 2, "STO Ixx LNAV", 12)) {
                     v4type = 161;
+                } else if (!strncmp(buff + 2, "STO Gxx CNVX", 12)) {
+                    v4type = 102; /* GPS CNAV STO (same data as LNAV STO) */
+                } else if (!strncmp(buff + 2, "STO Jxx CNVX", 12)) {
+                    v4type = 142;
+                } else if (!strncmp(buff + 2, "STO Cxx CNVX", 12)) {
+                    v4type = 152;
                 } else if (!strncmp(buff + 2, "ION Gxx LNAV", 12)) {
                     v4type = 301;
                 } else if (!strncmp(buff + 2, "ION Exx IFNV", 12)) {
@@ -1813,6 +1833,12 @@ static int readrnxnavb(FILE* fp, const char* opt, int ver, int sys, int* type, e
                     v4type = 351;
                 } else if (!strncmp(buff + 2, "ION Ixx LNAV", 12)) {
                     v4type = 361;
+                } else if (!strncmp(buff + 2, "ION Gxx CNVX", 12)) {
+                    v4type = 302; /* GPS CNAV Klobuchar ION */
+                } else if (!strncmp(buff + 2, "ION Jxx CNVX", 12)) {
+                    v4type = 342;
+                } else if (!strncmp(buff + 2, "ION Cxx CNVX", 12)) {
+                    v4type = 352;
                 } else {
                     v4type = 0;
                 }
@@ -1881,19 +1907,19 @@ static int readrnxnavb(FILE* fp, const char* opt, int ver, int sys, int* type, e
                 }
 
                 /* Ionosphere (ION) Klobuchar Model Message */
-                if (v4type == 301 && i >= 8) {
+                if ((v4type == 301 || v4type == 302) && i >= 8) {
                     for (j = 0; j < 8; j++) {
                         nav->ion_gps[j] = data[j];
                     }
                     i = 0;
                 }
-                if (v4type == 341 && i >= 8) {
+                if ((v4type == 341 || v4type == 342) && i >= 8) {
                     for (j = 0; j < 8; j++) {
                         nav->ion_qzs[j] = data[j];
                     }
                     i = 0;
                 }
-                if (v4type == 351 && i >= 8) {
+                if ((v4type == 351 || v4type == 352) && i >= 8) {
                     for (j = 0; j < 8; j++) {
                         nav->ion_cmp[j] = data[j];
                     }
