@@ -2041,8 +2041,18 @@ int mrtk_run(int argc, char** argv) {
 
     /* Initialize MRTKLIB runtime context */
     ctx = mrtk_ctx_create();
+    if (!ctx) {
+        fprintf(stderr, "error: MRTKLIB context allocation failed\n");
+        free(svr);
+        return -1;
+    }
     g_mrtk_ctx = ctx;
     g_mrtk_legacy_ctx = mrtk_context_new();
+    if (!g_mrtk_legacy_ctx) {
+        fprintf(stderr, "error: MRTKLIB legacy context allocation failed\n");
+        free(svr);
+        return -1;
+    }
 
     if (trace > 0) {
         traceopen(ctx, TRACEFILE);
