@@ -437,7 +437,7 @@ static void write_sta_cycle(stream_t* str, strconv_t* conv) {
         strwrite(str, conv->out.buff, conv->out.nbyte);
     }
 }
-/* convert stearm ------------------------------------------------------------*/
+/* convert stream ------------------------------------------------------------*/
 static void strconv(stream_t* str, strconv_t* conv, uint8_t* buff, int n) {
     int i, ret;
 
@@ -481,6 +481,9 @@ static void periodic_cmd(int cycle, const char* cmd, stream_t* stream) {
         for (q = p;; q++)
             if (*q == '\r' || *q == '\n' || *q == '\0') break;
         n = (int)(q - p);
+        if (n >= (int)sizeof(msg)) {
+            n = (int)sizeof(msg) - 1;
+        }
         strncpy(msg, p, n);
         msg[n] = '\0';
 
@@ -501,7 +504,7 @@ static void periodic_cmd(int cycle, const char* cmd, stream_t* stream) {
         if (!*q) break;
     }
 }
-/* stearm server thread ------------------------------------------------------*/
+/* stream server thread ------------------------------------------------------*/
 static void* strsvrthread(void* arg) {
     strsvr_t* svr = (strsvr_t*)arg;
     sol_t sol_nmea = {{0}};
