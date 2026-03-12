@@ -50,7 +50,7 @@ incrementally back-ported to each engine:
 | **v0.5.3** | All | Code quality: full `clang-format` application (116 files, Google style) | ✅ Released |
 | **v0.5.4** | All | Signals update: frequency / physical band separation and structuring | ✅ Released |
 | **v0.5.5** | PPP-RTK | Bug fix: CLAS real-time positioning via UBX does not work ([#31](https://github.com/h-shiono/MRTKLIB/issues/31)) | ✅ Released |
-| **v0.5.6** | All | Support RINEX 4.0 (OBS reading & basic data structures) | 🔜 Planned |
+| **v0.5.6** | All | RINEX 4.00 CNAV/CNV2 NAV support (GPS, QZSS, BDS) | ✅ Released |
 | **v0.5.x** | — | Port remaining RTKLIB console apps: `convbin`, `str2str` | 💭 Backlog |
 | **v0.5.x** | All | Doxygen docstring coverage expansion | 💭 Backlog |
 | **v0.6.0** | All | Single CLI App: Unified `mrtk` executable with subcommands | 💭 Backlog |
