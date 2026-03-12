@@ -561,6 +561,37 @@ extern int loadopts_toml(const char* file, opt_t* opts) {
         }
     }
 
+    /* Handle positioning.excluded_sats as string list (joins to space-separated) */
+    {
+        toml_table_t* pos_tbl = navigate_table(root, "positioning");
+        if (pos_tbl) {
+            toml_array_t* arr = toml_array_in(pos_tbl, "excluded_sats");
+            if (arr) {
+                opt_t* opt = searchopt("pos1-exclsats", opts);
+                if (opt) {
+                    char* buf = (char*)opt->var;
+                    int nelem = toml_array_nelem(arr), k, pos = 0;
+                    buf[0] = '\0';
+                    for (k = 0; k < nelem; k++) {
+                        toml_datum_t d = toml_string_at(arr, k);
+                        if (d.ok) {
+                            if (pos > 0 && pos < 1023) {
+                                buf[pos++] = ' ';
+                            }
+                            int len = (int)strlen(d.u.s);
+                            if (pos + len < 1024) {
+                                memcpy(buf + pos, d.u.s, len);
+                                pos += len;
+                            }
+                            free(d.u.s);
+                        }
+                    }
+                    buf[pos] = '\0';
+                }
+            }
+        }
+    }
+
     toml_free(root);
 
     trace(NULL, 3, "loadopts_toml: loaded %d options from %s\n", count, file);
