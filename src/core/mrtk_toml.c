@@ -551,7 +551,7 @@ extern int loadopts_toml(const char* file, opt_t* opts) {
                         free(d.u.s);
                     }
                 }
-                if (mask) {
+                {
                     opt_t* opt = searchopt("pos1-navsys", opts);
                     if (opt) {
                         *(int*)opt->var = mask;
