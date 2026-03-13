@@ -389,7 +389,7 @@ format = "ubx"
 [streams.input.correction]
 type = "file"
 path = "correction.l6::T::+1"
-format = "sbf"
+format = "clas"
 
 [streams.output.stream1]
 type = "file"

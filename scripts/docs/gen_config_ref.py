@@ -149,7 +149,7 @@ def main() -> int:
     lines.append("[streams.input.correction]")
     lines.append('type = "file"')
     lines.append('path = "correction.l6::T::+1"')
-    lines.append('format = "sbf"')
+    lines.append('format = "clas"')
     lines.append("")
     lines.append("[streams.output.stream1]")
     lines.append('type = "file"')
