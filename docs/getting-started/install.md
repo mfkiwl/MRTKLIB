@@ -86,7 +86,7 @@ ctest --output-on-failure
 ```
 
 !!! note "Real-time tests"
-    Tests labeled `realtime` require ~90 seconds of file-stream replay and are excluded from CI.
+    Tests labeled `realtime` use file-stream replay (ranging from ~90 seconds to several minutes) and are excluded from CI.
     To run them locally:
 
     ```bash

@@ -1,6 +1,6 @@
 # Configuration Options Reference
 
-Complete list of all TOML configuration options available in MRTKLIB.
+TOML configuration options available in MRTKLIB (generated from the internal mapping table).
 Options are grouped by their TOML section.
 
 !!! tip "Auto-generated"
@@ -17,7 +17,7 @@ TOML section: `[positioning]`
 | `frequency` | enum | `1:l1,2:l1+2,3:l1+2+3,4:l1+2+3+4,5:l1+2+3+4+5` | `pos1-frequency` |
 | `solution_type` | enum | `0:forward,1:backward,2:combined` | `pos1-soltype` |
 | `elevation_mask` | float | — | `pos1-elmask` |
-| `dynamics` | boolean | `0:off,1:on` | `pos1-dynamics` |
+| `dynamics` | boolean | `true` / `false` | `pos1-dynamics` |
 | `satellite_ephemeris` | enum | `0:brdc,1:precise,2:brdc+sbas,3:brdc+ssrapc,4:brdc+ssrcom` | `pos1-sateph` |
 | `systems` | string[] | e.g. `["GPS", "Galileo", "QZSS"]` | `pos1-navsys` |
 | `excluded_sats` | string | — | `pos1-exclsats` |
@@ -41,8 +41,8 @@ TOML section: `[positioning.snr_mask]`
 
 | TOML Key | Type | Values | Legacy Key |
 |----------|------|--------|------------|
-| `rover_enabled` | boolean | `0:off,1:on` | `pos1-snrmask_r` |
-| `base_enabled` | boolean | `0:off,1:on` | `pos1-snrmask_b` |
+| `rover_enabled` | boolean | `true` / `false` | `pos1-snrmask_r` |
+| `base_enabled` | boolean | `true` / `false` | `pos1-snrmask_b` |
 | `L1` | array[int] | 9-element array (0-45 dBHz per 5°) | `pos1-snrmask_L1` |
 | `L2` | array[int] | 9-element array (0-45 dBHz per 5°) | `pos1-snrmask_L2` |
 | `L5` | array[int] | 9-element array (0-45 dBHz per 5°) | `pos1-snrmask_L5` |
@@ -53,18 +53,18 @@ TOML section: `[positioning.corrections]`
 
 | TOML Key | Type | Values | Legacy Key |
 |----------|------|--------|------------|
-| `satellite_antenna` | boolean | `0:off,1:on` | `pos1-posopt1` |
-| `receiver_antenna` | boolean | `0:off,1:on` | `pos1-posopt2` |
+| `satellite_antenna` | boolean | `true` / `false` | `pos1-posopt1` |
+| `receiver_antenna` | boolean | `true` / `false` | `pos1-posopt2` |
 | `phase_windup` | enum | `0:off,1:on,2:precise` | `pos1-posopt3` |
-| `exclude_eclipse` | boolean | `0:off,1:on` | `pos1-posopt4` |
-| `raim_fde` | boolean | `0:off,1:on` | `pos1-posopt5` |
+| `exclude_eclipse` | boolean | `true` / `false` | `pos1-posopt4` |
+| `raim_fde` | boolean | `true` / `false` | `pos1-posopt5` |
 | `iono_compensation` | enum | `0:off,1:ssr,2:meas` | `pos1-posopt6` |
-| `partial_ar` | boolean | `0:off,1:on` | `pos1-posopt7` |
-| `shapiro_delay` | boolean | `0:off,1:on` | `pos1-posopt8` |
-| `exclude_qzs_ref` | boolean | `0:off,1:on` | `pos1-posopt9` |
-| `no_phase_bias_adj` | boolean | `0:off,1:on` | `pos1-posopt10` |
+| `partial_ar` | boolean | `true` / `false` | `pos1-posopt7` |
+| `shapiro_delay` | boolean | `true` / `false` | `pos1-posopt8` |
+| `exclude_qzs_ref` | boolean | `true` / `false` | `pos1-posopt9` |
+| `no_phase_bias_adj` | boolean | `true` / `false` | `pos1-posopt10` |
 | `gps_frequency` | enum | `1:l1,2:l1+l2,3:l1+l5,4:l1+l2+l5,5:l1+l5(l2)` | `pos1-posopt11` |
-| `reserved` | boolean | `0:off,1:on` | `pos1-posopt12` |
+| `reserved` | boolean | `true` / `false` | `pos1-posopt12` |
 | `qzs_frequency` | enum | `1:l1,2:l1+l2,3:l1+l5,4:l1+l2+l5,5:l1+l5(l2)` | `pos1-posopt13` |
 | `tidal_correction` | enum | `0:off,1:on,2:otl,3:solid+otl-clasgrid+pole` | `pos1-tidecorr` |
 
@@ -84,10 +84,10 @@ TOML section: `[ambiguity_resolution]`
 | TOML Key | Type | Values | Legacy Key |
 |----------|------|--------|------------|
 | `mode` | enum | `0:off,1:continuous,2:instantaneous,3:fix-and-hold` | `pos2-armode` |
-| `gps_ar` | boolean | `0:off,1:on` | `pos2-gpsarmode` |
+| `gps_ar` | boolean | `true` / `false` | `pos2-gpsarmode` |
 | `glonass_ar` | enum | `0:off,1:on` | `pos2-gloarmode` |
-| `bds_ar` | boolean | `0:off,1:on` | `pos2-bdsarmode` |
-| `qzs_ar` | boolean | `0:off,1:on` | `pos2-qzsarmode` |
+| `bds_ar` | boolean | `true` / `false` | `pos2-bdsarmode` |
+| `qzs_ar` | boolean | `true` / `false` | `pos2-qzsarmode` |
 | `systems` | integer | — | `pos2-arsys` |
 
 ## Ambiguity Resolution — Thresholds
@@ -129,7 +129,7 @@ TOML section: `[ambiguity_resolution.partial_ar]`
 | `min_fix_sats` | integer | — | `pos2-arminfixsats` |
 | `min_drop_sats` | integer | — | `pos2-armindropsats` |
 | `min_hold_sats` | integer | — | `pos2-arminholdsats` |
-| `ar_filter` | boolean | `0:off,1:on` | `pos2-arfilter` |
+| `ar_filter` | boolean | `true` / `false` | `pos2-arfilter` |
 
 ## Ambiguity Resolution — Hold
 
@@ -172,7 +172,7 @@ TOML section: `[kalman_filter]`
 | TOML Key | Type | Values | Legacy Key |
 |----------|------|--------|------------|
 | `iterations` | integer | — | `pos2-niter` |
-| `sync_solution` | boolean | `0:off,1:on` | `pos2-syncsol` |
+| `sync_solution` | boolean | `true` / `false` | `pos2-syncsol` |
 
 ## Kalman Filter — Measurement Error
 
@@ -215,7 +215,6 @@ TOML section: `[kalman_filter.process_noise]`
 | `position_v` | float | — | `stats-prnpositv` |
 | `position` | float | — | `stats-prnpos` |
 | `ifb` | float | — | `stats-prnifb` |
-| `ifb` | float | — | `stats-prndcb` |
 | `iono_time_const` | float | — | `stats-tconstiono` |
 | `clock_stability` | float | — | `stats-clkstab` |
 
@@ -225,7 +224,7 @@ TOML section: `[adaptive_filter]`
 
 | TOML Key | Type | Values | Legacy Key |
 |----------|------|--------|------------|
-| `enabled` | boolean | `0:off,1:on` | `pos2-prnadpt` |
+| `enabled` | boolean | `true` / `false` | `pos2-prnadpt` |
 | `iono_forgetting` | float | — | `pos2-forgetion` |
 | `iono_gain` | float | — | `pos2-afgainion` |
 | `pva_forgetting` | float | — | `pos2-forgetpva` |
@@ -249,16 +248,16 @@ TOML section: `[receiver]`
 
 | TOML Key | Type | Values | Legacy Key |
 |----------|------|--------|------------|
-| `iono_correction` | boolean | `0:off,1:on` | `pos2-ionocorr` |
-| `ignore_chi_error` | boolean | `0:off,1:on` | `pos2-ign_chierr` |
-| `bds2_bias` | boolean | `0:off,1:on` | `pos2-bds2bias` |
+| `iono_correction` | boolean | `true` / `false` | `pos2-ionocorr` |
+| `ignore_chi_error` | boolean | `true` / `false` | `pos2-ign_chierr` |
+| `bds2_bias` | boolean | `true` / `false` | `pos2-bds2bias` |
 | `ppp_sat_clock_bias` | integer | — | `pos2-pppsatcb` |
 | `ppp_sat_phase_bias` | integer | — | `pos2-pppsatpb` |
 | `uncorr_bias` | integer | — | `pos2-uncorrbias` |
 | `max_bias_dt` | integer | — | `pos2-maxbiasdt` |
 | `satellite_mode` | integer | — | `pos2-sattmode` |
 | `phase_shift` | enum | `0:off,1:table` | `pos2-phasshft` |
-| `isb` | boolean | `0:off,1:on` | `pos2-isb` |
+| `isb` | boolean | `true` / `false` | `pos2-isb` |
 | `reference_type` | string | — | `pos2-rectype` |
 | `max_age` | float | — | `pos2-maxage` |
 | `baseline_length` | float | — | `pos2-baselen` |
@@ -294,7 +293,7 @@ TOML section: `[antenna.base]`
 | `delta_n` | float | — | `ant2-antdeln` |
 | `delta_u` | float | — | `ant2-antdelu` |
 | `max_average_epochs` | integer | — | `ant2-maxaveep` |
-| `init_reset` | boolean | `0:off,1:on` | `ant2-initrst` |
+| `init_reset` | boolean | `true` / `false` | `ant2-initrst` |
 
 ## Output
 
@@ -303,15 +302,15 @@ TOML section: `[output]`
 | TOML Key | Type | Values | Legacy Key |
 |----------|------|--------|------------|
 | `format` | enum | `0:llh,1:xyz,2:enu,3:nmea` | `out-solformat` |
-| `header` | boolean | `0:off,1:on` | `out-outhead` |
-| `options` | boolean | `0:off,1:on` | `out-outopt` |
-| `velocity` | boolean | `0:off,1:on` | `out-outvel` |
+| `header` | boolean | `true` / `false` | `out-outhead` |
+| `options` | boolean | `true` / `false` | `out-outopt` |
+| `velocity` | boolean | `true` / `false` | `out-outvel` |
 | `time_system` | enum | `0:gpst,1:utc,2:jst` | `out-timesys` |
 | `time_format` | enum | `0:tow,1:hms` | `out-timeform` |
 | `time_decimals` | integer | — | `out-timendec` |
 | `coordinate_format` | enum | `0:deg,1:dms` | `out-degform` |
 | `field_separator` | string | — | `out-fieldsep` |
-| `single_output` | boolean | `0:off,1:on` | `out-outsingle` |
+| `single_output` | boolean | `true` / `false` | `out-outsingle` |
 | `max_solution_std` | float | — | `out-maxsolstd` |
 | `height_type` | enum | `0:ellipsoidal,1:geodetic` | `out-height` |
 | `geoid_model` | enum | `0:internal,1:egm96,2:egm08_2.5,3:egm08_1,4:gsi2000` | `out-geoid` |
@@ -362,7 +361,7 @@ TOML section: `[server]`
 | `nav_msg_select` | string | — | `misc-navmsgsel` |
 | `proxy` | string | — | `misc-proxyaddr` |
 | `swap_margin` | integer | — | `misc-fswapmargin` |
-| `time_interpolation` | boolean | `0:off,1:on` | `misc-timeinterp` |
+| `time_interpolation` | boolean | `true` / `false` | `misc-timeinterp` |
 | `sbas_satellite` | string | — | `misc-sbasatsel` |
 | `max_obs_loss` | float | — | `misc-maxobsloss` |
 | `float_count` | integer | — | `misc-floatcnt` |
@@ -384,7 +383,7 @@ Stream configuration uses a hierarchical structure:
 ```toml
 [streams.input.rover]
 type = "serial"
-path = "/dev/ttyACM0:115200"
+path = "ttyACM0:115200"
 format = "ubx"
 
 [streams.input.correction]

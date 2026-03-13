@@ -29,7 +29,7 @@ mode = "fix-and-hold"
 # ...
 
 [output]
-solution_format = "llh"
+format = "llh"
 # ...
 ```
 
@@ -47,7 +47,7 @@ solution_format = "llh"
 | `[output]` | Solution format, time format, output paths |
 | `[streams]` | Real-time stream configuration (rtkrcv only) |
 | `[files]` | Antenna, DCB, geoid, ionosphere files |
-| `[misc]` | Miscellaneous options |
+| `[server]` / `[console]` | Server and console options (rtkrcv) |
 
 ## Constellation Selection
 

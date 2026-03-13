@@ -6,6 +6,10 @@ Usage:
 
 Reads the MAPPING table and ENUM_DEFS from conf2toml.py to produce a
 Markdown configuration reference grouped by TOML section.
+
+Note: This reference covers options in conf2toml.py's MAPPING plus a small
+set of additional sections (such as [streams]).  It is intended as a
+convenient reference, but may not list every key the loader supports.
 """
 from __future__ import annotations
 
@@ -82,7 +86,7 @@ def main() -> int:
     lines: list[str] = []
     lines.append("# Configuration Options Reference")
     lines.append("")
-    lines.append("Complete list of all TOML configuration options available in MRTKLIB.")
+    lines.append("TOML configuration options available in MRTKLIB (generated from the internal mapping table).")
     lines.append("Options are grouped by their TOML section.")
     lines.append("")
     lines.append("!!! tip \"Auto-generated\"")
@@ -101,15 +105,21 @@ def main() -> int:
         lines.append("| TOML Key | Type | Values | Legacy Key |")
         lines.append("|----------|------|--------|------------|")
 
+        seen_keys: set[str] = set()
         for legacy_key, _, toml_key, vtype in entries:
+            # Skip duplicate TOML keys (e.g. aliases like stats-prndcb → ifb)
+            if toml_key in seen_keys:
+                continue
+            seen_keys.add(toml_key)
+
             tl = type_label(vtype)
             enum_vals = get_enum_values(legacy_key)
 
-            if enum_vals:
+            if vtype == "bool":
+                values = "`true` / `false`"
+            elif enum_vals:
                 # Format enum values for display
                 values = f"`{enum_vals}`"
-            elif vtype == "bool":
-                values = "`true` / `false`"
             elif vtype == "navsys":
                 values = 'e.g. `["GPS", "Galileo", "QZSS"]`'
             elif vtype == "siglist":
@@ -133,7 +143,7 @@ def main() -> int:
     lines.append("```toml")
     lines.append("[streams.input.rover]")
     lines.append('type = "serial"')
-    lines.append('path = "/dev/ttyACM0:115200"')
+    lines.append('path = "ttyACM0:115200"')
     lines.append('format = "ubx"')
     lines.append("")
     lines.append("[streams.input.correction]")

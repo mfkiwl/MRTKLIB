@@ -82,10 +82,10 @@ cmake --preset default
 cmake --build build
 
 # Post-processing (PPP)
-mrtk post -k conf/madocalib/ppp.toml obs.obs nav.nav -l6 correction.l6
+mrtk post -k conf/madocalib/rnx2rtkp.toml obs.obs nav.nav -l6 correction.l6
 
 # Real-time positioning (CLAS PPP-RTK)
-mrtk run -s -o conf/claslib/rtkrcv_clas_1ch.toml
+mrtk run -s -o conf/claslib/rtkrcv.toml
 ```
 
 See the [Installation Guide](getting-started/install.md) for detailed build instructions.
