@@ -96,4 +96,4 @@ See the [Installation Guide](getting-started/install.md) for detailed build inst
 
 MRTKLIB is licensed under the [BSD 2-Clause License](https://github.com/h-shiono/MRTKLIB/blob/main/LICENSE).
 
-Upstream components (MALIB, MADOCALIB, CLASLIB) are each licensed under BSD 2-Clause by their respective authors (JAXA, TOSHIBA, QZSS Strategy Office).
+Upstream components (MALIB, MADOCALIB, CLASLIB, GSILIB) are each licensed under BSD 2-Clause by their respective authors (JAXA, TOSHIBA, Cabinet Office, Lighthouse Technology & Consulting, Mitsubishi Electric, and the Geospatial Information Authority of Japan).
