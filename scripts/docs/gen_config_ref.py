@@ -443,6 +443,30 @@ def main() -> int:
 
         lines.append("")
 
+        # Section-specific supplementary notes
+        if section == "positioning":
+            lines.append("### Frequency Index Mapping")
+            lines.append("")
+            lines.append("The `frequency` option selects how many frequency slots to use (`l1` = 1, `l1+2` = 2, etc.).")
+            lines.append("Each slot maps to a different signal depending on the constellation:")
+            lines.append("")
+            lines.append("| | L1 (idx 0) | L2 (idx 1) | L3 (idx 2) | L4 (idx 3) | L5 (idx 4) |")
+            lines.append("|:---|:-----------|:-----------|:-----------|:-----------|:-----------|")
+            lines.append("| **GPS** | L1 | L2 | L5 | — | — |")
+            lines.append("| **GLONASS** | G1 | G2 | G3 | — | — |")
+            lines.append("| **Galileo** | E1 | E5a | E5b | E6 | E5a+b |")
+            lines.append("| **QZSS** | L1 | L5 | L2 | L6 | — |")
+            lines.append("| **BDS** | B1I/B1C/B1A | B3I/B3A | B2I/B2b | B2a | B2a+b |")
+            lines.append("| **SBAS** | L1 | L5 | — | — | — |")
+            lines.append("| **NavIC** | L5 | S | — | — | — |")
+            lines.append("")
+            lines.append("!!! warning \"CLAS PPP-RTK: Use `l1+2` (nf=2)\"")
+            lines.append("    With `l1+2`, GPS uses L1+L2 and Galileo uses E1+E5a.")
+            lines.append("    CLAS does not provide E5b bias corrections. Using `l1+2+3` (nf=3)")
+            lines.append("    adds the E5b slot without valid bias, causing false cycle slips on")
+            lines.append("    Galileo and degrading fix rate from >99% to ~67%.")
+            lines.append("")
+
     # Stream configuration (not in MAPPING)
     lines.append("## Streams")
     lines.append("")

@@ -38,6 +38,27 @@ TOML section: `[positioning]`
 | `excluded_sats` | string | All | Satellites to exclude. Space-separated PRN list (e.g., `G01 G02`). Prefix `+` to include only. |
 | `signals` | string[] | All | Explicit signal code list. Overrides default observation definition when set. e.g. `["G1C", "G2W", "E1C"]` |
 
+### Frequency Index Mapping
+
+The `frequency` option selects how many frequency slots to use (`l1` = 1, `l1+2` = 2, etc.).
+Each slot maps to a different signal depending on the constellation:
+
+| | L1 (idx 0) | L2 (idx 1) | L3 (idx 2) | L4 (idx 3) | L5 (idx 4) |
+|:---|:-----------|:-----------|:-----------|:-----------|:-----------|
+| **GPS** | L1 | L2 | L5 | — | — |
+| **GLONASS** | G1 | G2 | G3 | — | — |
+| **Galileo** | E1 | E5a | E5b | E6 | E5a+b |
+| **QZSS** | L1 | L5 | L2 | L6 | — |
+| **BDS** | B1I/B1C/B1A | B3I/B3A | B2I/B2b | B2a | B2a+b |
+| **SBAS** | L1 | L5 | — | — | — |
+| **NavIC** | L5 | S | — | — | — |
+
+!!! warning "CLAS PPP-RTK: Use `l1+2` (nf=2)"
+    With `l1+2`, GPS uses L1+L2 and Galileo uses E1+E5a.
+    CLAS does not provide E5b bias corrections. Using `l1+2+3` (nf=3)
+    adds the E5b slot without valid bias, causing false cycle slips on
+    Galileo and degrading fix rate from >99% to ~67%.
+
 ## Positioning — CLAS
 
 TOML section: `[positioning.clas]`
