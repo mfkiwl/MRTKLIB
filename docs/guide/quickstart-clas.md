@@ -118,9 +118,10 @@ any of them wrong will silently degrade or prevent Fix solutions.
 frequency = "l1+2"   # REQUIRED for CLAS
 ```
 
-CLAS does not provide Galileo E5a (L5) phase bias. Using `l1+2+3` (nf=3)
-causes false geometry-free cycle slips on Galileo, dropping fix rate
-from >99% to ~67%.
+CLAS provides E1 and E5a corrections but does not provide Galileo E5b
+phase bias. Using `l1+2+3` (nf=3) adds the E5b slot, which has no valid
+bias correction, causing false geometry-free cycle slips on Galileo and
+dropping fix rate from >99% to ~67%.
 
 ### Ionosphere: `est-adaptive` (Not `dual-freq`)
 
