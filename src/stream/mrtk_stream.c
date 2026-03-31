@@ -843,7 +843,13 @@ static void urldecode(char* str) {
             hi = (hi >= '0' && hi <= '9') ? hi - '0' : (hi >= 'A' && hi <= 'F') ? hi - 'A' + 10 : (hi >= 'a' && hi <= 'f') ? hi - 'a' + 10 : -1;
             lo = (lo >= '0' && lo <= '9') ? lo - '0' : (lo >= 'A' && lo <= 'F') ? lo - 'A' + 10 : (lo >= 'a' && lo <= 'f') ? lo - 'a' + 10 : -1;
             if (hi >= 0 && lo >= 0) {
-                *dst++ = (char)((hi << 4) | lo);
+                char ch = (char)((hi << 4) | lo);
+                if (ch == '\0') {
+                    /* reject %00 NUL to avoid string truncation */
+                    src += 3;
+                    continue;
+                }
+                *dst++ = ch;
                 src += 3;
                 continue;
             }
@@ -1941,6 +1947,11 @@ static int readntrip(ntrip_t* ntrip, uint8_t* buff, int n, char* msg) {
                 tracet(NULL, 2, "readntrip: chunk decode error\n");
                 return 0;
             }
+            /* preserve unconsumed encoded bytes back to response buffer */
+            if (nin > 0 && ntrip->nb + nin <= NTRIP_MAXRSP) {
+                memmove(ntrip->buff + ntrip->nb, in, nin);
+                ntrip->nb += nin;
+            }
             memcpy(buff, tmp, nd);
             return nd;
         }
@@ -1959,6 +1970,11 @@ static int readntrip(ntrip_t* ntrip, uint8_t* buff, int n, char* msg) {
         if (nd < 0) {
             tracet(NULL, 2, "readntrip: chunk decode error\n");
             return 0;
+        }
+        /* preserve unconsumed encoded bytes to response buffer */
+        if (nin > 0 && ntrip->nb + nin <= NTRIP_MAXRSP) {
+            memcpy(ntrip->buff + ntrip->nb, in, nin);
+            ntrip->nb += nin;
         }
         return nd;
     }

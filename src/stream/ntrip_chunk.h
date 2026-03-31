@@ -11,13 +11,17 @@
 #ifndef NTRIP_CHUNK_H
 #define NTRIP_CHUNK_H
 
-#include <ctype.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef __linux__
-#include <strings.h> /* strncasecmp on Linux */
+#if defined(_WIN32) || defined(_WIN64)
+#ifndef strncasecmp
+#define strncasecmp _strnicmp
+#endif
+#else
+#include <strings.h> /* strncasecmp on POSIX (Linux, macOS, BSD, etc.) */
 #endif
 
 /*============================================================================
@@ -32,7 +36,8 @@
  * Chunked Transfer Encoding Types
  *===========================================================================*/
 
-#define CHUNK_HDR_MAX 16 /* max chunk-size header length ("FFFFFFFF\r\n") */
+#define CHUNK_HDR_MAX 16       /* max chunk-size header length ("FFFFFFFF\r\n") */
+#define CHUNK_SIZE_MAX 0xFFFFFF /* max chunk size (~16 MB, well within int range) */
 
 typedef struct {               /* chunked transfer decoder state */
     int state;                 /* 0:size, 1:data, 2:trail, 3:done */
@@ -82,18 +87,32 @@ static int chunk_decode(chunk_dec_t *dec, const uint8_t **pin, int *pnin,
                     dec->hdr[dec->nhdr - 1] = '\0'; /* strip \r */
                     unsigned long size = 0;
                     const char *h = dec->hdr;
+                    int ndigits = 0;
 
                     /* parse hex digits (stop at extension ';' if present) */
                     while (*h) {
                         int d;
-                        if (*h >= '0' && *h <= '9') d = *h - '0';
-                        else if (*h >= 'a' && *h <= 'f') d = *h - 'a' + 10;
-                        else if (*h >= 'A' && *h <= 'F') d = *h - 'A' + 10;
-                        else break; /* extension or invalid */
+                        if (*h >= '0' && *h <= '9') {
+                            d = *h - '0';
+                        } else if (*h >= 'a' && *h <= 'f') {
+                            d = *h - 'a' + 10;
+                        } else if (*h >= 'A' && *h <= 'F') {
+                            d = *h - 'A' + 10;
+                        } else {
+                            break; /* extension or invalid */
+                        }
                         size = (size << 4) | d;
+                        ndigits++;
                         h++;
                     }
                     dec->nhdr = 0;
+
+                    /* reject empty size line or overflow */
+                    if (ndigits == 0 || size > CHUNK_SIZE_MAX) {
+                        *pin = in;
+                        *pnin = nin;
+                        return -1;
+                    }
                     dec->remain = (int)size;
 
                     if (dec->remain == 0) {
@@ -185,26 +204,39 @@ static int chunk_encode(uint8_t *out, int nout, const uint8_t *data,
  * HTTP Header Helpers
  *===========================================================================*/
 
-/* find end of HTTP headers in buffer, return offset to body start
- * returns 0 if headers are incomplete (no \r\n\r\n found yet) */
+/* find end of HTTP headers in buffer (bounded search for \r\n\r\n)
+ * returns offset to body start, or 0 if headers are incomplete */
 static int http_header_end(const uint8_t *buff, int nb) {
-    const char *p = strstr((const char *)buff, "\r\n\r\n");
-    if (!p) return 0;
-    return (int)(p - (const char *)buff) + 4;
+    int i;
+    if (nb < 4) {
+        return 0;
+    }
+    for (i = 0; i <= nb - 4; i++) {
+        if (buff[i]     == '\r' && buff[i + 1] == '\n' &&
+            buff[i + 2] == '\r' && buff[i + 3] == '\n') {
+            return i + 4;
+        }
+    }
+    return 0;
 }
 
 /* extract HTTP status code from first line (e.g. "HTTP/1.1 200 OK\r\n")
  * returns status code (e.g. 200), or 0 if not found */
 static int http_status_code(const uint8_t *buff, int nb) {
-    int code = 0;
-    if (nb < 12) return 0;
-    if (strncmp((const char *)buff, "HTTP/", 5) != 0) return 0;
-
-    const char *p = strchr((const char *)buff, ' ');
-    if (p && p - (const char *)buff < nb) {
-        code = atoi(p + 1);
+    int i;
+    if (nb < 12) {
+        return 0;
     }
-    return code;
+    if (strncmp((const char *)buff, "HTTP/", 5) != 0) {
+        return 0;
+    }
+    /* find first space within nb */
+    for (i = 5; i < nb; i++) {
+        if (buff[i] == ' ') {
+            return atoi((const char *)buff + i + 1);
+        }
+    }
+    return 0;
 }
 
 /* search for a specific HTTP header value (case-insensitive header name)
@@ -216,13 +248,16 @@ static int http_find_header(const uint8_t *buff, int nb, const char *name,
     const char *end = p + nb;
 
     while (p < end) {
-        /* find start of line */
-        if (strncasecmp(p, name, nlen) == 0 && p[nlen] == ':') {
+        /* check if enough room for "name:" */
+        if (p + nlen + 1 <= end &&
+            strncasecmp(p, name, nlen) == 0 && p[nlen] == ':') {
             const char *v = p + nlen + 1;
-            /* skip leading whitespace */
-            while (v < end && (*v == ' ' || *v == '\t')) v++;
-            /* copy until \r or \n or end */
             int i = 0;
+            /* skip leading whitespace */
+            while (v < end && (*v == ' ' || *v == '\t')) {
+                v++;
+            }
+            /* copy until \r or \n or end */
             while (v < end && *v != '\r' && *v != '\n' && i < vmax - 1) {
                 val[i++] = *v++;
             }
@@ -230,8 +265,12 @@ static int http_find_header(const uint8_t *buff, int nb, const char *name,
             return 1;
         }
         /* advance to next line */
-        while (p < end && *p != '\n') p++;
-        if (p < end) p++; /* skip \n */
+        while (p < end && *p != '\n') {
+            p++;
+        }
+        if (p < end) {
+            p++; /* skip \n */
+        }
     }
     val[0] = '\0';
     return 0;
