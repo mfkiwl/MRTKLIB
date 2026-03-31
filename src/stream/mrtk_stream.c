@@ -1794,9 +1794,11 @@ static int waitntrip(ntrip_t* ntrip, char* msg) {
 }
 /* parse query parameters from mountpoint string
  * supported: ?ver=N (NTRIP version), &host=HOSTNAME (Host header override)
- * strips the query string from mntpnt */
+ * strips the query string from mntpnt
+ * query string is copied to a local buffer to avoid modifying mntpnt beyond '?' */
 static int parse_ntrip_query(char* mntpnt, char* host_override, int host_size) {
-    char *q, *p, *params;
+    char params[256], *p, *next;
+    char *q;
     int ver = ntrip_ver_default;
 
     host_override[0] = '\0';
@@ -1806,11 +1808,21 @@ static int parse_ntrip_query(char* mntpnt, char* host_override, int host_size) {
         return ver;
     }
 
-    params = q + 1;
+    /* copy query string to local buffer before truncating mntpnt */
+    snprintf(params, sizeof(params), "%s", q + 1);
     *q = '\0'; /* strip query string from mountpoint */
 
-    /* parse &-separated parameters */
-    for (p = strtok(params, "&"); p; p = strtok(NULL, "&")) {
+    tracet(NULL, 3, "parse_ntrip_query: mntpnt=%s params=%s\n", mntpnt, params);
+
+    /* parse &-separated parameters manually (no strtok) */
+    p = params;
+    while (*p) {
+        /* find end of current parameter */
+        next = strchr(p, '&');
+        if (next) {
+            *next = '\0';
+        }
+
         if (strncmp(p, "ver=", 4) == 0) {
             int v = atoi(p + 4);
             if (v == 1) {
@@ -1821,7 +1833,14 @@ static int parse_ntrip_query(char* mntpnt, char* host_override, int host_size) {
         } else if (strncmp(p, "host=", 5) == 0) {
             snprintf(host_override, host_size, "%s", p + 5);
         }
+
+        if (next) {
+            p = next + 1;
+        } else {
+            break;
+        }
     }
+    tracet(NULL, 3, "parse_ntrip_query: ver=%d host_override=%s\n", ver, host_override);
     return ver;
 }
 /* open ntrip ----------------------------------------------------------------*/
