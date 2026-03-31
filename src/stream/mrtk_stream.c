@@ -1792,20 +1792,35 @@ static int waitntrip(ntrip_t* ntrip, char* msg) {
     }
     return 1;
 }
-/* parse ntrip version from mountpoint query string (?ver=1 or ?ver=2)
- * strips the query string from mntpnt and returns the version */
-static int parse_ntrip_ver(char* mntpnt) {
-    char* q = strstr(mntpnt, "?ver=");
+/* parse query parameters from mountpoint string
+ * supported: ?ver=N (NTRIP version), &host=HOSTNAME (Host header override)
+ * strips the query string from mntpnt */
+static int parse_ntrip_query(char* mntpnt, char* host_override, int host_size) {
+    char *q, *p, *params;
     int ver = ntrip_ver_default;
 
-    if (q) {
-        int v = atoi(q + 5);
-        if (v == 1) {
-            ver = NTRIP_VER_1;
-        } else if (v == 2) {
-            ver = NTRIP_VER_2;
+    host_override[0] = '\0';
+
+    q = strchr(mntpnt, '?');
+    if (!q) {
+        return ver;
+    }
+
+    params = q + 1;
+    *q = '\0'; /* strip query string from mountpoint */
+
+    /* parse &-separated parameters */
+    for (p = strtok(params, "&"); p; p = strtok(NULL, "&")) {
+        if (strncmp(p, "ver=", 4) == 0) {
+            int v = atoi(p + 4);
+            if (v == 1) {
+                ver = NTRIP_VER_1;
+            } else if (v == 2) {
+                ver = NTRIP_VER_2;
+            }
+        } else if (strncmp(p, "host=", 5) == 0) {
+            snprintf(host_override, host_size, "%s", p + 5);
         }
-        *q = '\0'; /* strip query string from mountpoint */
     }
     return ver;
 }
@@ -1839,17 +1854,24 @@ static ntrip_t* openntrip(const char* path, int type, char* msg) {
     /* decode tcp/ntrip path */
     decodetcppath(path, addr, port, ntrip->user, ntrip->passwd, ntrip->mntpnt, ntrip->str);
 
-    /* parse ?ver= from mountpoint */
-    ntrip->ver = parse_ntrip_ver(ntrip->mntpnt);
+    /* parse query parameters (?ver=N&host=HOSTNAME) from mountpoint */
+    {
+        char host_override[256] = "";
+        ntrip->ver = parse_ntrip_query(ntrip->mntpnt, host_override, sizeof(host_override));
 
-    /* use default port if no port specified */
-    if (!*port) {
-        sprintf(port, "%d", type ? NTRIP_CLI_PORT : NTRIP_SVR_PORT);
+        /* use default port if no port specified */
+        if (!*port) {
+            sprintf(port, "%d", type ? NTRIP_CLI_PORT : NTRIP_SVR_PORT);
+        }
+        sprintf(tpath, "%s:%s", addr, port);
+
+        /* save host header value (host= override takes priority) */
+        if (*host_override) {
+            snprintf(ntrip->host, sizeof(ntrip->host), "%s", host_override);
+        } else {
+            snprintf(ntrip->host, sizeof(ntrip->host), "%s:%s", addr, port);
+        }
     }
-    sprintf(tpath, "%s:%s", addr, port);
-
-    /* save host header value */
-    snprintf(ntrip->host, sizeof(ntrip->host), "%s:%s", addr, port);
 
     /* ntrip access via proxy server */
     if (*proxyaddr) {

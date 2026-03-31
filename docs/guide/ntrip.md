@@ -22,6 +22,7 @@ All NTRIP stream paths follow this format:
 | `port` | TCP port | 2101 (client), 80 (server) |
 | `mountpoint` | Stream mountpoint name | _(required)_ |
 | `?ver=N` | NTRIP version override (1 or 2) | auto |
+| `&host=HOSTNAME` | Host header override (for TLS tunnels) | _(from addr:port)_ |
 
 ### Special Characters in Passwords
 
@@ -138,20 +139,27 @@ stunnel ntrip-tls.conf
 
 #### 4. Connect MRTKLIB through the tunnel
 
-Point MRTKLIB at the local stunnel endpoint:
+Point MRTKLIB at the local stunnel endpoint. Use `&host=` to set the
+correct Host header for the remote caster:
 
 ```toml
 [streams.input.correction]
 type = "ntripcli"
-path = "user:p%40ssword@127.0.0.1:2101/MOUNT?ver=2"
+path = "user:p%40ssword@127.0.0.1:2101/MOUNT?ver=2&host=caster.cddis.eosdis.nasa.gov"
 ```
 
 Or via CLI:
 
 ```bash
-mrtk relay -in ntrip://user:p%40ssword@127.0.0.1:2101/MOUNT?ver=2 \
+mrtk relay -in "ntrip://user:p%40ssword@127.0.0.1:2101/MOUNT?ver=2&host=caster.cddis.eosdis.nasa.gov" \
            -out file://output.rtcm3
 ```
+
+!!! warning "Host header is required for most TLS casters"
+    When connecting through stunnel, the NTRIP v2 `Host:` header defaults
+    to `localhost:2101`. Many casters use this header for routing and will
+    return 404 if it doesn't match. Always add `&host=<real-hostname>` when
+    using a TLS tunnel with NTRIP v2.
 
 !!! note "NASA Earthdata Credentials"
     NASA Earthdata uses your Earthdata Login credentials.
