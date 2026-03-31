@@ -95,6 +95,7 @@ nav:
     - Configuration (TOML): guide/configuration.md
     - "Quick Start: CLAS PPP-RTK": guide/quickstart-clas.md
     - "Quick Start: MADOCA-PPP": guide/quickstart-madoca-ppp.md
+    - NTRIP Streams: guide/ntrip.md
   - Reference:
     - Configuration Options: reference/config-options.md
     - API Reference (Doxygen): reference/api.md
