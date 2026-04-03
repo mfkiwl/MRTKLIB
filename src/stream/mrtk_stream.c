@@ -1490,8 +1490,12 @@ static int reqntrip_s(ntrip_t* ntrip, char* msg) {
     tracet(NULL, 3, "reqntrip_s: state=%d ver=%d\n", ntrip->state, ntrip->ver);
 
     if (use_v2) {
-        /* NTRIP v2: POST with HTTP/1.1 */
-        BUFADD(p, rem, "POST /%s HTTP/1.1\r\n", ntrip->mntpnt);
+        /* NTRIP v2: POST with HTTP/1.1 (use absolute URL for proxy) */
+        if (*ntrip->url) {
+            BUFADD(p, rem, "POST %s/%s HTTP/1.1\r\n", ntrip->url, ntrip->mntpnt);
+        } else {
+            BUFADD(p, rem, "POST /%s HTTP/1.1\r\n", ntrip->mntpnt);
+        }
         BUFADD(p, rem, "Host: %s\r\n", ntrip->host);
         BUFADD(p, rem, "Ntrip-Version: Ntrip/2.0\r\n");
         BUFADD(p, rem, "User-Agent: NTRIP %s\r\n", NTRIP_AGENT);
@@ -1992,37 +1996,28 @@ static int readntrip(ntrip_t* ntrip, uint8_t* buff, int n, char* msg) {
     }
 
     if (ntrip->nb > 0) { /* read response buffer first */
+        if (ntrip->chunked) {
+            /* decode directly from ntrip->buff into caller's buff */
+            const uint8_t* in = ntrip->buff;
+            int nin = ntrip->nb;
+            int nd = chunk_decode(&ntrip->cdec, &in, &nin, buff, n);
+            if (nd < 0) {
+                tracet(NULL, 2, "readntrip: chunk decode error\n");
+                return 0;
+            }
+            /* compact: remove consumed bytes from ntrip->buff */
+            if (nin > 0) {
+                memmove(ntrip->buff, in, nin);
+            }
+            ntrip->nb = nin;
+            return nd;
+        }
         nb = ntrip->nb <= n ? ntrip->nb : n;
         memcpy(buff, ntrip->buff, nb);
         if (nb < ntrip->nb) {
             memmove(ntrip->buff, ntrip->buff + nb, ntrip->nb - nb);
         }
         ntrip->nb -= nb;
-
-        if (ntrip->chunked) {
-            /* decode buffered data through chunked decoder */
-            const uint8_t* in = buff;
-            int nin = nb;
-            uint8_t tmp[4096];
-            int nd = chunk_decode(&ntrip->cdec, &in, &nin, tmp, MIN(nb, (int)sizeof(tmp)));
-            if (nd < 0) {
-                tracet(NULL, 2, "readntrip: chunk decode error\n");
-                return 0;
-            }
-            /* preserve unconsumed encoded bytes back to response buffer */
-            if (nin > 0) {
-                if (ntrip->nb + nin <= NTRIP_MAXRSP) {
-                    memmove(ntrip->buff + ntrip->nb, in, nin);
-                    ntrip->nb += nin;
-                } else {
-                    tracet(NULL, 2, "readntrip: chunk buffer overflow, resetting\n");
-                    ntrip->nb = 0;
-                    chunk_dec_init(&ntrip->cdec);
-                }
-            }
-            memcpy(buff, tmp, nd);
-            return nd;
-        }
         return nb;
     }
     if (ntrip->chunked) {
@@ -2271,9 +2266,12 @@ static void rsp_ntripc(ntripc_t* ntripc, int i) {
         discon_ntripc(ntripc, i);
         return;
     }
-    /* test NTRIP version */
+    /* test NTRIP version (clamp to 1 or 2) */
     if ((p = strstr((char*)con->buff, "Ntrip-Version:"))) {
         sscanf(p + 14, " Ntrip/%d", &ver);
+        if (ver < 1 || ver > 2) {
+            ver = 1; /* treat unsupported versions as v1 */
+        }
     }
     if ((p = strchr(url, '/'))) {
         strcpy(mntpnt, p + 1);
