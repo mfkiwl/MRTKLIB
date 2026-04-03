@@ -1473,9 +1473,16 @@ static int encbase64(char* str, const uint8_t* byte, int n) {
     tracet(NULL, 5, "encbase64: str=%s\n", str);
     return j;
 }
+/* safe append to buffer with overflow tracking */
+#define BUFADD(p, rem, ...) do { \
+    int _n = snprintf(p, rem, __VA_ARGS__); \
+    if (_n > 0 && _n < (rem)) { (p) += _n; (rem) -= _n; } \
+    else { (rem) = 0; } \
+} while (0)
 /* send ntrip server request -------------------------------------------------*/
 static int reqntrip_s(ntrip_t* ntrip, char* msg) {
-    char buff[1024 + NTRIP_MAXSTR], user[514], *p = buff;
+    char buff[2048], user[514], *p = buff;
+    int rem = (int)sizeof(buff);
     int use_v2 = (ntrip->ver == NTRIP_VER_2 ||
                   (ntrip->ver == NTRIP_VER_AUTO &&
                    (!ntrip->v2_tried || ntrip->ver_neg == NTRIP_VER_2)));
@@ -1484,26 +1491,34 @@ static int reqntrip_s(ntrip_t* ntrip, char* msg) {
 
     if (use_v2) {
         /* NTRIP v2: POST with HTTP/1.1 */
-        p += sprintf(p, "POST /%s HTTP/1.1\r\n", ntrip->mntpnt);
-        p += sprintf(p, "Host: %s\r\n", ntrip->host);
-        p += sprintf(p, "Ntrip-Version: Ntrip/2.0\r\n");
-        p += sprintf(p, "User-Agent: NTRIP %s\r\n", NTRIP_AGENT);
+        BUFADD(p, rem, "POST /%s HTTP/1.1\r\n", ntrip->mntpnt);
+        BUFADD(p, rem, "Host: %s\r\n", ntrip->host);
+        BUFADD(p, rem, "Ntrip-Version: Ntrip/2.0\r\n");
+        BUFADD(p, rem, "User-Agent: NTRIP %s\r\n", NTRIP_AGENT);
         if (*ntrip->user) {
-            sprintf(user, "%s:%s", ntrip->user, ntrip->passwd);
-            p += sprintf(p, "Authorization: Basic ");
-            p += encbase64(p, (uint8_t*)user, strlen(user));
-            p += sprintf(p, "\r\n");
+            snprintf(user, sizeof(user), "%s:%s", ntrip->user, ntrip->passwd);
+            BUFADD(p, rem, "Authorization: Basic ");
+            if (rem > 0) {
+                int n = encbase64(p, (uint8_t*)user, strlen(user));
+                p += n;
+                rem -= n;
+            }
+            BUFADD(p, rem, "\r\n");
         }
-        p += sprintf(p, "Transfer-Encoding: chunked\r\n");
-        p += sprintf(p, "\r\n");
+        BUFADD(p, rem, "Transfer-Encoding: chunked\r\n");
+        BUFADD(p, rem, "\r\n");
     } else {
         /* NTRIP v1: SOURCE command */
-        p += sprintf(p, "SOURCE %s %s\r\n", ntrip->passwd, ntrip->mntpnt);
-        p += sprintf(p, "Source-Agent: NTRIP %s\r\n", NTRIP_AGENT);
-        p += sprintf(p, "STR: %s\r\n", ntrip->str);
-        p += sprintf(p, "\r\n");
+        BUFADD(p, rem, "SOURCE %s %s\r\n", ntrip->passwd, ntrip->mntpnt);
+        BUFADD(p, rem, "Source-Agent: NTRIP %s\r\n", NTRIP_AGENT);
+        BUFADD(p, rem, "STR: %s\r\n", ntrip->str);
+        BUFADD(p, rem, "\r\n");
     }
 
+    if (rem <= 0) {
+        sprintf(msg, "request buffer overflow");
+        return 0;
+    }
     if (writetcpcli(ntrip->tcp, (uint8_t*)buff, (int)(p - buff), msg) != (int)(p - buff)) {
         return 0;
     }
@@ -1515,7 +1530,8 @@ static int reqntrip_s(ntrip_t* ntrip, char* msg) {
 }
 /* send ntrip client request -------------------------------------------------*/
 static int reqntrip_c(ntrip_t* ntrip, char* msg) {
-    char buff[MAXSTRPATH + 1024], user[514], *p = buff;
+    char buff[2048], user[514], *p = buff;
+    int rem = (int)sizeof(buff);
     int use_v2 = (ntrip->ver == NTRIP_VER_2 ||
                   (ntrip->ver == NTRIP_VER_AUTO &&
                    (!ntrip->v2_tried || ntrip->ver_neg == NTRIP_VER_2)));
@@ -1524,37 +1540,49 @@ static int reqntrip_c(ntrip_t* ntrip, char* msg) {
 
     if (use_v2) {
         /* NTRIP v2: HTTP/1.1 with Host and Ntrip-Version headers */
-        p += sprintf(p, "GET %s/%s HTTP/1.1\r\n", ntrip->url, ntrip->mntpnt);
-        p += sprintf(p, "Host: %s\r\n", ntrip->host);
-        p += sprintf(p, "Ntrip-Version: Ntrip/2.0\r\n");
-        p += sprintf(p, "User-Agent: NTRIP %s\r\n", NTRIP_AGENT);
+        BUFADD(p, rem, "GET %s/%s HTTP/1.1\r\n", ntrip->url, ntrip->mntpnt);
+        BUFADD(p, rem, "Host: %s\r\n", ntrip->host);
+        BUFADD(p, rem, "Ntrip-Version: Ntrip/2.0\r\n");
+        BUFADD(p, rem, "User-Agent: NTRIP %s\r\n", NTRIP_AGENT);
 
         if (*ntrip->user) {
-            sprintf(user, "%s:%s", ntrip->user, ntrip->passwd);
-            p += sprintf(p, "Authorization: Basic ");
-            p += encbase64(p, (uint8_t*)user, strlen(user));
-            p += sprintf(p, "\r\n");
+            snprintf(user, sizeof(user), "%s:%s", ntrip->user, ntrip->passwd);
+            BUFADD(p, rem, "Authorization: Basic ");
+            if (rem > 0) {
+                int n = encbase64(p, (uint8_t*)user, strlen(user));
+                p += n;
+                rem -= n;
+            }
+            BUFADD(p, rem, "\r\n");
         }
-        p += sprintf(p, "Connection: close\r\n");
-        p += sprintf(p, "\r\n");
+        BUFADD(p, rem, "Connection: close\r\n");
+        BUFADD(p, rem, "\r\n");
     } else {
         /* NTRIP v1: HTTP/1.0 (original) */
-        p += sprintf(p, "GET %s/%s HTTP/1.0\r\n", ntrip->url, ntrip->mntpnt);
-        p += sprintf(p, "User-Agent: NTRIP %s\r\n", NTRIP_AGENT);
+        BUFADD(p, rem, "GET %s/%s HTTP/1.0\r\n", ntrip->url, ntrip->mntpnt);
+        BUFADD(p, rem, "User-Agent: NTRIP %s\r\n", NTRIP_AGENT);
 
         if (!*ntrip->user) {
-            p += sprintf(p, "Accept: */*\r\n");
-            p += sprintf(p, "Connection: close\r\n");
+            BUFADD(p, rem, "Accept: */*\r\n");
+            BUFADD(p, rem, "Connection: close\r\n");
         } else {
-            sprintf(user, "%s:%s", ntrip->user, ntrip->passwd);
-            p += sprintf(p, "Authorization: Basic ");
-            p += encbase64(p, (uint8_t*)user, strlen(user));
-            p += sprintf(p, "\r\n");
+            snprintf(user, sizeof(user), "%s:%s", ntrip->user, ntrip->passwd);
+            BUFADD(p, rem, "Authorization: Basic ");
+            if (rem > 0) {
+                int n = encbase64(p, (uint8_t*)user, strlen(user));
+                p += n;
+                rem -= n;
+            }
+            BUFADD(p, rem, "\r\n");
         }
-        p += sprintf(p, "\r\n");
+        BUFADD(p, rem, "\r\n");
     }
 
-    if (writetcpcli(ntrip->tcp, (uint8_t*)buff, p - buff, msg) != p - buff) {
+    if (rem <= 0) {
+        sprintf(msg, "request buffer overflow");
+        return 0;
+    }
+    if (writetcpcli(ntrip->tcp, (uint8_t*)buff, (int)(p - buff), msg) != (int)(p - buff)) {
         return 0;
     }
 
@@ -1683,43 +1711,11 @@ static int rspntrip_c(ntrip_t* ntrip, char* msg) {
                     /* shift body to start of buffer */
                     ntrip->nb -= body_off;
                     memmove(ntrip->buff, ntrip->buff + body_off, ntrip->nb);
-                    /* enable persistent chunked decoding for incremental reads */
+                    /* enable persistent chunked decoding for incremental reads.
+                     * ntrip->buff remains encoded; readntrip() decodes on demand */
                     if (is_chunked) {
                         ntrip->chunked = 1;
                         chunk_dec_init(&ntrip->cdec);
-                        /* decode any body data already buffered */
-                        if (ntrip->nb > 0) {
-                            const uint8_t *in = ntrip->buff;
-                            int nin = ntrip->nb;
-                            int total = 0;
-                            uint8_t tmp[4096];
-                            while (nin > 0 && total < NTRIP_MAXRSP) {
-                                int nd = chunk_decode(&ntrip->cdec, &in, &nin, tmp,
-                                                      MIN((int)sizeof(tmp), NTRIP_MAXRSP - total));
-                                if (nd < 0) {
-                                    tracet(NULL, 2, "rspntrip_c: chunk decode error\n");
-                                    ntrip->nb = 0;
-                                    ntrip->state = 0;
-                                    discontcp(&ntrip->tcp->svr, ntrip->tcp->tirecon);
-                                    return 0;
-                                }
-                                if (nd == 0) {
-                                    break;
-                                }
-                                memcpy(ntrip->buff + total, tmp, nd);
-                                total += nd;
-                            }
-                            ntrip->nb = total;
-                            /* preserve unconsumed encoded bytes */
-                            if (nin > 0) {
-                                if (ntrip->nb + nin <= NTRIP_MAXRSP) {
-                                    memmove(ntrip->buff + ntrip->nb, in, nin);
-                                    ntrip->nb += nin;
-                                } else {
-                                    tracet(NULL, 2, "rspntrip_c: chunked buffer overflow\n");
-                                }
-                            }
-                        }
                     }
                     sprintf(msg, "source table received");
                     tracet(NULL, 3, "rspntrip_c: v2 source table nb=%d\n", ntrip->nb);

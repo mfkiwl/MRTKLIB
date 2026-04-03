@@ -210,7 +210,9 @@ endforeach()
 
 # NTRIP v2 chunked codec test (header-only, no library dependency)
 add_executable(t_ntrip ${_UTEST_DIR}/t_ntrip.c)
-# Override global -ansi (=C90) for this target, same as mrtklib target
+# Override global -ansi (=C90) for this target, same as mrtklib target.
+# Note: set_property(C_STANDARD 11) and target_compile_features(c_std_11) do NOT
+# override -ansi from add_compile_options(); explicit -std=c11 is required.
 target_compile_options(t_ntrip PRIVATE -std=c11)
 add_test(NAME utest_t_ntrip COMMAND t_ntrip
          WORKING_DIRECTORY ${_UTEST_DIR})

@@ -77,33 +77,33 @@ static int chunk_decode(chunk_dec_t *dec, const uint8_t **pin, int *pnin,
 
     while (nin > 0 && dec->state != 3) { /* 3 = DONE (terminal) */
         switch (dec->state) {
-        case 0: /* SIZE: read chunk-size line */
+        case 0: /* SIZE: read chunk-size line
+                 * Only hex digits are stored in hdr[]. Once a non-hex char
+                 * (extension ';' etc.) is seen, remaining chars are skipped
+                 * until \r\n, so extensions cannot overflow hdr[]. */
             while (nin > 0) {
                 char c = (char)*in++;
                 nin--;
 
-                if (c == '\n' && dec->nhdr > 0 && dec->hdr[dec->nhdr - 1] == '\r') {
-                    /* complete chunk-size line: parse hex */
-                    dec->hdr[dec->nhdr - 1] = '\0'; /* strip \r */
+                if (c == '\n') {
+                    /* end of chunk-size line: parse accumulated hex digits */
                     unsigned long size = 0;
-                    const char *h = dec->hdr;
-                    int ndigits = 0;
+                    int i, ndigits = 0;
 
-                    /* parse hex digits (stop at extension ';' if present) */
-                    while (*h) {
+                    for (i = 0; i < dec->nhdr; i++) {
                         int d;
-                        if (*h >= '0' && *h <= '9') {
-                            d = *h - '0';
-                        } else if (*h >= 'a' && *h <= 'f') {
-                            d = *h - 'a' + 10;
-                        } else if (*h >= 'A' && *h <= 'F') {
-                            d = *h - 'A' + 10;
+                        char h = dec->hdr[i];
+                        if (h >= '0' && h <= '9') {
+                            d = h - '0';
+                        } else if (h >= 'a' && h <= 'f') {
+                            d = h - 'a' + 10;
+                        } else if (h >= 'A' && h <= 'F') {
+                            d = h - 'A' + 10;
                         } else {
-                            break; /* extension or invalid */
+                            break;
                         }
                         size = (size << 4) | d;
                         ndigits++;
-                        h++;
                     }
                     dec->nhdr = 0;
 
@@ -122,13 +122,12 @@ static int chunk_decode(chunk_dec_t *dec, const uint8_t **pin, int *pnin,
                     }
                     break;
                 }
-                if (dec->nhdr < CHUNK_HDR_MAX - 1) {
-                    dec->hdr[dec->nhdr++] = c;
-                } else {
-                    /* chunk-size header too long */
-                    *pin = in;
-                    *pnin = nin;
-                    return -1;
+                /* only accumulate hex digits and ';' marker; skip extension content */
+                if (c != '\r') {
+                    if (dec->nhdr < CHUNK_HDR_MAX - 1) {
+                        dec->hdr[dec->nhdr++] = c;
+                    }
+                    /* if hdr full, just skip remaining chars until \n */
                 }
             }
             break;
