@@ -61,6 +61,7 @@
  */
 #include <arpa/inet.h>
 #include <errno.h>
+#include <execinfo.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -284,6 +285,14 @@ static void sigshut(int sig) {
     trace(NULL, 3, "sigshut: sig=%d\n", sig);
 
     intflg = 1;
+}
+/* SIGSEGV handler with backtrace (#74 debug) --------------------------------*/
+static void sigcrash(int sig) {
+    void* frames[64];
+    int n = backtrace(frames, 64);
+    fprintf(stderr, "\n*** SIGSEGV (signal %d) ***\n", sig);
+    backtrace_symbols_fd(frames, n, STDERR_FILENO);
+    _exit(128 + sig);
 }
 /* discard space characters at tail ------------------------------------------*/
 static void chop(char* str) {
@@ -752,6 +761,8 @@ static void prstatus(vt_t* vt) {
     char tstr[64], s[1024], *p, tmp[64];
     double runtime, rt[3] = {0}, dop[4] = {0}, rr[3], bl1 = 0.0, bl2 = 0.0;
     double azel[MAXSAT * 2], pos[3], vel[3], *del;
+    double x3[3] = {0}, P_diag[3] = {0}, xa3[3] = {0}, Pa_diag[3] = {0};
+    int has_x = 0, has_P = 0, has_xa = 0, has_Pa = 0;
 
     trace(NULL, 4, "prstatus:\n");
 
@@ -785,7 +796,31 @@ static void prstatus(vt_t* vt) {
         memcpy(nmsg2[i], svr->rtcm[i].nmsg2, sizeof(nmsg2[i]));
         memcpy(nmsg3[i], svr->rtcm[i].nmsg3, sizeof(nmsg3[i]));
     }
+    /* deep copy state vector values to avoid data race after unlock (#74) */
+    if (svr->rtk.x) {
+        has_x = 1;
+        memcpy(x3, svr->rtk.x, sizeof(double) * 3);
+    }
+    if (svr->rtk.P) {
+        has_P = 1;
+        P_diag[0] = svr->rtk.P[0];
+        P_diag[1] = svr->rtk.P[1 + 1 * svr->rtk.nx];
+        P_diag[2] = svr->rtk.P[2 + 2 * svr->rtk.nx];
+    }
+    if (svr->rtk.xa) {
+        has_xa = 1;
+        memcpy(xa3, svr->rtk.xa, sizeof(double) * 3);
+    }
+    if (svr->rtk.Pa) {
+        has_Pa = 1;
+        Pa_diag[0] = svr->rtk.Pa[0];
+        Pa_diag[1] = svr->rtk.Pa[1 + 1 * svr->rtk.na];
+        Pa_diag[2] = svr->rtk.Pa[2 + 2 * svr->rtk.na];
+    }
     rtksvrunlock(svr);
+
+    /* null out shared pointers to prevent accidental access after unlock */
+    rtk.x = rtk.P = rtk.Q = rtk.xa = rtk.Pa = NULL;
 
     for (i = n = 0; i < MAXSAT; i++) {
         if (rtk.opt.mode == PMODE_SINGLE && !rtk.ssat[i].vs) {
@@ -865,14 +900,14 @@ static void prstatus(vt_t* vt) {
     vt_printf(vt, "%-28s: %.8f,%.8f,%.3f\n", "pos llh single (deg,m) rover", pos[0] * R2D, pos[1] * R2D, pos[2]);
     ecef2enu(pos, rtk.sol.rr + 3, vel);
     vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "vel enu (m/s) rover", vel[0], vel[1], vel[2]);
-    vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "pos xyz float (m) rover", rtk.x ? rtk.x[0] : 0, rtk.x ? rtk.x[1] : 0,
-              rtk.x ? rtk.x[2] : 0);
-    vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "pos xyz float std (m) rover", rtk.P ? SQRT(rtk.P[0]) : 0,
-              rtk.P ? SQRT(rtk.P[1 + 1 * rtk.nx]) : 0, rtk.P ? SQRT(rtk.P[2 + 2 * rtk.nx]) : 0);
-    vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "pos xyz fixed (m) rover", rtk.xa ? rtk.xa[0] : 0, rtk.xa ? rtk.xa[1] : 0,
-              rtk.xa ? rtk.xa[2] : 0);
-    vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "pos xyz fixed std (m) rover", rtk.Pa ? SQRT(rtk.Pa[0]) : 0,
-              rtk.Pa ? SQRT(rtk.Pa[1 + 1 * rtk.na]) : 0, rtk.Pa ? SQRT(rtk.Pa[2 + 2 * rtk.na]) : 0);
+    vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "pos xyz float (m) rover", has_x ? x3[0] : 0, has_x ? x3[1] : 0,
+              has_x ? x3[2] : 0);
+    vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "pos xyz float std (m) rover", has_P ? SQRT(P_diag[0]) : 0,
+              has_P ? SQRT(P_diag[1]) : 0, has_P ? SQRT(P_diag[2]) : 0);
+    vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "pos xyz fixed (m) rover", has_xa ? xa3[0] : 0, has_xa ? xa3[1] : 0,
+              has_xa ? xa3[2] : 0);
+    vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "pos xyz fixed std (m) rover", has_Pa ? SQRT(Pa_diag[0]) : 0,
+              has_Pa ? SQRT(Pa_diag[1]) : 0, has_Pa ? SQRT(Pa_diag[2]) : 0);
     vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "pos xyz (m) base", rtk.rb[0], rtk.rb[1], rtk.rb[2]);
     if (norm(rtk.rb, 3) > 0.0) {
         ecef2pos(rtk.rb, pos);
@@ -889,15 +924,15 @@ static void prstatus(vt_t* vt) {
     vt_printf(vt, "%-28s: %.3f %.3f %.3f\n", "ant delta base", del[0], del[1], del[2]);
     ecef2enu(pos, rtk.rb + 3, vel);
     vt_printf(vt, "%-28s: %.3f,%.3f,%.3f\n", "vel enu (m/s) base", vel[0], vel[1], vel[2]);
-    if (rtk.opt.mode > 0 && rtk.x && norm(rtk.x, 3) > 0.0) {
+    if (rtk.opt.mode > 0 && has_x && norm(x3, 3) > 0.0) {
         for (i = 0; i < 3; i++) {
-            rr[i] = rtk.x[i] - rtk.rb[i];
+            rr[i] = x3[i] - rtk.rb[i];
         }
         bl1 = norm(rr, 3);
     }
-    if (rtk.opt.mode > 0 && rtk.xa && norm(rtk.xa, 3) > 0.0) {
+    if (rtk.opt.mode > 0 && has_xa && norm(xa3, 3) > 0.0) {
         for (i = 0; i < 3; i++) {
-            rr[i] = rtk.xa[i] - rtk.rb[i];
+            rr[i] = xa3[i] - rtk.rb[i];
         }
         bl2 = norm(rr, 3);
     }
@@ -2127,6 +2162,7 @@ int mrtk_run(int argc, char** argv) {
     signal(SIGUSR2, sigshut);
     signal(SIGHUP, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGSEGV, sigcrash); /* backtrace on crash (#74 debug) */
 
     /* start rtk server */
     if (start) {

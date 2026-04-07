@@ -142,6 +142,7 @@ add_executable(mrtk
 target_include_directories(mrtk PRIVATE apps/rtkrcv)
 target_compile_definitions(mrtk PRIVATE SVR_REUSEADDR)
 target_link_libraries(mrtk PRIVATE mrtklib pthread)
+target_link_options(mrtk PRIVATE $<$<NOT:$<PLATFORM_ID:Darwin>>:-rdynamic>)
 
 # ── Install ───────────────────────────────────────────────────────────────────
 # cmake --install build  →  copies binaries to bin/ (matches make install)
