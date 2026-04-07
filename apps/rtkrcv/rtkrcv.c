@@ -61,7 +61,6 @@
  */
 #include <arpa/inet.h>
 #include <errno.h>
-#include <execinfo.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -286,25 +285,23 @@ static void sigshut(int sig) {
 
     intflg = 1;
 }
-/* SIGSEGV handler with backtrace --------------------------------------------*/
+/* SIGSEGV handler (best-effort, async-signal-safe only) ---------------------*/
 static void sigcrash(int sig) {
-    /* all functions used here are async-signal-safe (write, backtrace,
-     * backtrace_symbols_fd, sigaction, raise) — no fprintf/malloc */
+    /* Keep this handler minimal: only async-signal-safe operations are used.
+     * Symbolization should be performed from a core dump if needed. */
     static const char msg[] = "\n*** SIGSEGV ***\n";
-    void* frames[64];
-    int n;
     struct sigaction sa;
 
     (void)write(STDERR_FILENO, msg, sizeof(msg) - 1);
-    n = backtrace(frames, 64);
-    backtrace_symbols_fd(frames, n, STDERR_FILENO);
 
-    /* restore default handler and re-raise to produce a core dump */
+    /* restore default handler and re-send to produce a core dump */
     sigemptyset(&sa.sa_mask);
     sa.sa_handler = SIG_DFL;
     sa.sa_flags = 0;
-    sigaction(sig, &sa, NULL);
-    raise(sig);
+    (void)sigaction(sig, &sa, NULL);
+    (void)kill(getpid(), sig);
+    /* fallback if signal re-delivery did not terminate the process */
+    _exit(128 + sig);
 }
 /* discard space characters at tail ------------------------------------------*/
 static void chop(char* str) {
@@ -856,9 +853,9 @@ static void prstatus(vt_t* vt) {
     vt_printf(vt, "%-28s: %s\n", "rtk server state", svrstate[state]);
     vt_printf(vt, "%-28s: %d\n", "processing cycle (ms)", cycle);
     vt_printf(vt, "%-28s: %s\n", "positioning mode",
-              rtk.opt.mode < (int)(sizeof(mode) / sizeof(mode[0])) ? mode[rtk.opt.mode] : "?");
+              rtk.opt.mode >= 0 && rtk.opt.mode < (int)(sizeof(mode) / sizeof(mode[0])) ? mode[rtk.opt.mode] : "?");
     vt_printf(vt, "%-28s: %s\n", "frequencies",
-              rtk.opt.nf < (int)(sizeof(freq) / sizeof(freq[0])) ? freq[rtk.opt.nf] : "?");
+              rtk.opt.nf >= 0 && rtk.opt.nf < (int)(sizeof(freq) / sizeof(freq[0])) ? freq[rtk.opt.nf] : "?");
     vt_printf(vt, "%-28s: %02.0f:%02.0f:%04.1f\n", "accumulated time to run", rt[0], rt[1], rt[2]);
     vt_printf(vt, "%-28s: %d\n", "cpu time for a cycle (ms)", cputime);
     vt_printf(vt, "%-28s: %d\n", "missing obs data count", prcout);
@@ -2178,7 +2175,13 @@ int mrtk_run(int argc, char** argv) {
     signal(SIGUSR2, sigshut);
     signal(SIGHUP, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);
-    signal(SIGSEGV, sigcrash); /* backtrace on crash (#74 debug) */
+    {
+        struct sigaction sa_crash;
+        sigemptyset(&sa_crash.sa_mask);
+        sa_crash.sa_handler = sigcrash;
+        sa_crash.sa_flags = 0;
+        sigaction(SIGSEGV, &sa_crash, NULL);
+    }
 
     /* start rtk server */
     if (start) {
