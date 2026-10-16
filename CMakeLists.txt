@@ -83,6 +83,7 @@ add_library(mrtklib STATIC
     src/data/mrtk_fcb.c
     src/data/mrtk_sbas.c
     src/data/mrtk_rcvraw.c
+    src/data/mrtk_l6.c
     src/data/rcv/mrtk_rcv_binex.c
     src/data/rcv/mrtk_rcv_crescent.c
     src/data/rcv/mrtk_rcv_javad.c
@@ -337,6 +338,28 @@ target_link_libraries(utest_msm_bds_b2b PRIVATE mrtklib)
 add_test(NAME utest_msm_bds_b2b COMMAND utest_msm_bds_b2b
          WORKING_DIRECTORY ${_UTEST_DIR})
 set_tests_properties(utest_msm_bds_b2b PROPERTIES LABELS "utest")
+
+# QZSS L6 frame header parsing / service classification (issue #351).
+# l6_frames.bin: one real 218-byte frame per service (CLAS, MADOCA, MADOCA
+# iono, QZNMA) from mosaic-G5 SBF captures (scripts/tests/extract_l6_frames.py).
+add_executable(utest_l6_header ${_UTEST_DIR}/utest_l6_header.c)
+# Override global -ansi (=C90): this test uses C11 (P-01).
+target_compile_options(utest_l6_header PRIVATE -std=c11)
+target_link_libraries(utest_l6_header PRIVATE mrtklib)
+add_test(NAME utest_l6_header COMMAND utest_l6_header
+         WORKING_DIRECTORY ${_UTEST_DIR})
+set_tests_properties(utest_l6_header PROPERTIES LABELS "utest")
+
+# QZSS L6 frame routing in the UBX/SBF decoders (issue #351 PR-B). Fixtures
+# tests/utest/l6route_*: short real SBF/UBX slices plus re-wrapped real frames
+# (scripts/tests/make_l6_route_fixtures.py).
+add_executable(utest_l6_route ${_UTEST_DIR}/utest_l6_route.c)
+# Override global -ansi (=C90): this test uses C11 (P-01).
+target_compile_options(utest_l6_route PRIVATE -std=c11)
+target_link_libraries(utest_l6_route PRIVATE mrtklib)
+add_test(NAME utest_l6_route COMMAND utest_l6_route
+         WORKING_DIRECTORY ${_UTEST_DIR})
+set_tests_properties(utest_l6_route PROPERTIES LABELS "utest")
 
 # NTRIP v2 chunked codec test (header-only, no library dependency)
 add_executable(t_ntrip ${_UTEST_DIR}/t_ntrip.c)
@@ -903,6 +926,58 @@ set_tests_properties(claslib_ppp_rtk_abs_check PROPERTIES
     DEPENDS           claslib_ppp_rtk
     FIXTURES_REQUIRED claslib_data
     LABELS            "absolute;claslib;ppp-rtk"
+)
+
+# ── CLAS PPP-RTK 2023 dataset: .l6d input + upstream 0.9.0 parity (#351) ─────
+# Data: 2023/02/13 09:00-10:00 (claslib 0.9.0 CMA sample), 0627044J.bnx +
+# 2023044J.l6d + 2023044J.l6e from claslib_cma_testdata.tar.gz (#350).
+# Exercises mrtk post recognition of .l6d (CLAS by frame header) and .l6e
+# (ignored in CLAS mode until CMA, #353/#354). Reference: ref_L6_AUTH_noauth.nmea
+# = upstream claslib 0.9.0 rnx2rtkp on the same inputs without .l6e (CMA off).
+add_test(NAME claslib_cma_setup
+    COMMAND bash -c "tar xzf \"${_CLSDATA}/claslib_cma_testdata.tar.gz\" -C \"${_CLSDATA}\" \
+        0627044J.bnx 2023044J.l6d 2023044J.l6e"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_cma_setup PROPERTIES
+    FIXTURES_SETUP  claslib_cma_data
+    TIMEOUT         60
+    LABELS          "regression;claslib"
+)
+add_test(NAME claslib_cma_cleanup
+    COMMAND bash -c "rm -f ${_CLSDATA}/0627044J.bnx ${_CLSDATA}/2023044J.l6d ${_CLSDATA}/2023044J.l6e"
+)
+set_tests_properties(claslib_cma_cleanup PROPERTIES
+    FIXTURES_CLEANUP claslib_cma_data
+    LABELS           "regression;claslib"
+)
+
+add_test(NAME claslib_ppp_rtk_2023
+    COMMAND $<TARGET_FILE:mrtk> post
+        -k ${CMAKE_SOURCE_DIR}/conf/claslib/rnx2rtkp.toml
+        -ts 2023/02/13 09:00:00 -te 2023/02/13 09:59:59 -ti 1
+        -o ${CMAKE_BINARY_DIR}/out_claslib_ppp_rtk_2023.nmea
+        ${_CLSDATA}/0627044J.bnx
+        ${_CLSDATA}/2023044J.l6d
+        ${_CLSDATA}/2023044J.l6e
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(claslib_ppp_rtk_2023 PROPERTIES
+    FIXTURES_REQUIRED "claslib_data;claslib_cma_data"
+    TIMEOUT           300
+    LABELS            "regression;claslib;ppp-rtk"
+)
+
+add_test(NAME claslib_ppp_rtk_2023_check
+    COMMAND ${Python3_EXECUTABLE} ${_COMPARE_NMEA}
+        ${_CLSDATA}/ref_L6_AUTH_noauth.nmea
+        ${CMAKE_BINARY_DIR}/out_claslib_ppp_rtk_2023.nmea
+        --tolerance 0.10
+)
+set_tests_properties(claslib_ppp_rtk_2023_check PROPERTIES
+    DEPENDS           claslib_ppp_rtk_2023
+    FIXTURES_REQUIRED claslib_data
+    LABELS            "regression;claslib;ppp-rtk"
 )
 
 # ── CLAS PPP-RTK periodic filter reset (#264) ────────────────────────────────
