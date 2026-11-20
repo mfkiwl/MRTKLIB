@@ -82,6 +82,13 @@ Supported constellation names (case-insensitive):
 
     When both `systems` and `constellations` are present, `systems` takes priority.
 
+!!! warning "BeiDou: set `bds2_sats`"
+    Since the BeiDou PRN reassignment of April 2026, BDS-3 satellites also use PRN
+    1–18, and MRTKLIB cannot tell BDS-2 from BDS-3 there by itself. When BeiDou is
+    enabled, list the BDS-2 satellites in `[positioning] bds2_sats`:
+    `["C09", "C10"]` for data after 2026-04-21, `["C01-C18"]` for data before
+    2026-04-10. See [BeiDou PRN Reassignment](beidou-prn-reassignment.md).
+
 ## Satellite Exclusion
 
 Exclude specific satellites using a string list:
@@ -121,6 +128,9 @@ MRTKLIB ships with ready-to-use configuration files for common use cases:
 |------|------|
 | `conf/claslib/rnx2rtkp.toml` | PPP-RTK single-channel (post-processing) |
 | `conf/claslib/rnx2rtkp_vrs.toml` | VRS-RTK (post-processing) |
+| `conf/claslib/rnx2rtkp_L1CL5_vrs.toml` | VRS-RTK with QZS L1C + L5 (post-processing) |
+| `conf/claslib/ssr2obs.toml` | VRS observation generation (`mrtk ssr2obs`) |
+| `conf/claslib/ssr2obs_L1CL5.toml` | VRS observation generation with QZS L1C (`-JL1X`) |
 | `conf/claslib/rtkrcv.toml` | PPP-RTK single-channel (real-time) |
 | `conf/claslib/rtkrcv_2ch.toml` | PPP-RTK dual-channel (real-time) |
 

@@ -140,11 +140,11 @@ same CLAS correction decoder.
 | Metric | Post-Processing (`mrtk post`) | Real-Time (`mrtk run`) |
 |--------|:---:|:---:|
 | Total epochs | 3,580 | 3,599 |
-| Fix (Q=4) | 3,575 (99.86%) | 3,517 (97.72%) |
+| Fix (Q=4) | 3,575 (99.86%) | 3,553 (98.72%) |
 | Float (Q=5) | 5 (0.14%) | 5 (0.14%) |
-| SPP (Q=1) | 0 (0.00%) | 77 (2.14%) |
+| SPP (Q=1) | 0 (0.00%) | 41 (1.14%) |
 
-The 77 Q=1 epochs correspond to the initial convergence period (~77 seconds).
+The 41 Q=1 epochs correspond to the initial convergence period (~41 seconds).
 After convergence, the steady-state fix rate is identical: ~99.86%.
 
 ### Dual-channel (2025/157 dataset)
@@ -153,9 +153,9 @@ After convergence, the steady-state fix rate is identical: ~99.86%.
 
 | Metric | Post-Processing (`mrtk post`) | Real-Time, ch0 only | Real-Time, `l6_merge = 1` |
 |--------|:---:|:---:|:---:|
-| Fix (Q=4) | 3,579 (99.4%) | 3,560 (98.9%) | 3,523 (97.9%) |
-| Float (Q=5) | ~21 (0.6%) | 5 (0.1%) | 37 (1.0%) |
-| SPP (Q=1) | 0 (0.0%) | 35 (1.0%) | 40 (1.1%) |
+| Fix (Q=4) | 3,579 (99.4%) | 3,577 (99.4%) | 3,577 (99.4%) |
+| Float (Q=5) | ~21 (0.6%) | 5 (0.1%) | 5 (0.1%) |
+| SPP (Q=1) | 0 (0.0%) | 18 (0.5%) | 18 (0.5%) |
 | Mean satellites per fixed epoch | 15.6 | 14.6 | 15.5 |
 
 Merging the two transmit patterns buys about one extra usable satellite per
@@ -231,43 +231,72 @@ entry mapping its `tick_n` (ms since first epoch) to its file offset.
 ### L6 Tag (`gen_l6_tag.py`)
 
 L6 data is transmitted at 250 bytes/s (one frame per second).  The tag
-generator creates one entry per frame at 1-second intervals.
+generator writes one entry per frame.  `--sync-tag <master.tag>` is required.
 
-The L6 filename encodes UTC start time (session letter A–X maps to hours
-0–23).  Since `gen_bnx_tag.py` stores GPST-basis timestamps, `gen_l6_tag.py`
-applies GPS-UTC leap seconds (+18 s as of 2017) to match the same time basis.
+- **Frame time from the content.** Each subframe starts with a CSSR ST1 whose
+  GNSS epoch time is the GPS time of week of that frame. Frames in between are
+  one second apart, timed from the latest ST1 before them. The file name is not
+  used: L6 files start at the GPST hour, not at the UTC hour the session letter
+  suggests.
+- **Release at epoch + 1 s.** A receiver outputs a frame one second after its
+  epoch (SBF `QZSRawL6D` TOW = ST1 epoch + 1 s).
+- **Master timeline.** The L6 tag takes the master's header time and
+  `tick_f`, so `strsync()` applies no offset, and
+  `tick_n = (release time − master start) × 1000`. Frames released before the
+  master starts get `tick_n = 0` and are delivered at once when the replay
+  starts. The master is assumed to run at 1000 ms per GNSS second, as
+  `gen_bnx_tag.py` tags and tags recorded in real time do.
 
-With `--sync-tag`, it aligns the L6 tag to a master tag file:
-- Reads the master's `tick_f` and base time (GPST basis)
-- Converts L6 UTC start time to GPST (adds leap seconds)
-- Computes the GNSS-time offset between L6 start and master start
-- Sets `tick_f` so the offset produces correct `strsync()` alignment
-- Matches `tick_n` scaling to the master tag's timing (handles both
-  real-time and non-real-time recorded masters)
+`scripts/tests/check_l6_tag_sync.py --bnx <file.bnx> <file.l6> …` replays the
+`strsync()` timing offline and prints, for every frame, the lag between the
+newest complete observation epoch and the frame's epoch. The CTest
+`rtkrcv_rt_clas_tag_sync_check` requires 0 to +2 s; a live receiver gives +1 s.
+
+A tag record `(tick_n, fpos)` does not release the file up to `fpos` at
+`tick_n`: `readfile()` makes the file readable up to the `fpos` of the first
+record whose tick is still ahead. The L6 tag therefore writes each frame's
+release tick with the start offset of that frame. In these replays the clock
+age at use is 1–5 s (median 3 s). Single-SBF replays of live captures measured
+a median of about 4 s (#416), post-processing 2 s.
+
+Before #515 the generator took the start time from the file name as a UTC hour,
+which made the L6 stream lag the observations by 20 s (2019/239) or by 18 s
+falling to 1 s over the hour (2025/157). The bundled tags in
+`claslib_testdata.tar.gz` still carry that lag. The `claslib_setup` CTest
+fixture rebuilds them with the current generator.
 
 ---
 
 ## CTest Integration
 
-Two CLAS real-time tests are registered in `CMakeLists.txt`:
+The CLAS real-time tests are registered in `CMakeLists.txt` with the label
+`realtime`:
 
 ```bash
-cd build && ctest -R rtkrcv_rt_clas --output-on-failure
+cd build && ctest -R 'rtkrcv_(rt_clas|clas_l6gap|handover)' --output-on-failure
 ```
 
 | Test | Config | Dataset | Wall time |
 |------|--------|---------|-----------|
+| `rtkrcv_rt_clas_tag_sync_check` | — | L6 / BINEX tags of the three replays below (#515) | <1s |
 | `rtkrcv_rt_clas` | `rtkrcv.toml` | 2019/239 (1ch) | ~370s at x10 |
 | `rtkrcv_rt_clas_2ch` | `rtkrcv_2ch.toml` | 2025/157 (2ch) | ~372s at x10 |
+| `rtkrcv_rt_clas_2ch_merge` (+ `_nsat_check`) | `rtkrcv_2ch.toml`, `l6_merge = 1` | 2025/157 (2ch) | — |
+| `rtkrcv_rt_clas_sf1gap` (+ `_setup`, `_check`) | `rtkrcv.toml` | 2019/239 with subframes 1 removed (#406) | — |
+| `rtkrcv_clas_l6gap_{nomerge,merge}` (+ `_check`) | `tests/data/handover/rtkrcv_handover.toml.in` | `clas_l6gap-v1`, live capture with L6 frame gaps (#363) | — |
+| `rtkrcv_handover_*` (+ `_check`) | `tests/data/handover/rtkrcv_handover.toml.in`, per case | `handover-v1`, QZSS L6 handovers (#372) | — |
 
-Each test:
-1. Extracts test data from `claslib_testdata.tar.gz` (fixture)
-2. Patches the TOML config with a temporary output path
-3. Runs `mrtk run` at x10 speed
-4. Compares output line count against reference (>=90% threshold)
+The first two tests:
+1. Extract test data from `claslib_testdata.tar.gz` (fixture)
+2. Patch the TOML config with a temporary output path
+3. Run `mrtk run` at x10 speed
+4. Compare output line count against reference (>=90% threshold)
 
-Both tests use `RESOURCE_LOCK rtkrcv_port` to prevent parallel execution
-conflicts with the MADOCA `rtkrcv_rt` test.
+The replays run concurrently: each has its own console port and runs `mrtk
+run` in its own empty working directory, because `mrtk run` reads and rewrites
+`rtkrcv.nav` there (#448). They pace against the wall clock, so an
+oversubscribed host can make them drop epochs; see the `ctest -j` note in the
+[installation guide](../getting-started/install.md).
 
 ---
 
@@ -290,6 +319,7 @@ conflicts with the MADOCA `rtkrcv_rt` test.
 | `positioning.relative.time_interpolation` | `true` | Interpolate corrections between epochs |
 | `positioning.clas.resilience.max_obs_loss` | `90.0` | Max epochs without obs before reset |
 | `positioning.clas.resilience.float_count` | `15` | Float epochs before fix attempt |
+| `output.clas_nmea_source_id` | `true` (default) | L6 PRN + facility of the corrections in the GGA station ID — see [GGA Station ID](../guide/quickstart-clas.md#gga-station-id-clas-l6-source) |
 
 ### Required Support Files
 

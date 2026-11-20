@@ -37,6 +37,7 @@
 
 /* forward declarations (implemented in rtkcmn.c, resolved at link time) -----*/
 extern int satno(int sys, int prn);
+extern int satsys_bd2(int sat, int* prn);
 extern void satno2id(int sat, char* id);
 extern double time2gpst(gtime_t t, int* week);
 extern gtime_t utc2gpst(gtime_t t);
@@ -129,6 +130,7 @@ typedef struct {
     int cellmask[MAXSAT];                          /* Cellmask */
     int ncell[MAXSAT];                             /* No. of cellmask flags */
     int siglist[MCSSR_MAX_SYS][MCSSR_MAX_SIGMASK]; /* 0:Terminate,1...:CODE_xxx */
+    int siglist_bd3[MCSSR_MAX_SIGMASK];            /* GNSS ID 3 signal list read by the BDS-3 table */
     int nsat[MCSSR_MAX_SYS];                       /* No. of sat */
     int nsig[MCSSR_MAX_SYS];                       /* No. of signal */
     int ns;                                        /* total No. of */
@@ -137,10 +139,25 @@ typedef struct {
     int tow0;                                      /* for Hourly Epoch Time 1s */
     int ep0;                                       /* for Hourly Epoch Time 1s regresses check */
     int iod;                                       /* IOD SSR */
+    double ftag;                                   /* receiver time tag of the input frame (s, 0: none) */
+    double ftag_last;                              /* receiver time tag of the last accepted frame */
+    int skip;                                      /* frames skipped until the next subframe indicator */
 } mcssr_t;
 
 mcssr_t _mcssr[SSR_CH_NUM];
 static int _mcssr_ch = 0; /* current channel index */
+
+/* signal code of a cell -------------------------------------------------------
+ * IS-QZSS-MDC-005: a BDS-3 satellite sent in GNSS ID 3 (PRN 1-18, after the
+ * April 2026 BeiDou PRN reassignment) has its signal mask read with the
+ * GNSS ID 7 (BDS-3) table. returns 0 for a signal undefined in the table.
+ *----------------------------------------------------------------------------*/
+static int mcssr_sigcode(const mcssr_t* mc, int gnssid, int sat, int k) {
+    if (gnssid == MCSSR_SYS_BDS && sat > 0 && satsys_bd2(sat, NULL) == SYS_CMP) {
+        return mc->siglist_bd3[k];
+    }
+    return mc->siglist[gnssid][k];
+}
 
 /* count 16 bit flags --------------------------------------------------------*/
 static int flgcnt16(const uint16_t flg) {
@@ -346,6 +363,9 @@ static int decode_mcssr_mask(mcssr_t* mc, int i) {
         i += 1; /* Cell-mask Avail.Flag */
         nsat = svmask2list(svmask, gnssid, &mc->satlist[mc->ns], &mc->gidlist[mc->ns]);
         nsig = sigmask2list(sigmask, gnssid, mc->siglist[gnssid]);
+        if (gnssid == MCSSR_SYS_BDS) {
+            sigmask2list(sigmask, MCSSR_SYS_BD3, mc->siglist_bd3);
+        }
 
         trace(NULL, 4, "decode_mcssr_mask: gnssid=%d, svmask=0x%02X%08X, sigmask=0x%X, cmaflg=%d, nsat=%d, nsig=%d\n",
               gnssid, (uint8_t)(svmask >> 32), (uint32_t)(svmask), sigmask, cmaflg, nsat, nsig);
@@ -487,7 +507,7 @@ static int decode_mcssr_cc(mcssr_t* mc, ssr_t* ssr, int i, int apply) {
 
 /* decode MADOCA-PPP L6E CSSR ST4 code bias ----------------------------------*/
 static int decode_mcssr_cb(mcssr_t* mc, ssr_t* ssr, int i, int apply) {
-    int j, k, sync, iod, ep, sat, nsig, mask, cb, flg;
+    int j, k, sync, iod, ep, sat, nsig, mask, cb, flg, code;
     int vcbias[MAXCODE] = {0};
     double udint, cbias[MAXCODE];
     char satid[8];
@@ -516,7 +536,9 @@ static int decode_mcssr_cb(mcssr_t* mc, ssr_t* ssr, int i, int apply) {
         satno2id(sat, satid);
         nsig = mc->nsig[mc->gidlist[j]];
         mask = 1 << (nsig - 1);
-        for (k = 0; k < nsig; k++) {
+        /* advance the mask in the loop header: the skips below must not leave it
+         * on the current cell (upstream mdccssr.c re-reads it for a sparse mask) */
+        for (k = 0; k < nsig; k++, mask >>= 1) {
             if ((flg = (mc->cellmask[j] & mask))) {
                 cb = getbits(mc->buff, i, 11);
                 i += 11; /* Code Bias */
@@ -527,18 +549,21 @@ static int decode_mcssr_cb(mcssr_t* mc, ssr_t* ssr, int i, int apply) {
                     continue; /* unsupprted sat */
                 }
 
-                cbias[mc->siglist[mc->gidlist[j]][k] - 1] = cb * 0.02;
-                vcbias[mc->siglist[mc->gidlist[j]][k] - 1] = 1; /* 1:output */
+                code = mcssr_sigcode(mc, mc->gidlist[j], sat, k);
+                if (code <= 0) {
+                    continue; /* undefined signal */
+                }
+                cbias[code - 1] = cb * 0.02;
+                vcbias[code - 1] = 1; /* 1:output */
 
                 if (cb == MCSSR_INVALID_11BIT) { /* invalid value */
-                    cbias[mc->siglist[mc->gidlist[j]][k] - 1] = SSR_INVALID_CBIAS;
+                    cbias[code - 1] = SSR_INVALID_CBIAS;
                     trace(NULL, 3, "decode_mcssr_cb: invalid cbias %s %s %s\n", time_str(mc->gt, 3), satid,
-                          code2obs(mc->siglist[mc->gidlist[j]][k]));
+                          code2obs(code));
                 }
             }
-            mask >>= 1;
         }
-        if (apply) {
+        if (apply && sat > 0) { /* sat 0 (unsupported): cells read above, nothing to store */
             ssr[sat - 1].t0[4] = mc->gt;
             ssr[sat - 1].udi[4] = udint;
             ssr[sat - 1].iod[4] = iod;
@@ -554,7 +579,7 @@ static int decode_mcssr_cb(mcssr_t* mc, ssr_t* ssr, int i, int apply) {
 
 /* decode MADOCA-PPP L6E CSSR ST5 phase bias ---------------------------------*/
 static int decode_mcssr_pb(mcssr_t* mc, ssr_t* ssr, int i, int apply) {
-    int j, k, sync, iod, ep, sat, nsig, mask, pb, di, flg;
+    int j, k, sync, iod, ep, sat, nsig, mask, pb, di, flg, code;
     int discnt[MAXCODE] = {0}, vpbias[MAXCODE] = {0};
     double udint, pbias[MAXCODE];
     char satid[8];
@@ -583,7 +608,9 @@ static int decode_mcssr_pb(mcssr_t* mc, ssr_t* ssr, int i, int apply) {
         satno2id(sat, satid);
         nsig = mc->nsig[mc->gidlist[j]];
         mask = 1 << (nsig - 1);
-        for (k = 0; k < nsig; k++) {
+        /* advance the mask in the loop header: the skips below must not leave it
+         * on the current cell (upstream mdccssr.c re-reads it for a sparse mask) */
+        for (k = 0; k < nsig; k++, mask >>= 1) {
             if ((flg = (mc->cellmask[j] & mask))) {
                 pb = getbits(mc->buff, i, 15);
                 i += 15; /* Phase Bias */
@@ -597,17 +624,20 @@ static int decode_mcssr_pb(mcssr_t* mc, ssr_t* ssr, int i, int apply) {
                     continue; /* unsupprted sat */
                 }
 
-                pbias[mc->siglist[mc->gidlist[j]][k] - 1] = pb * 0.001;
-                vpbias[mc->siglist[mc->gidlist[j]][k] - 1] = 1; /* 1:output */
-                discnt[mc->siglist[mc->gidlist[j]][k] - 1] = di;
+                code = mcssr_sigcode(mc, mc->gidlist[j], sat, k);
+                if (code <= 0) {
+                    continue; /* undefined signal */
+                }
+                pbias[code - 1] = pb * 0.001;
+                vpbias[code - 1] = 1; /* 1:output */
+                discnt[code - 1] = di;
 
                 if (pb == MCSSR_INVALID_15BIT) { /* invalid value */
-                    pbias[mc->siglist[mc->gidlist[j]][k] - 1] = SSR_INVALID_PBIAS;
+                    pbias[code - 1] = SSR_INVALID_PBIAS;
                 }
             }
-            mask >>= 1;
         }
-        if (apply) {
+        if (apply && sat > 0) { /* sat 0 (unsupported): cells read above, nothing to store */
             ssr[sat - 1].t0[5] = mc->gt;
             ssr[sat - 1].udi[5] = udint;
             ssr[sat - 1].iod[5] = iod;
@@ -742,8 +772,27 @@ extern int decode_qzss_l6emsg(rtcm_t* rtcm) {
         _mcssr[_mcssr_ch].prn_chk_cnt = 0;
     }
 
+    /* a frame lost before a frame that continues a message (RS failure or
+     * input loss) would shift the bits of the message: discard it and wait
+     * for the next subframe indicator. Every message starts with one, and
+     * QZNMA frames on the same PRN fall between messages (#363) */
+    if (_mcssr[_mcssr_ch].ftag > 0.0) {
+        double dt = _mcssr[_mcssr_ch].ftag - _mcssr[_mcssr_ch].ftag_last;
+        if (!si && _mcssr[_mcssr_ch].ftag_last > 0.0 && (dt <= 0.0 || dt > 1.5) && !_mcssr[_mcssr_ch].skip) {
+            trace(NULL, 2, "decode_qzss_l6emsg : %s,frame gap dt=%.3f s, message discarded prn=%d frame=%d\n",
+                  time_str(_mcssr[_mcssr_ch].gt, 3), dt, prn,
+                  _mcssr[_mcssr_ch].maxframe > 0 ? _mcssr[_mcssr_ch].frame : 0);
+            _mcssr[_mcssr_ch].maxframe = 0;
+            _mcssr[_mcssr_ch].skip = 1;
+        }
+        _mcssr[_mcssr_ch].ftag_last = _mcssr[_mcssr_ch].ftag;
+        _mcssr[_mcssr_ch].ftag = 0.0;
+    }
     if (si == 1) {
         _mcssr[_mcssr_ch].maxframe = 0; /* Subframe Indicator : First Data */
+        _mcssr[_mcssr_ch].skip = 0;
+    } else if (_mcssr[_mcssr_ch].skip) {
+        return 0;
     }
 
     /* frame recognition */
@@ -884,6 +933,9 @@ extern void set_mcssr_ch(int ch) {
 }
 extern int get_mcssr_ch(void) { return _mcssr_ch; }
 
+/* set receiver time tag of the next L6E frame (current channel) ------------*/
+extern void set_mcssr_ftag(double tag) { _mcssr[_mcssr_ch].ftag = tag; }
+
 /* initialize MADOCA-PPP CSSR control ----------------------------------------
  * initialize MADOCA-PPP CSSR control struct for current channel
  * args   : gtime_t *gt   I    GPST for week number determination
@@ -895,6 +947,8 @@ extern void init_mcssr(const gtime_t gt) {
     _mcssr[_mcssr_ch].prn = -1;   /* invalid value */
     _mcssr[_mcssr_ch].tow0 = -1;  /* invalid value */
     _mcssr[_mcssr_ch].frame = 0;  /* initial value */
+    _mcssr[_mcssr_ch].ftag = _mcssr[_mcssr_ch].ftag_last = 0.0;
+    _mcssr[_mcssr_ch].skip = 0;
 }
 
 /* stack QZSS L6E message ----------------------------------------------------

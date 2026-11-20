@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* nominal L6 PRN assignments (see l6_prn_info_t). MADOCA iono regions:
  * PRN 200 Philippines/Indonesia/western Australia, PRN 201 Japan/eastern
@@ -96,33 +97,64 @@ extern int l6_service_expected(const l6_header_t* h) {
     return h->svc == info->svc;
 }
 
+extern l6_file_type_t l6_file_type(const char* file) {
+    static const char* const ext[] = {".l6", ".l6d", ".l6e"};
+    const char* p = strrchr(file, '.');
+    size_t i, k;
+
+    if (!p) {
+        return L6_FILE_NONE;
+    }
+    for (i = 0; i < sizeof(ext) / sizeof(ext[0]); i++) {
+        for (k = 0; p[k] && ext[i][k]; k++) {
+            char c = p[k] >= 'A' && p[k] <= 'Z' ? (char)(p[k] - 'A' + 'a') : p[k];
+            if (c != ext[i][k]) break;
+        }
+        if (!p[k] && !ext[i][k]) {
+            return (l6_file_type_t)(L6_FILE_L6 + i);
+        }
+    }
+    return L6_FILE_NONE;
+}
+
 extern l6_service_t l6_file_service(const char* file) {
     l6_service_t svc = L6_SVC_UNKNOWN;
     l6_header_t hdr;
     uint8_t* buf;
     FILE* fp;
-    size_t n, i;
+    size_t n, i, keep;
 
     if (!(fp = fopen(file, "rb"))) {
         return L6_SVC_UNKNOWN;
     }
-    if (!(buf = (uint8_t*)malloc(L6_FILE_SCAN_BYTES))) {
+    if (!(buf = (uint8_t*)malloc(L6_FILE_SCAN_BYTES + L6_FRAME_LEN))) {
         fclose(fp);
         return L6_SVC_UNKNOWN;
     }
-    n = fread(buf, 1, L6_FILE_SCAN_BYTES, fp);
-    fclose(fp);
-
-    for (i = 0; i + L6_FRAME_LEN <= n; i++) {
-        if (!l6_parse_header(buf + i, &hdr)) {
-            continue;
+    /* read in chunks until the first classifiable frame or the end of the
+     * file: a long run of null messages must not hide the service. "keep"
+     * bytes of the previous chunk are carried over so a frame that straddles
+     * two chunks is still seen. */
+    keep = 0;
+    while (svc == L6_SVC_UNKNOWN && (n = fread(buf + keep, 1, L6_FILE_SCAN_BYTES, fp)) > 0) {
+        n += keep;
+        for (i = 0; i + L6_FRAME_LEN <= n; i++) {
+            if (!l6_parse_header(buf + i, &hdr)) {
+                continue;
+            }
+            if (hdr.svc != L6_SVC_NULL && hdr.svc != L6_SVC_UNKNOWN) {
+                svc = hdr.svc;
+                break;
+            }
+            i += L6_FRAME_LEN - 1; /* null / reserved frame: skip to the next one */
         }
-        if (hdr.svc != L6_SVC_NULL && hdr.svc != L6_SVC_UNKNOWN) {
-            svc = hdr.svc;
+        if (svc != L6_SVC_UNKNOWN) {
             break;
         }
-        i += L6_FRAME_LEN - 1; /* null / reserved frame: skip to the next one */
+        keep = n - i < L6_FRAME_LEN ? n - i : 0; /* partial frame at the end */
+        memmove(buf, buf + n - keep, keep);
     }
+    fclose(fp);
     free(buf);
     return svc;
 }

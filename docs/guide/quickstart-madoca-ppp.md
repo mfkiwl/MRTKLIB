@@ -29,8 +29,8 @@ tar xzf tests/data/madocalib/madocalib_testdata.tar.gz -C tests/data/madocalib/
 | Antenna model (`.atx`) | `files.receiver_atx` | Receiver/satellite antenna phase center model |
 
 !!! note "ANTEX File: IGS20 for MADOCA"
-    Unlike CLAS (which requires IGS14), MADOCA-PPP uses the **IGS20/ITRF2020**
-    reference frame. Use `igs20.atx` for antenna corrections.
+    MADOCA-PPP uses the **IGS20/ITRF2020** reference frame. Use `igs20.atx` for
+    antenna corrections.
 
 ### Optional Files (for PPP-AR)
 
@@ -95,6 +95,10 @@ Key differences from basic PPP:
 - `ambiguity_resolution.mode = "continuous"` — AR enabled
 - `ionosphere = "est-stec"` — Slant TEC estimation (better than dual-freq for AR)
 - `systems` includes all 5 constellations (GPS, GLONASS, Galileo, QZSS, BeiDou)
+- `bds2_sats = ["C01-C18"]` / `bds3_igso_sats = ["C38-C40"]` — the sample data
+  predates the April 2026 BeiDou PRN reassignment. For your own data after
+  2026-04-21 use `bds2_sats = ["C09", "C10"]` and remove `bds3_igso_sats`; see
+  [BeiDou PRN Reassignment](beidou-prn-reassignment.md)
 
 **Expected accuracy:** Centimeter-level after convergence (Q=1 Fix).
 
@@ -197,8 +201,8 @@ ura_ratio = 0.1
 | **Signal** | QZSS L6E | QZSS L6D |
 | **Convergence** | 10-30 minutes | 1-2 minutes |
 | **Accuracy (converged)** | cm-level (PPP-AR) | cm-level |
-| **Reference frame** | ITRF2020 (IGS20) | ITRF2014 (IGS14) |
-| **ANTEX file** | `igs20.atx` | `igs14.atx` |
+| **Reference frame** | ITRF2020 (IGS20) | ITRF2020 (IGb20) |
+| **ANTEX file** | `igs20.atx` | `igs14_L5copy.atx` (igs20-based) |
 | **Grid files needed** | No | Yes (Japan grid) |
 | **ISB table needed** | No | Yes |
 

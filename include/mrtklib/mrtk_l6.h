@@ -44,7 +44,7 @@ extern "C" {
 #define L6_RAW_LEN 250           /* frame length with R-S parity (bytes) */
 #define L6_HEADER_BITS 49        /* preamble + PRN + type ID + alert (bits) */
 #define L6_DATA_BITS 1695        /* data part (bits) */
-#define L6_FILE_SCAN_BYTES 65536 /* bytes scanned by l6_file_service() */
+#define L6_FILE_SCAN_BYTES 65536 /* read chunk of l6_file_service() */
 
 #define L6_VID_MADOCA 2 /* vendor ID 010b: MADOCA-PPP (L6D and L6E) [3] */
 #define L6_VID_QZNMA 3  /* vendor ID 011b: QZNMA (L6E only) [3] */
@@ -138,6 +138,21 @@ const l6_prn_info_t* l6_prn_info(int prn);
  */
 int l6_service_expected(const l6_header_t* h);
 
+/** @brief QZSS L6 file type from the file name extension. */
+typedef enum {
+    L6_FILE_NONE = 0, /**< not an L6 file */
+    L6_FILE_L6,       /**< ".l6" (legacy: CLAS L6D or MADOCA-PPP L6E) */
+    L6_FILE_L6D,      /**< ".l6d" */
+    L6_FILE_L6E       /**< ".l6e" */
+} l6_file_type_t;
+
+/**
+ * @brief Classify a file name by its QZSS L6 extension (case-insensitive).
+ * @param[in] file  File path or name.
+ * @return L6 file type, L6_FILE_NONE if the extension is not .l6/.l6d/.l6e.
+ */
+l6_file_type_t l6_file_type(const char* file);
+
 /**
  * @brief Service of an L6 frame file, from the first non-null frame header.
  *
@@ -147,7 +162,9 @@ int l6_service_expected(const l6_header_t* h);
  *
  * @param[in] file  File path (no keyword expansion).
  * @return Service, or L6_SVC_UNKNOWN if the file cannot be read or holds no
- *         classifiable frame in its first L6_FILE_SCAN_BYTES bytes.
+ *         classifiable frame. The file is read in L6_FILE_SCAN_BYTES chunks
+ *         until the first classifiable frame, so a leading run of null
+ *         messages of any length is skipped.
  */
 l6_service_t l6_file_service(const char* file);
 

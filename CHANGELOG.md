@@ -7,6 +7,1397 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.7.18] - 2026-11-20
+
+**CLAS remnants and claslib 0.9.x alignment.** The VRS-RTK engine selects
+the frequency pair per system as claslib 0.9.0 does: `qzs_frequency` takes
+effect, and `l1+l2+l5` uses the third frequency
+([#346](https://github.com/h-shiono/MRTKLIB/issues/346),
+[#534](https://github.com/h-shiono/MRTKLIB/issues/534)). `mrtk ssr2obs` builds
+QZS L1C + L5 VRS observations (2025/022: fix 99.86 %, 2D 95 % 4.52 cm,
+claslib 0.9.1 99.83 % / 4.97 cm)
+([#349](https://github.com/h-shiono/MRTKLIB/issues/349)). PPP-RTK keeps its
+states across a correction gap of up to 5 s (4.9-day RT replay: fix
+93.91 → 96.10 %, misfix > 0.3 m 2511 → 1605)
+([#389](https://github.com/h-shiono/MRTKLIB/issues/389)), and CLAS applies
+satellite health and the SNR mask as claslib does. `mrtk post` accepts several
+L6D files per CLAS channel. In real time, epochs with no rover observations are
+skipped, and an RTCM3 rover no longer loses the CLAS corrections after 60 s.
+Fixes in the input decoders: u-blox and RTCM3 MSM half-cycle flags in RTK,
+the LLI of a blank RINEX phase, RINEX 3.05 GLONASS records, SBF QZSS J08–J10,
+and QZS-1R / QZS-6 no longer excluded as unhealthy. IGS PPP: Bias-SINEX is
+read with `-ts` alone, and Galileo-only runs start. The unit tests run with
+`assert()` enabled. New dataset `rtksvr_empty-v1`. No ABI change.
+
+### CLAS VRS-RTK (claslib 0.9.0)
+
+- **Frequency pair selected per system**
+  ([#346](https://github.com/h-shiono/MRTKLIB/issues/346)). The VRS-RTK
+  engine (`src/pos/mrtk_vrs.c`) kept the claslib selection from before 0.9.0:
+  it read `gps_frequency` (`posopt[10]`) for every system and always took slot
+  2 for Galileo. `udion()` and `zdres_sat()` now call `clas_osr_selfreqpair()`,
+  the selection of claslib 0.9.0 `rtkvrs.c` / `cssr2osr.c`. QZS follows
+  `qzs_frequency` (`posopt[12]`) and no longer `gps_frequency`. A rover with
+  Galileo E1 but no E5a keeps its Galileo ionosphere state instead of
+  re-initializing it on every epoch. Two deviations from upstream: `udion()`
+  skips a satellite with no observation in the epoch, as the PPP-RTK `udion()`
+  does, and `zdres_sat()` falls back to slot 1 for Galileo when slot 2 is
+  empty. With both options unset (all bundled configurations) the output is
+  byte-identical. With `qzs_frequency = "l1+l5"` on 2019/239: QZS on L1 + L5,
+  fix 99.86 %, 2D 95 % 3.35 cm (default 3.51 cm). New
+  `claslib_vrs_rtk_qzs_l1l5` with `_check` and `_gps_check`.
+- **`l1+l2+l5` uses the third frequency in VRS-RTK**
+  ([#534](https://github.com/h-shiono/MRTKLIB/issues/534)). An MRTKLIB-only
+  fallback in `zdres_sat()` read the slot bitmask as an index (`obs->L[qj]`).
+  `l1+l2+l5` (mask 3) read the empty slot 3 and always ran as L1 + L2, and
+  `l1+l5` used L2 for a satellite without L5, where claslib runs it on L1
+  alone. The fallback is removed. Bundled configurations are byte-identical
+  (it never triggered). 2019/239 with `l1+l2+l5`: 2D 95 % 4.37 → 5.21 cm,
+  which is the upstream behaviour of the option; the default stays L1 + L2.
+  New `claslib_vrs_rtk_l1l2l5` and `claslib_vrs_rtk_gps_l1l5` with `_check`.
+- **QZS L1C + L5 VRS from `mrtk ssr2obs`**
+  ([#349](https://github.com/h-shiono/MRTKLIB/issues/349)). In the SSR2OSR
+  modes (`ssr2obs`, `cssr2rtcm3`, `mrtk ssr2osr`) the signal index is the
+  j-th CSSR signal of the satellite, not a frequency slot, as in upstream
+  `CSSR2OSR_VRS`. The port had merged that path into the PPP-RTK one. On
+  2025/022 (QZS sends L1C/A, L1C, L2C and L5), QZS came out as L1C/A + L2C
+  without L5, GPS L5 was missing on every dataset, and the carrier phase of
+  QZS was NaN in 1,488 values of the hour (`clas_osr_compensatedisp()` took
+  the wavelength by frequency number, so a satellite with two L1 signals got
+  `1 - fi^2 = 0`). The signal loops now run over the satellite's CSSR
+  signals, the wavelength ratio follows the signal order, and one L1 signal
+  is output with the SSR ionosphere compensation (claslib 0.9.0 `getL1idx`:
+  L1C/A, or L1C with `-JL1X`). The `ssr2obs` RINEX header lists the codes of
+  every satellite in the corrections, not those of the first output epoch, so
+  a satellite missing at the start is still written. New configurations
+  `conf/claslib/ssr2obs_L1CL5.toml` and `conf/claslib/rnx2rtkp_L1CL5_vrs.toml`.
+  2025/022, 1 h, `ssr2obs` → VRS-RTK, against GSI F5 (TSUKUBA3): fix 99.86 %,
+  2D 95 % 4.52 cm (claslib 0.9.1: 99.83 %, 4.97 cm), 3D RMS to the upstream
+  solution 4.67 cm. `cssr2rtcm3` on `clas_l6gap` is byte-identical, and
+  `mrtk ssr2osr` 2019/239 is identical. The bundled 2019/239 `ssr2obs` →
+  VRS-RTK case now has GPS L5 and the Galileo compensation: 3D RMS to upstream
+  5.33 → 4.87 cm (tolerance 0.20 m unchanged). 10 new tests
+  (`claslib_ssr2obs_l1cl5`, `_l1ca`, `_l1cl5_latesat`, `claslib_vrs_rtk_l1cl5`
+  and their checks). **New tolerances:** parity with upstream 0.10 m (as the
+  other VRS parity checks), absolute 0.085 m. New test files
+  `ref_L6_L1CL5_VRS.nmea` (587 KB) and `brdc_0627022Q.nav` (36 KB), rebuilt by
+  `tests/data/claslib/generate_reference_l1cl5_vrs.sh` from claslib 0.9.1. The
+  remaining parity gap (4.67 cm, against 2.3–3.2 cm for the other VRS cases)
+  is an ambiguity-resolution divergence in the last 20 minutes of the dataset,
+  tracked in [#538](https://github.com/h-shiono/MRTKLIB/issues/538).
+
+### CLAS PPP-RTK and CSSR decoding
+
+- **PPP-RTK states kept across short correction gaps**
+  ([#389](https://github.com/h-shiono/MRTKLIB/issues/389)). When the CLAS
+  corrections dropped out for a few epochs while the rover still had
+  observations (for example at an L6 handover), `ppp_rtk_pos()` counted every
+  carrier as an outage and ran the reset-on-failure of claslib `ppprtk.c`, so
+  the filter re-converged from scratch. Within 5 s (`CLAS_GAP_BRIDGE`) of the
+  last measurement update, the outage counters of the observed carriers are
+  now restored and the reset is skipped. Longer gaps are unchanged, and the
+  status during the gap is unchanged. The 26 claslib post-processing outputs
+  are byte-identical (without the 5 s limit, 14 changed and the F9P case
+  misfixed). `mcla_a` RT handover: non-fix 82 → 14 epochs, fix 90.4 →
+  98.4 %, gate tightened to `--max-nonfix 30`. 4.9-day RT replay (416,004
+  epochs): `l6_merge = 1` fix 93.91 → 96.10 %, misfix > 0.3 m 2511 → 1605;
+  `l6_merge = 0` 93.78 → 95.86 %, 1835 → 1547. The remaining `mcla_a` epochs
+  are 2 Single ([#416](https://github.com/h-shiono/MRTKLIB/issues/416) policy)
+  and 11 s of Float from ambiguity-resolution acceptance (#394). The other
+  handover cases (`d9c_m`, `d9c_s`) are unchanged.
+- **`l6_merge = 1` keeps fix after a single-channel pattern change**
+  ([#390](https://github.com/h-shiono/MRTKLIB/issues/390)). When the old
+  pattern's channel went silent, `clas_clear_current()` zeroed its facility,
+  and `check_same_fac()` then compared facility 0 with the new channel's,
+  found them different and re-initialized the phase biases of every satellite
+  that changed channel. A channel without corrections in the epoch now takes
+  its last known facility, as the stale `CurrentCSSR` entry does in claslib.
+  `mcla_e_merge` RT handover: non-fix 5 → 0, gate tightened to 30 s / 10. The
+  4.9-day replay and the `l6_merge` post-processing case are unchanged.
+- **Satellite health in `clas_osr_zdres()`**
+  ([#285](https://github.com/h-shiono/MRTKLIB/issues/285)). A satellite was
+  rejected only without an ephemeris, so an unhealthy satellite that CSSR
+  still corrected was used in PPP-RTK and written by VRS / `ssr2obs`. The
+  health half of claslib `satsigexclude()` is ported as
+  `clas_osr_healthexclude()`: `svh != 0` excludes a non-QZS satellite. For
+  QZS, bits 0x20 (L1), 0x08 (L2C) and 0x04 (L5) remove that signal, chosen by
+  the band of the observation code because MRTKLIB orders the QZS slots
+  L1 / L5 / L2 (claslib L1 / L2 / L5). Force-included satellites
+  (`excluded_sats = ["+Gnn"]`) skip the check. No bundled data reaches the
+  check with a non-zero effect, so all references are unchanged. New
+  `utest_clas_health` and `claslib_ppp_rtk_health_gate` (health injected into
+  a copy of the navigation file at test time).
+- **SNR mask in SNR_UNIT on the CLAS PPP-RTK and VRS paths**
+  ([#479](https://github.com/h-shiono/MRTKLIB/issues/479)). The CLAS OSR and
+  VRS mask checks scaled `obsd_t.SNR` by claslib's 0.25 dBHz. MRTKLIB decoders
+  store `SNR_UNIT` (0.001 dBHz), so 45 dBHz was tested as ~11,250 dBHz and the
+  mask never rejected a satellite. Bundled outputs are byte-identical (their
+  masks reject nothing on this data). With a 45 dBHz rover mask on 2019/239,
+  the mean VRS satellite count goes 10.64 → 7.52. New
+  `claslib_ppp_rtk_snrmask` and `claslib_vrs_rtk_snrmask` with `_check`.
+- **SSR ionosphere compensation with two L1 signals**
+  ([#345](https://github.com/h-shiono/MRTKLIB/issues/345)). With
+  `iono_compensation = "ssr"` and a CSSR mask holding QZS L1C/A and L1C,
+  `clas_osr_compensatedisp()` divided by `1 - fi^2 = 0` and dropped the
+  satellite on a NaN. The L1–L1 pair is skipped, as claslib 0.9.0 does.
+  2025/022 L1C + L5: J03 used in 20 → 3375 of 3600 epochs, 2D 95 % 4.94 →
+  4.74 cm. All bundled configurations use `"meas"` and are unchanged. New
+  `claslib_ppp_rtk_l1cl5_iono_ssr` with `_check`.
+- **CSSR ST1 mask bounded**
+  ([#276](https://github.com/h-shiono/MRTKLIB/issues/276)). `decode_cssr_mask()`
+  did not check the mask: more than 64 satellites wrote past `cellmask[]` and
+  past the stack array of every ST2–ST12 decoder, a GNSS ID given twice
+  misaligned `cellmask[]`, and a satellite without a number indexed
+  `dec_ssr[-1]`. Such a mask is now dropped whole (IOD invalidated, rest of
+  the subframe skipped) with a trace level 1 message, and `svmask2sat()` is
+  capped at `CSSR_MAX_SV`. `mrtk dump --parse` applies the same check. Real
+  CLAS streams are unaffected. New `utest_clas_mask`.
+- **No crash when the selected CLAS grid count drops**
+  ([#481](https://github.com/h-shiono/MRTKLIB/pull/481), contributed by
+  @hal1278). `output_selected_grid()` compared the grid identifiers up to the
+  previous selection count, so a smaller selection read an uninitialized
+  entry of `gridindex` (segmentation fault in `mrtk post`). The comparison now
+  runs only when both counts are equal. Positioning is unchanged.
+
+### Real time
+
+- **Rover epochs with no observations skipped**
+  ([#382](https://github.com/h-shiono/MRTKLIB/issues/382)). `mrtk run` called
+  `rtkpos()` with `n = 0` for a rover epoch that decoded with no observations
+  (an SBF MeasEpoch during a ~50 s signal blockage). `rtkpos()` read a stale
+  `obs[0]` and the solution was written again under the previous epoch's
+  time: 51 GGA at the same time. These epochs are now skipped, as `mrtk post`
+  does, and nothing is written during the gap. New `rtkrcv_rt_empty_epoch`
+  with `_check` (port 52022) on the new dataset `rtksvr_empty-v1`
+  (`FUET284f_200s.sbf`, 352 KB).
+- **CLAS L6 paths on the rover's own clock**
+  ([#365](https://github.com/h-shiono/MRTKLIB/issues/365)). `decoderaw()` read
+  the rover time from `raw[0]`, but an RTCM2/3 rover decodes into `rtcm[0]`,
+  so with an RTCM3 rover the clock stayed at the start time. The 60 s rate
+  limit of `STRFMT_CLAS` then held the L6 frames once they ran 60 s ahead and
+  the corrections aged out. The rate limit, the two CLAS week anchors and the
+  handover demux now take the clock by rover format (`rtcm[0]` for RTCM2/3,
+  `raw[0]` otherwise). 2019/239 CLAS RT replay with the rover as RTCM3 MSM7:
+  fix 55 → 3553 epochs, 2D 95 % 122 → 4.56 cm (BINEX rover: 4.55 cm). Raw
+  rovers are unchanged. New `rtkrcv_rt_clas_rtcm3` with `_abs_check` (port
+  52023; the RTCM3 rover is converted from the bundled BINEX at test time).
+  The MADOCA part of the issue is left to
+  [#359](https://github.com/h-shiono/MRTKLIB/issues/359).
+
+### Post-processing
+
+- **Several CLAS L6D files per channel**
+  ([#373](https://github.com/h-shiono/MRTKLIB/issues/373)). `mrtk l6extract`
+  writes one file per L6 PRN (#362), so a channel that hands over from one QZS
+  to another is split over two files, and `mrtk post` silently used only one
+  file per channel. It now pre-scans the files (`src/clas/mrtk_clas_l6seq.c`)
+  and builds the channels from their contents: with `l6_merge = 1` one channel
+  per transmit pattern in order of first appearance, as the RT demux does;
+  with `l6_merge = 0` all files go to channel 0. Within a channel the files
+  are read by 30 s CSSR block in time order, and blocks that would step back
+  in time are skipped. The new grouping applies with more than two CLAS
+  files, two files of one pattern, or `l6_merge = 0` with two or more files;
+  otherwise file i still goes to channel i. Unused files give a warning. The
+  files of one run must span less than 3.5 days (ST1 carries only the time of
+  week). New `utest_clas_l6seq` and `post_handover_*_prn` (five cases,
+  byte-identical to the concatenated-channel runs).
+- **Bias-SINEX and FCB loaded for every `-ts` / `-te` combination**
+  ([#475](https://github.com/h-shiono/MRTKLIB/issues/475), reported by
+  @badaboom). `postpos()` set the `.bia` / `.fcb` paths only when both `-ts`
+  and `-te` were given. With `-ts` alone or no time limits, IGS PPP-AR loaded
+  no phase bias and never fixed, with no message. Upstream MALIB has the same
+  gap (fixed in v1.3.0). `igs_pppar_ge` with `-ts` only: Q=1 epochs 0 → 77, as
+  with both limits. New `igs_pppar_ge_tsonly` with `_check`.
+- **IGS PPP without GPS**
+  ([#476](https://github.com/h-shiono/MRTKLIB/issues/476), reported by
+  @badaboom). With precise ephemerides, `udclk_ppp()` initialized every
+  receiver clock state from the SPP GPS clock term, which is ~0 when SPP uses
+  no GPS satellite. On a receiver with a large clock bias every measurement
+  was then rejected and no epoch was written (Galileo-only, or any set of
+  systems without GPS). The clock now comes from the GPS term plus the
+  inter-system term when SPP used no satellite of the reference group, as the
+  broadcast / SSR branch already does. GPS-only and mixed runs are
+  byte-identical. ECJ02 (u-blox, clock ~43 ms) Galileo-only: 0 → 119 of 119
+  epochs. New `igs_iflc_ppp_gal` with `_check` and the overlay
+  `conf/igs/rnx2rtkp_iflc_galileo.toml`. **New tolerance: 0.25 m** (measured
+  3D 1σ 8.1 cm, 95 % 15.0 cm).
+
+### Fixed
+
+- **QZS-1R / QZS-6 no longer excluded as unhealthy**
+  ([#512](https://github.com/h-shiono/MRTKLIB/issues/512),
+  [#485](https://github.com/h-shiono/MRTKLIB/issues/485)). `satexclude()`
+  ignored only QZS LNAV health bit 0, which it called LEX health. In
+  IS-QZSS-PNT-006 bit 0 is L1C/B health and bit 4 is L1C/A health. The two
+  signals are broadcast exclusively, and the bit of the one not broadcast is 1,
+  so QZS-1R/6 (L1C/B) send 0x10 and were dropped from SPP, RTK, PPP and VRS.
+  As in MALIB v1.3.0, the bit is now ignored when exactly one of 0x01 / 0x10
+  is set. 0x11 and every other bit still exclude the satellite. Live
+  mosaic-G5 2026-07-05 (J04/J08 at 0x10), 1 h at 1 Hz: SPP GPS+QZS +2.0
+  satellites, 2D rms 1.19 → 1.07 m, U rms 1.36 → 1.12 m. QZS-only SPP 0 → 100 %
+  of epochs. MADOCA-PPP kinematic +1.0 satellite, converged accuracy unchanged.
+  Of the bundled regressions, only the `clas_l6gap` RT replays see a QZS at
+  0x10 (through the CLAS SPP seed), and their GGA output is identical. The
+  PPC data carries no 0x10. `claslib_ppp_rtk_health_gate` now requires an
+  injected 0x10 to leave the solution byte-identical. New `utest_qzs_health`.
+- **RTK: no more half-cycle slip on every epoch with raw u-blox observations**
+  ([#160](https://github.com/h-shiono/MRTKLIB/issues/160), upstream
+  [RTKLIB #673](https://github.com/tomojitakasu/RTKLIB/issues/673), reproduced
+  on F9P / F10N captures by @dj1711572002). `ssat[].slip[]` holds the slip and
+  half-cycle flags of the epoch in bits 0x03 and the previous LLI of the rover
+  and of the base in 0xC0 / 0x30. `detslp_ll()` ORed the whole observation LLI
+  into that byte. The u-blox RXM-RAWX decoder sets `LLI_HALFS` (0x80) on every
+  epoch while the receiver reports a half cycle subtracted from the phase. At
+  the rover or at the base, it was read back as a previous LLI of 2, so a
+  half-cycle slip was flagged and the ambiguity of that signal reset on every
+  epoch. For the same reason a change to `LLI_HALFC` under 0x80 flagged no
+  slip. Only `LLI_SLIP | LLI_HALFC` now reach the byte. This affects relative
+  positioning in `mrtk run` with raw u-blox input. The reporter's F10N capture
+  went from 0 to 1,326 fixed epochs of 1,800 (their measurement, the capture
+  is not in the repository). NovAtel `LLI_HALFA` (0x40) and the
+  RT17 encrypted-code bit (0x04) are kept out as well. They caused no slip in
+  forward processing. RINEX and BINEX input carry none of these bits, so
+  `mrtk post` is unchanged: on the six PPC RTK runs the fix status and
+  satellite count of every epoch are identical, and positions differ by at
+  most 1 mm (last printed digit), as two runs of the same binary do. New
+  `utest_rtk_lli`.
+- **RTCM3 MSM: half-cycle ambiguity indicator decoded as `LLI_HALFC`**
+  ([#531](https://github.com/h-shiono/MRTKLIB/issues/531)). For an MSM cell
+  with the indicator set, `save_msm_obs()` added 3 to the loss-of-lock flag.
+  The indicator alone gave LLI 3, a slip on every epoch while it stayed set.
+  With a loss of lock on the same epoch it gave LLI 4, which carries neither
+  flag, so the slip was left to the other detectors and RTK took the half
+  cycle as resolved. The LLI is now `LLI_SLIP` for a loss of lock ORed with `LLI_HALFC`
+  for the indicator, as in demo5 since 2019 (RTKLIB 2.4.3, MALIB, MADOCALIB
+  and claslib add 3). With MSM4 to MSM7 input:
+  - RTK no longer resets the ambiguity on every epoch of a signal with the
+    indicator set. It flags a slip when the indicator changes, in either
+    direction, and keeps the signal out of ambiguity resolution in between.
+  - PPP, PPP-RTK and VRS-RTK treat `LLI_HALFC` as a slip, as before, and now
+    also on the epoch where a loss of lock came with the indicator.
+  - SPP TDCP (opt-in, also the CLAS SPP seed) takes its slip mask from
+    `LLI_SLIP` alone. It no longer drops an L1 phase for the indicator alone
+    (the phase-rate check against Doppler still applies), and it now drops the
+    epoch where a loss of lock came with the indicator.
+  - `mrtk relay` re-encoding RTCM3 to RTCM3 no longer restarts the MSM lock
+    time on every epoch with the indicator set, and no longer drops both the
+    lock-time restart and the indicator when they coincide.
+  - `mrtk convert` writes RINEX LLI 2 / 3 where it wrote 3 / 4.
+
+  No RTCM3 file of the regression tests has the indicator set (466,900 MSM
+  cells), so their results do not change, and the effect on a receiver's own
+  MSM output is not measured. One hour of mosaic-G5 SBF had the half-cycle flag
+  alone on 19 of 723,416 phase observations and together with a slip on 4. New
+  `utest_msm_half_lli` (MSM4 to MSM7 encode / decode round trip).
+- **RINEX: the slip of a blank phase carried to the next valid phase**
+  ([#504](https://github.com/h-shiono/MRTKLIB/issues/504), reported by
+  @njkasdasd). `decode_obsdata()` dropped a blank field together with its
+  LLI. A receiver that flags a slip only on an epoch whose phase is empty and
+  writes the next phase with LLI 0 (Trimble Alloy 6.40 on QZSS L6) therefore
+  lost the slip in `mrtk post`. `LLI_SLIP` of a blank phase is now kept, and
+  `restslips()` holds it until the next valid phase of the same signal, as
+  `mrtk convert` already did. Of the bundled RINEX files only ECJ02 has such
+  slips, and `igs_iflc_ppp` is byte-identical (GF / MW detection caught them
+  on the same epoch). New `utest_t_rinex_lli`.
+- **RINEX 3.05 navigation files with 3-line GLONASS records**
+  ([#482](https://github.com/h-shiono/MRTKLIB/issues/482), reported by
+  @njkasdasd). `readrnxnavb()` took the GLONASS record length from the header
+  version alone. IGS `BRDC00IGS_R_20220600000_01D_MN.rnx` is labelled 3.05
+  but has the 3.04 layout, so the next record's epoch line was read as
+  BROADCAST ORBIT-4: every second record was lost and the GLONASS satellites
+  were marked unhealthy for the day. A 3.05 record now ends after three lines
+  when the next line starts with a satellite ID (or `>`), and the ORBIT-4
+  fields are set only when present. Conformant files are unchanged. New
+  `utest_t_rinex_glo305`.
+- **SNR mask with no C/N0 in the observations**
+  ([#477](https://github.com/h-shiono/MRTKLIB/issues/477), reported by
+  @badaboom). `testsnr()` compared `SNR = 0` (no C/N0: RINEX without `S`,
+  RTCM MSM1–3) with the mask as 0 dBHz, so with the mask on a rover RINEX
+  without `S` lost every satellite and `mrtk post` wrote no solution. An
+  unknown C/N0 is no longer masked, in `mrtk post` and `mrtk run`. `mrtk post`
+  prints a warning once when the mask is on and a receiver's observations
+  carry no C/N0. `07590920.05o` single with mask: 0 → 230 solutions. CLAS
+  PPP-RTK outputs are byte-identical; the 2025/157 2-channel VRS case uses
+  the observations with `SNR = 0` again (fix 98.86 → 99.86 %, 2D 95 % 8.11 →
+  8.02 cm). New `utest_t_snrmask`.
+- **SBF QZSS SVID 188–190 decoded as J08–J10**
+  ([#471](https://github.com/h-shiono/MRTKLIB/issues/471),
+  [#505](https://github.com/h-shiono/MRTKLIB/pull/505) contributed by
+  @hal1278). `svid2sat()` returned 0 for SVID 188–190, so the MeasEpoch,
+  QZSRawL1CA and QZSNav blocks of J08–J10 (QZS-6 among them) were dropped.
+  `mrtk convert -r sbf` of a 20 min mosaic-G5 capture now writes J08 and J09
+  (0 → 1185 epochs each). The `clas_l6gap` RT replays are byte-identical
+  (their CLAS corrections cover J02 / J03 only). New `utest_sbf_qzss_svid`
+  with two small SBF fixtures.
+
+### Tools
+
+- **CLAS antenna and ERP files can be regenerated**
+  ([#478](https://github.com/h-shiono/MRTKLIB/pull/478)). claslib 0.9.1
+  replaced `igs14_L5copy.atx` and `igu00p01.erp` without saying how they were
+  built. `scripts/tools/make_clas_atx.py` takes an `igs20` ANTEX and copies
+  G02 to G05 on 12 ground antennas (on `igs20_2437.atx` the output differs
+  from the claslib 0.9.1 file only by the satellite `BLOCK IIA` G01 entry,
+  left out on purpose). `scripts/tools/update_igu_erp.py` extends the
+  cumulative ERP with the 6-hourly ultra-rapid issues from BKG
+  (`--full` gives the 36,060 epochs of claslib 0.9.1; 5 rows that do not
+  follow the rule are documented). The provenance is in the new page
+  `docs/design/clas-support-files.md`. The bundled test files stay the claslib
+  0.9.0 versions (#358).
+
+### Tests
+
+- **CLAS RT replay L6 tags in step with the observations**
+  ([#515](https://github.com/h-shiono/MRTKLIB/issues/515)). The `.tag` files of
+  `rtkrcv_rt_clas`, `rtkrcv_rt_clas_2ch(_merge)` and `rtkrcv_rt_clas_sf1gap`
+  timed the L6 frames from the file name as a UTC hour, but the files start at
+  the GPST hour. The L6 stream therefore lagged the BINEX observations by 20 s
+  (2019/239), or by 18 s falling to 1 s over the hour (2025/157, from a
+  0.5 % tick scale), and the engine used clocks 22 s (2019) / 11 s (2025) old at
+  the median instead of 3 s. `gen_l6_tag.py` now takes each frame's time from
+  the CSSR ST1 epoch in the file, releases it at epoch + 1 s (as a receiver
+  does), and writes the tag on the master tag's timeline. `--sync-tag` is now
+  required. The `claslib_setup` fixture rebuilds the three tags of
+  `claslib_testdata.tar.gz`. New `rtkrcv_rt_clas_tag_sync_check` replays the
+  `strsync()` / `readfile()` timing offline
+  (`scripts/tests/check_l6_tag_sync.py`). Fix rate (the replays repeat
+  identically): `rt_clas` 98.19 → 98.72 %, `rt_clas_2ch` and `_2ch_merge`
+  98.89 → 99.36 %, epoch counts unchanged. With the tags in step, a lost
+  subframe 1 costs no Single in `rtkrcv_rt_clas_sf1gap` (19 s before), and 17 s
+  without the #406 fix, which the old 25 s gate let pass. `--max-single` is now
+  8 s. `gen_l6_tag.py` skips an ST1 whose TOW jumps back (or more than
+  a day ahead of its frames) instead of taking it as a week rollover, which
+  would delay every later frame by a week; the bundled tags are unchanged.
+- **`assert()`-based unit tests run with their asserts**
+  ([#277](https://github.com/h-shiono/MRTKLIB/issues/277),
+  [#509](https://github.com/h-shiono/MRTKLIB/pull/509) contributed by
+  @hal1278). The `t_*` unit tests check with `assert()`, which `-DNDEBUG`
+  removed in the default `RelWithDebInfo` preset: 300 asserts in 17 of 21
+  tests never ran. They are now compiled with `-UNDEBUG` (the library is not).
+  The four tests that then failed are fixed: `t_geoid` checks the embedded
+  model only (the file models are not in the repository, #507), `t_rinex4`
+  accepts BDS CNAV-1 IODC = IODE = 0, `t_rinex` expects 120 epochs
+  (`DTTOL` 0.025 s) and allocates its `nav_t` on the heap (clang builds
+  overflowed the 8 MiB stack), and `t_preceph` reads `igs20_trim.atx` from the
+  `igs_data` fixture.
+- **RT console ports** now run 52003–52023 (`rtkrcv_rt_empty_epoch` 52022,
+  `rtkrcv_rt_clas_rtcm3` 52023).
+- Suite: 220 → 271 tests.
+
+### Documentation
+
+- **CLAS SSR orbit / clock validity**
+  ([#416](https://github.com/h-shiono/MRTKLIB/issues/416)). New design page
+  `docs/design/clas-ssr-validity.md`. It records why CLAS keeps the 60 s
+  orbit / 60 s clock age limits and the upstream orbit / clock pairing,
+  rather than the IS-QZSS-L6 nominal validity (60 / 10 s) or the claslib
+  limits (240 / 120 s). It includes the correction change against age on two
+  clean hours (about 5 cm RMS at 60 s) and the probe of lossy streams. No
+  code change.
+- New design page `docs/design/clas-l6-multi-file.md` and a `docs/guide/cli.md`
+  section: several L6D files per CLAS channel (#373).
+  `docs/guide/configuration.md` lists the new L1C + L5 VRS configurations
+  (#349). `docs/reference/rtkrcv-clas-realtime.md` updated for the replay tag
+  timing (#515). `quickstart-clas.md`: refreshing the CLAS antenna / ERP files (#478); the
+  "CLAS requires IGS14" statements are removed from `quickstart-clas.md` and
+  `quickstart-madoca-ppp.md` (IS-QZSS-L6-008 defines ITRF2020).
+
+### API / ABI
+
+- **No ABI change.** No public struct changes layout.
+- **API:** new `clas_l6_scan_file()`, `clas_l6_free_file()`,
+  `clas_l6seq_build()`, `clas_l6seq_input()`, `clas_l6seq_free()` with
+  `clas_l6blk_t`, `clas_l6file_t`, `clas_l6seg_t`, `clas_l6seq_t`
+  (`mrtk_clas.h`, #373); `clas_osr_vrs_codes()` (`mrtk_clas.h`, #349);
+  `mrtk_claslib_qzs_l1_priority()` (`mrtk_obs.h`, #349).
+- **Behaviour:** `testsnr()` never masks an unknown C/N0 (`snr <= 0`);
+  `satexclude()` ignores the QZS health bit of the L1 signal that is not
+  broadcast.
+
+## [v0.7.17] - 2026-11-07
+
+**SouthPAN PVS.** `correction = "southpan-pvs"` runs float PPP with the PPP
+via SouthPAN corrections (DFMC L5 MT32 of GEO PRN 122) on GPS L1 C/A + L5 and
+Galileo E1 + E5a, in `mrtk post` and `mrtk run`
+([#418](https://github.com/h-shiono/MRTKLIB/issues/418)). With it MRTKLIB runs
+all five open satellite-broadcast PPP / PPP-RTK services (QZSS CLAS, QZSS
+MADOCA-PPP, Galileo HAS, BeiDou PPP-B2b, SouthPAN PVS) in post-processing and
+in real time; a new reference page lists their capabilities
+([#419](https://github.com/h-shiono/MRTKLIB/issues/419)). On ALBY (Albany)
+2025-08-21, last 20 min of one hour: kinematic 6.0 cm 2D / 12.6 cm U rms,
+static 8.0 / 6.4 cm. SBAS messages carry their band (L1 / L5) and SBF
+`GEORawL5` (4021) is decoded. Fixes: SBF `GALNav` F/NAV no longer overwrites
+the I/NAV ephemeris; in `mrtk run`, MADOCA or RTCM3 SSR no longer overwrites
+Galileo HAS / PPP-B2b corrections
+([#464](https://github.com/h-shiono/MRTKLIB/issues/464)); `[output]
+geoid_model` is read again (broken in v0.7.16). New dataset `southpan-v1`.
+No ABI break (`sbsmsg_t.band` uses a padding byte); new API `sbsmsgtype()`,
+`sbsupdatepvs()`.
+
+### SouthPAN PVS
+
+- **New correction source `southpan-pvs`**
+  ([#418](https://github.com/h-shiono/MRTKLIB/issues/418)): float PPP with
+  the PPP via SouthPAN corrections, the DFMC L5 MT32 messages of GEO PRN 122
+  with odd `tD/16`, on GPS L1 C/A + L5 (LNAV) and Galileo E1 + E5a (F/NAV), in
+  `mrtk post` and `mrtk run`. The ECEF orbit / clock corrections go to the SSR
+  store with vendor `SSR_VENDOR_PVS`. `satpos_ssr()` adds them without the
+  radial/along/cross rotation, accepts them for 100 s from reception and
+  removes the GPS TGD: the DFMC clock refers to the L1/L5 iono-free clock,
+  and without it GPS-only PPP on ALBY 2025-233 has a 5.7 m vertical bias.
+  `corr_meas()` applies no satellite bias. Needs
+  `satellite_ephemeris = "brdc+ssrapc"`, two frequencies and the GPS L1/L5 +
+  Galileo E1/E5a signal pairs. `brdc+ssrcom` is rejected: the corrected
+  broadcast orbit already refers to the antenna phase centre, so the
+  satellite antenna offset would be added twice. Ambiguity resolution, other
+  signal pairs, a single frequency and, in `mrtk post`, backward / combined
+  solutions (a correction is valid only after its reception) are rejected.
+  The PVS corrections own the SSR store: in `mrtk run` MADOCA or RTCM3 SSR on
+  the same streams is not applied, and `mrtk post` ignores `.rtcm3` and L6E
+  files with a warning. Only
+  PRN 122 is used: other DFMC GEOs (BDSBAS PRN 130/143/144 in Japan) send
+  MT32 for their own service.
+- **SBAS L5 messages.** `sbsmsg_t` gains `band` (`SBS_BAND_L1` /
+  `SBS_BAND_L5`) in its padding byte, so `sizeof` is unchanged. SBF
+  `GEORawL5` (4021) is decoded (raw return code 3, as `GEORawL1`).
+  `sbsmsgtype()` reads the L5 type at bit 4. `sbsoutmsg()` writes it to the
+  `.sbs` type column, so `mrtk convert -s` now also writes L5 messages, and the
+  `.sbs` reader marks a message L5 when the type column matches the L5 field
+  and not the L1 field, or matches both and the frame has no L1 preamble
+  (an L5 MT0 with bits 4–13 zero; cssrlib `*_sbas.txt` files read as well). L5 messages
+  never reach the L1 decoders (`sbsupdatecorr()` returns −1), and `mrtk post`
+  applies them from their reception time, independent of the L1 messages of
+  the same second. New `sbsupdatepvs()`.
+- **DAS logs:** `scripts/tests/das2sbs.py` converts SouthPAN Data Access
+  Service logs (SISNeT `*MSG` lines, SINCA) to `.sbs`. The DAS path is not
+  validated (#462) and a real-time DAS input is not implemented.
+- **Configurations:** `conf/pvs/ppp_southpan_pvs.toml` (post) and
+  `conf/pvs/run_southpan_pvs.toml` (real time). Guide
+  `docs/guide/quickstart-southpan-pvs.md`; design `docs/design/southpan-pvs.md`.
+- **Validation** (last 20 min of one hour vs the RINEX header position): ALBY
+  2025-233 h kinematic 6.0 cm 2D / 12.6 cm U rms, static 8.0 / 6.4 cm, 11.7
+  satellites. ALIC 2025-110 f (DAS log) ends about 1 m off in MRTKLIB and in
+  cssrlib; the reference positions agree with IGS SINEX to ~1 cm and
+  CODE-products PPP of the same observations ends within 0.17 m, so the offset
+  is in the DAS-logged corrections of that hour (#462).
+- **Tests:** `utest_pvs`; `pvs_sbs_check`, `pvs_ppp`, `rtkrcv_pvs` on
+  `g5p3_296u-v1` (Tokyo, out of the service area: pipeline only); new dataset
+  `southpan-v1` (ALBY / ALIC from cssrlib-data, MIT; SouthPAN data CC BY 4.0)
+  for `pvs_alby_kin`, `pvs_alby_static`, `pvs_alic_das2sbs`, `pvs_alic_kin`.
+
+### Fixed
+
+- **SBF `GALNav` (4002) F/NAV** is stored in ephemeris set 1, as
+  `GALRawFNAV` does. It used set 0 and overwrote the I/NAV ephemeris; `mrtk
+  convert` of a one-hour mosaic-G5 capture wrote 1 F/NAV record instead of 29.
+- **Galileo I/NAV and F/NAV records of one IODnav** are no longer merged by
+  the ephemeris de-duplication (`uniqeph()`) when they sort next to each
+  other, which dropped one of them. With both fixes the HAS and CLAS regression
+  outputs are bit-identical, and the MADOCA ones stay within their ≤ 6 mm
+  run-to-run variation (fix quality unchanged); tolerances unchanged.
+- **`mrtk run` with `correction = "gal-has"` or `"bds-b2b"`** no longer lets
+  MADOCA L6E SSR (UBX / SBF L6 frames, raw L6E stream) or RTCM3 SSR overwrite
+  the HAS / PPP-B2b corrections in `nav.ssr_ch[0]`
+  ([#464](https://github.com/h-shiono/MRTKLIB/issues/464)), as for SouthPAN
+  PVS. The L6 decoders deliver MADOCA frames whatever the correction source,
+  so one mosaic-G5 SBF stream logging GALRawCNAV and QZSRawL6E switched
+  satellites to MADOCA orbit / clock while the HAS biases were applied: a
+  one-hour HAS replay (G5P3 2026-286 p) ended −11.8 / −0.3 / −31.1 m dENU,
+  now −0.11 / −0.13 / −0.17 m, the same as the capture without its L6 blocks.
+  `mrtk post` now follows the same rule: with `gal-has`, `bds-b2b` or
+  `southpan-pvs` it ignores `.rtcm3` and L6E files with a warning, and reads
+  a `.has` file only with `gal-has` (as `.b2b` only with `bds-b2b`).
+- **`[output] geoid_model`** is read again. v0.7.16 defined the value list of
+  the new `bds_geo_sats` option under the same macro name as the geoid model
+  list (`GEOOPT`), so `geoid_model` was checked against the BeiDou GEO list:
+  every value was rejected with `TOML: invalid value for output.geoid_model`
+  and the default (`internal`) was used. The bundled configurations all set
+  `internal`, so their output is unchanged; `egm96`, `egm08_2.5`, `egm08_1`
+  and `gsi2000` take effect again.
+
+### Documentation
+
+- New reference page `docs/reference/correction-services.md`: capability
+  matrix of the open correction services (post / real time, modes,
+  constellations, receiver inputs, release history, regression tests)
+  ([#419](https://github.com/h-shiono/MRTKLIB/issues/419)), linked from the
+  README and the docs site.
+- README and docs home: the introduction names all five satellite-broadcast
+  services; "Key Architectural Overhauls" becomes "Changes from RTKLIB", with
+  the platform statement matched to what is tested (CI on Linux without the
+  real-time replays, full suite on macOS Apple Silicon); SouthPAN PVS no
+  longer listed as planned;
+  emoji removed from the README headings.
+- README: the build badge shows the `build.yaml` workflow status (it was a
+  static "success" image); the other open-source projects are linked; Known
+  Limitations covers Galileo HAS, BeiDou PPP-B2b and SouthPAN PVS; the
+  "Running Applications" commands run on the bundled CLAS sample; the
+  AI-assistance statement describes the actual process (Claude Code
+  `Co-Authored-By` trailers; the author reviews, tests and merges). The LP64
+  BLAS/LAPACK details move to the installation guide.
+
+### API / ABI
+
+- **No ABI break:** `sbsmsg_t` gains `band` in a padding byte; `sizeof`
+  is unchanged.
+- **API:** new `sbsmsgtype()`, `sbsupdatepvs()` (`mrtk_sbas.h`),
+  `SBS_BAND_L1` / `SBS_BAND_L5`, `SSR_VENDOR_PVS`, `CORR_SOUTHPAN_PVS`.
+
+## [v0.7.16] - 2026-11-06
+
+**BeiDou PPP-B2b.** `correction = "bds-b2b"` runs BeiDou-only float PPP with
+the PPP-B2b corrections of the BDS-3 GEOs, in `mrtk post` and `mrtk run`
+([#417](https://github.com/h-shiono/MRTKLIB/issues/417)). The GEOs are on
+C01–C04 since the April 2026 PRN reassignment (C59–C62 before) and are
+configured by the new `[positioning] bds_geo_sats`. In real time the B-CNAV1
+ephemeris the corrections refer to comes from SBF `BDSCNav1` (4251). The
+decoder takes one GEO stream at a time, because the GEOs send two streams
+with different IOD SSR. On a 2 h live capture (Tokyo, mosaic-G5) after
+60 min: static 1.8 cm 2D / 3.9 cm U rms, kinematic 15.8 / 10.8 cm, real-time
+replay 14.8 / 10.7 cm. Two contributed fixes: the single-frequency NavIC L5
+group delay in SPP ([#384](https://github.com/h-shiono/MRTKLIB/pull/384)),
+and the NTRIP v2 source handshake, which sent a raw stream after advertising
+chunked transfer ([#385](https://github.com/h-shiono/MRTKLIB/pull/385)). New
+dataset `g5p3_296u-v1`, shared with the SouthPAN PVS work. ABI changes in
+`prcopt_t`, `raw_t` and `rtksvr_t`; new public API in `mrtk_b2b.h` and
+`set_bdsgeo()` / `is_bdsgeo()`.
+
+### BeiDou PPP-B2b
+
+- **New correction source `bds-b2b`**
+  ([#417](https://github.com/h-shiono/MRTKLIB/issues/417)). The decoder
+  (`src/b2b/mrtk_b2b.c`, `include/mrtklib/mrtk_b2b.h`) reads MT1–7 per
+  BDS-SIS-ICD-PPP-B2b-1.0 with the CRC-24Q, IOD SSR, IOD Corr and IODP rules,
+  bit-exact against cssrlib on a 2025 capture. It needs
+  `satellite_ephemeris = "brdc+ssrapc"` (or `brdc+ssrcom`). PPP-B2b has no
+  phase biases, so it runs as float PPP. The broadcast has no GPS code
+  biases, so the bundled configurations use BeiDou only.
+- **Post-processing.** `mrtk l6extract` writes the SBF `BDSRawB2b` (4242)
+  frames of the GEOs to `<input-basename>.b2b` (new options `-no-b2b`,
+  `-b2b-geo LIST`). `mrtk post` reads `.b2b` input and selects the B-CNAV1 /
+  B-CNAV2 ephemeris (RINEX 4 `CNV1` / `CNV2`) for BeiDou, matching the
+  correction IODN. A `.b2b` input is read only with `correction = "bds-b2b"`,
+  so it cannot replace the corrections of another selected service. A RINEX 4 broadcast file with CNV1 records is needed
+  (e.g. `BRD400DLR_S`); `mrtk convert` writes none.
+- **Real time.** The SBF decoder stages `BDSRawB2b` messages (raw return code
+  14) for the rtksvr B2b decoder. It also decodes `BDSCNav1` (4251, mosaic-G5
+  Firmware v1.1.0 Reference Guide pp. 245–246) into ephemeris set 1 as type
+  CNAV-1, only while the BeiDou selection is B-CNAV. The D1/D2 record of
+  `BDSNav` (4081) in set 0, other modes and `mrtk convert` are unchanged.
+  `rtksvrstart()` sets the selection as `postpos()` does, and frees a B2b
+  context left by a previous run.
+- **`[positioning] bds_geo_sats`** (legacy `pos2-bdsgeo`): the BDS-3 GEO
+  PRNs whose B2b-I frames are PPP-B2b, default `["C01-C04"]`; use
+  `["C59-C62"]` for data before 2026-04-17. IGSO / MEO B2b-I frames (B-CNAV3
+  navigation) pass the same CRC and reuse message types 1/4/5, and no header
+  bit separates them, so the GEOs cannot be told from the frames. Applied by
+  `set_bdsopt()` together with `bds2_sats` / `bds3_igso_sats`.
+- **One GEO stream at a time.** On 2026-10-23, C01–C03 sent IOD SSR 1 and
+  C04 IOD SSR 2 with the same mask (2025-08-21: C59 / C60 and C62). The
+  decoder takes the first GEO that sends a mask, until it is silent for 10 s,
+  so the orbit of one stream is never combined with the clock of the other.
+  An IOD SSR change clears every staged correction (published to the
+  positioning channel in real time too), and a withdrawn code bias
+  (−2048 / −2047) is removed. A code bias older than its 86400 s validity,
+  or never received, drops the pseudorange.
+- **Clock age limit 30 s for PPP-B2b** (`SSR_VENDOR_B2B`; other sources keep
+  60 s). The ICD's 12 s nominal validity is not usable as an age limit: live
+  clocks arrive 6–8 s after their epoch and are renewed every 6 s.
+- **Shared code** (`mrtk_eph.c`): `eph2pos()` applies the CNAV `Adot` /
+  `ndot` terms (BDS B1C ICD Table 7-2). D1/D2 and LNAV ephemerides have both
+  at zero, so they are unchanged. RINEX 4 CNAV records are now computed
+  correctly in every mode. `satpos_ssr()` accepts an orbit correction up to
+  its `udi[0]` when that exceeds 60 s, capped at 120 s (PPP-B2b orbits are
+  valid for 96 s). Sources whose `udi[0]` is 60 s or less (MADOCA-PPP, HAS,
+  CLAS, typical RTCM-SSR streams) keep the 60 s limit.
+- **Configurations:** `conf/b2b/ppp_bds_b2b.toml` (post) and
+  `conf/b2b/run_bds_b2b.toml` (real time), with the PRN lists for data after
+  2026-04-21.
+- **Validation** (BeiDou-only float PPP, mosaic-G5 + TOPCON CR-G5, Tokyo,
+  2026-10-23 20:00–22:00 GPST, against the PPP-AR reference of the handover
+  dataset, after 60 min, 2D rms / U rms / 3D 95 %):
+
+  | | static | kinematic |
+  |---|---|---|
+  | `mrtk post` | 1.8 / 3.9 / 6.4 cm | 15.8 / 10.8 / 30.9 cm |
+  | `mrtk run` replay | — | 14.8 / 10.7 / 27.9 cm |
+
+  About 9 BeiDou satellites per epoch.
+
+### SPP
+
+- **NavIC L5-only group delay**
+  ([#384](https://github.com/h-shiono/MRTKLIB/pull/384), contributed by
+  @badaboom). `prange()` derived γ for the single-frequency NavIC TGD
+  correction from the two observation codes. With no S-band code the second
+  frequency was zero and the correction non-finite: an infinite residual,
+  then NaN and an LSQ failure once a NavIC ephemeris was available. With an
+  S-band code present, γ was the inverse of the ICD value and the correction
+  about 20× too small. γ is now the nominal (f_S / f_L5)² of ISRO SPS ICD 1.1
+  §6.2.1.5 for single-frequency NavIC. The iono-free branch and other
+  constellations are unchanged.
+
+### Streams
+
+- **NTRIP v2 source handshake**
+  ([#385](https://github.com/h-shiono/MRTKLIB/pull/385), contributed by
+  @badaboom). A caster answering the v2 `POST` with `HTTP/1.1 200 OK`
+  matched the legacy `OK\r\n` first. The stream was then taken as v1, and
+  the NTRIP server stream (e.g. `mrtk relay` output to a caster) sent a raw
+  body although the request had advertised `Transfer-Encoding: chunked`. HTTP responses now stay in the
+  HTTP parser until the headers end. Chunked output is used only after a v2
+  request answered with HTTP 200; a v1 `SOURCE` answered with an HTTP status
+  line stays raw. Bare `OK` / `ICY 200 OK` stay v1.
+
+### Build
+
+- `mrtklib` links the thread library (`Threads::Threads`, PUBLIC). The stream
+  code calls `pthread_create`, and with glibc < 2.34 the utests that pull it in
+  through the static library did not link (#385 review).
+
+### Tests and test data
+
+- **New dataset `g5p3_296u-v1`** (9.2 MB): one hour of the kubolab mosaic-G5
+  capture of 2026-10-23 (19:59:30–21:00 GPST), with GEO `BDSRawB2b`,
+  `BDSCNav1`, SouthPAN `GEORawL5` PRN 122 (for v0.7.17) and a RINEX 4
+  navigation file cut from BRD400DLR. Built reproducibly by
+  `scripts/tests/make_g5p3_296u_fixture.py`; see
+  `tests/data/g5p3_296u/README.md`.
+- New tests: `b2b_extract`, `b2b_convert`, `b2b_ppp`, `b2b_ppp_check`,
+  `rtkrcv_b2b`, `rtkrcv_b2b_check` (replay at ×20, ~190 s). The gates catch
+  regressions, not the service accuracy (performance baseline:
+  [#457](https://github.com/h-shiono/MRTKLIB/issues/457)).
+- New unit tests: `utest_b2b` (decoder, GEO list, a real `BDSCNav1` block
+  against BRD400DLR CNV1, IOD SSR change, withdrawn bias, GEO stream lock),
+  `utest_navic_l5_tgd` (#384) and `utest_ntrip_server_response` (#385).
+
+### Documentation
+
+- New guide: Quick Start: BeiDou PPP-B2b.
+- BeiDou PRN Reassignment guide: `bds_geo_sats`.
+- Design document `docs/design/bds-b2b.md` updated for the real-time path,
+  the GEO PRNs and the two streams.
+- Configuration reference: `bds_geo_sats`.
+
+### API / ABI
+
+- **ABI:** `prcopt_t` gains `bdsgeo[256]` (appended). `raw_t` gains
+  `b2b_msg[61]`, `b2b_prn` and `b2b_time`. `rtksvr_t` gains `b2b`.
+- **API:** new `b2b_new()`, `b2b_free()`, `b2b_input_msg()`,
+  `b2b_input_file()`, `b2b_sel_biascode()` (`mrtk_b2b.h`), `set_bdsgeo()`,
+  `is_bdsgeo()`; `SSR_VENDOR_B2B`; `input_raw()` return code 14.
+
+## [v0.7.15] - 2026-11-06
+
+**CLAS real-time robustness, part 2: phase-bias discontinuities, L6 channel
+management and partial-AR integrity.** PPP-RTK honours the CSSR phase
+discontinuity indicator, the leading cause of Single epochs in 5.9 days of
+live data (#393). With `l6_merge`, a channel resuming across a GPS week
+rollover no longer stops the corrections until restart (#436), and a silent
+channel no longer counts as a correction source (#443). A single-channel L6
+lock moves from a degraded PRN to a clean one (#414). Partial AR restores a
+satellite's pre-trial valid flags (#413), and VRS-RTK partial AR no longer
+writes `rtk->ssat[-1]` (#412). MADOCA-PPP L6E / L6D-iono messages are no
+longer decoded across a lost frame (#363). `mrtk cssr2rtcm3` bridges a lost
+correction set with the last good one, outputs the latest PVT epoch, and
+takes SBF input only (**breaking CLI change**: raw L6 input, `-2ch` and
+`-pos` removed) (#442). The NMEA GGA station id names the CLAS L6 source.
+RT replay tests run concurrently, each in its own working directory (#448).
+claslib post-processing is byte-identical except `st12` / `l1cl5`
+(< 0.1 mm, #393); VRS-RTK, `ssr2obs` and `ssr2osr` are byte-identical.
+ABI changes in `clas_ctx_t`, `clas_l6buf_t`, `clas_bias_bank_t`,
+`clas_corr_t`, `clas_clock_bank_t`, `sol_t`, `solopt_t` and `mdcl6d_t`;
+API changes in `clas_route_l6frame()` and `decode_qzss_l6frame()`. The
+#381 reset loop is gone on current data without a change of its own (fixed by
+the v0.7.14 #363 fix).
+
+### CLAS
+
+- **Real-time L6 demux leaves a degraded PRN**
+  ([#414](https://github.com/h-shiono/MRTKLIB/issues/414)). A CLAS channel
+  stays locked to one QZS PRN and released the lock only after that PRN had
+  been silent for 10 s. A PRN that degrades at low elevation keeps sending
+  some frames while others fail RS decoding, so the lock was kept, no
+  subframe was complete, and PPP-RTK fell to Single when the corrections aged
+  out, while the other CLAS PRNs were clean. `clas_route_l6frame()` now
+  tracks the subframe completeness of every CLAS PRN from the receiver frame
+  time tags. When the locked PRN has delivered no complete subframe for more
+  than 10 s (`CLAS_L6_DEGRADE_TIMEOUT`) and another PRN has delivered two
+  complete subframes in a row (`CLAS_L6_CLEAN_NSF`), the channel moves to
+  that PRN at the first frame of its next subframe, so the subframe assembly
+  restarts cleanly. The silence timeout is unchanged, and a degraded lock is
+  kept if no other PRN is clean. RT replay of a mosaic-G5 capture
+  (2026-10-23 → 10-28, network 7, `l6_merge = 0`) with the lock started on
+  the PRN that degrades: at 2026-10-26 20:47 UTC the 47 Single epochs
+  (correction age up to 83 s) are gone, and the solution stays Fix (age ≤ 28 s).
+  Nine more windows set up the same way (lock forced at the start onto the
+  PRN 194 or 196 that degrades later): Single epochs 1022 → 611, misfixes
+  247 → 168, no window worse. The setting-satellite handovers also relock
+  earlier, without waiting 10 s of silence. The full 4.9-day replay keeps its
+  fix rate (93.74 % → 93.78 %); Single epochs 7312 → 7254, Fix→Single
+  events 866 → 872, misfixes 1840 (unchanged). The demux now relocks at four
+  handovers of a setting satellite during its degradation (30–75 s of lost
+  corrections before). Of the +6 Fix→Single events, +4 are in days whose lock
+  sequence is identical in both builds (RT replay timing); +2 are on
+  2026-10-24, when the new build moved from a degraded 199 to 194, which
+  later lost single frames that 196 / 199 did not. The candidate is the first
+  qualifying PRN, not the best one. API change: the function takes
+  the L6 header and the frame time tag (`const l6_header_t*`, `double tag`)
+  instead of the PRN and pattern. ABI change: `clas_ctx_t` gains
+  `l6sfok_time[]` and `l6health[]`.
+- **`l6_merge = 1` no longer counts a silent L6 channel as a correction
+  source** ([#443](https://github.com/h-shiono/MRTKLIB/issues/443)). In
+  real time the merge channels are keyed by transmit pattern. When the only
+  PRN of one pattern sets or is not yet steadily received, that channel has
+  no source, but its bank lookup in `ppp_rtk_pos()` still succeeded: first
+  at the observation time within the 180 s orbit age, then at the
+  `l6buf[ch].time` fallback, which stays at the time of the last frame. When
+  the live channel then lost a subframe at an input gap (#363), the silent
+  channel still counted, so the BackupCSSR bridge was not used and the live
+  channel's set was cleared. The silent channel's troposphere was too old,
+  and PPP-RTK fell to Single for ~17 s, where `l6_merge = 0` kept Fix. A
+  merge channel whose locked PRN has sent no frame for more than
+  `CLAS_L6_RELOCK_TIMEOUT` (`clas_l6_silent()`) is now skipped, and merge
+  falls back to single-channel behaviour. RT replay of a mosaic-G5 capture
+  (2026-10-23 → 10-28, network 7, `l6_merge = 1`): on 2026-10-27, while
+  PRN 194 (the only pattern-1 PRN) was lost, 20:45–21:23 UTC Single epochs
+  168 → 6. Over 4.9 days, Fix→Single events 875 → 860 (`l6_merge = 0`: 872),
+  Single epochs 7123 → 6900, fix rate 93.80 % → 93.90 %, Fix epochs with a
+  horizontal error > 0.3 m unchanged (2511). All 16 Fix→Single events that
+  only `l6_merge = 1` had are gone. The one new event (10-27 22:58) is part
+  of the same Single period as in the baseline, which started 30 s earlier.
+  Post-processing and `l6_merge = 0` are unaffected: only the RT demux sets
+  the lock time.
+- **`l6_merge = 1`: a BackupCSSR restore no longer applies the stale set of
+  a channel without a usable backup.** When both merge channels fail to
+  supply corrections in an epoch (or the grid lookup fails), PPP-RTK
+  restores the last good set of each channel whose backup is usable. A
+  channel whose backup was skipped, because its facility had changed since
+  (new in this release, #442) or because the backup was older than 180 s,
+  kept its `current` set from an earlier epoch, since a failed bank fetch
+  leaves it untouched, and that set was then applied to `nav->ssr_ch`:
+  after a facility change, the previous facility's corrections. The skipped
+  channel is now cleared, as a channel that fails a normal fetch already
+  is. `l6_merge = 0`, `mrtk cssr2rtcm3`, `ssr2obs` and `ssr2osr` are not
+  affected (one channel: no restore without a usable backup). New case (8)
+  in `utest_clas_bank` (fails without the fix). Reported in a cross-review
+  of the release candidate.
+- **Partial AR restores a satellite as it was before the trial exclusion**
+  ([#413](https://github.com/h-shiono/MRTKLIB/issues/413)). Both CLAS
+  engines try excluding one satellite at a time; after a failed trial they
+  set every frequency of it valid, so a frequency that was invalid before the
+  trial (one is allowed per candidate) became valid for the rest of the epoch.
+  The pre-trial `vsat[]` is now saved and restored. This happens often
+  (claslib regressions: 0–985 times per PPP-RTK run, 66–197 per VRS run), but
+  every claslib PPP-RTK / VRS NMEA output and the six PPC CLAS runs are
+  byte-identical; only the per-satellite valid flags in the `.stat` output
+  change. Upstream claslib 0.9.0 has the same behaviour.
+- **VRS-RTK partial AR no longer writes `rtk->ssat[-1]`**
+  ([#412](https://github.com/h-shiono/MRTKLIB/issues/412)). When no trial
+  exclusion gave a ratio, the partial-AR loop in `mrtk_vrs.c` cleared
+  `vsat[]` of satellite index −1, overwriting the end of `ambc[MAXSAT-1]`
+  in `rtk_t`. This happened in every claslib VRS regression (20 times per
+  run, at the start-up epochs). The loop now stops when nothing can be
+  excluded; the remaining iterations would only have repeated the same
+  trials. The PPP-RTK engine already had the guard. Upstream claslib 0.9.0
+  has the same defect in both engines. VRS-RTK and `ssr2obs` outputs are
+  byte-identical.
+- **PPP-RTK honours the CSSR phase discontinuity indicator**
+  ([#393](https://github.com/h-shiono/MRTKLIB/issues/393)). CLAS advances
+  the 2-bit indicator of a signal in ST5 / ST6 when its phase bias steps.
+  The decoder read it, but the bias bank, `clas_corr_t` and
+  `clas_update_global()` dropped it (upstream claslib ignores it too). The
+  filter therefore kept ambiguities estimated against the old bias. When CLAS
+  stepped the network phase biases of every satellite at once, all phase
+  residuals (0.5–1.5 m) were rejected and the epoch fell to Single, then again
+  when the biases stepped back. In 5.9 days of live data from a receiver in
+  network 7 this happened about 2.9 times a day and was the leading cause of
+  Single epochs. The network (ST6) and global (ST5) indicators now travel with
+  the phase bias to `nav->ssr_ch[].discnt`. `ppp_rtk_pos()` compares them per
+  L6 channel, satellite and frequency after the epoch's corrections are
+  applied, and re-initializes the phase bias state of each signal whose
+  indicator changed. RT replay of the two issue captures (mosaic-G5,
+  2026-10-24 01:00:30 / 07:30:30 GPST): the two Single epochs of each event
+  are gone, the solution stays Float through both bias steps and re-fixes at
+  the same epoch as before (event 1: 2 epochs earlier); the re-fix still
+  waits for the step back 30 s later. claslib post-processing: 8 of 10 PP outputs
+  byte-identical; `st12` and `l1cl5` (single-satellite indicator changes)
+  move by < 0.1 mm 3D RMS with unchanged fix rate. VRS-RTK, `ssr2obs` and
+  `ssr2osr` are byte-identical.
+- `clas_bias_bank_t` and `clas_corr_t` gain `discnt[MAXSAT][MAXCODE]` (ABI
+  change, +9.4 KB each with the default preset, +0.3 MB per L6 channel
+  bank); new API `clas_osr_bias_smode()`.
+- **The NMEA GGA station id now names the CLAS L6 source of the solution.**
+  In PPP-RTK mode, GGA field 14 (differential reference station id, until now
+  always `0000`) carries `P1*100 + P2*10 + F`, within the NMEA range
+  0000–1023: `P1`/`P2` = L6 PRN − 192 of channel 1/2 (0 when the channel
+  carries no corrections), `F` = facility id + 1, or 9 when the two
+  `l6_merge` channels carry different facilities. Examples: `0201` = 1 ch,
+  PRN 194, facility 1; `0243` = PRN 194 + 196 merged, facility 3; `0000` =
+  no CLAS corrections (Single). The PRN is the one that delivered the clock
+  set in use, so a QZSS handover or a facility switch is visible in the NMEA
+  alone. The facility is the pattern-normalized id, not the raw header bits,
+  which differ between transmit patterns for the same facility. On by
+  default; `[output] clas_nmea_source_id = false` writes `0000` again. VRS-RTK
+  is not covered, and the GGA that `mrtk run` sends to an NTRIP caster still
+  writes `0000`. No positioning change.
+- `sol_t`, `solopt_t`, `clas_clock_bank_t` and `clas_corr_t` gain fields
+  (ABI change); new API `clas_nmea_refid()`.
+- **Real-time `l6_merge`: a channel resuming across a GPS week rollover no
+  longer stops the CLAS corrections until restart**
+  ([#436](https://github.com/h-shiono/MRTKLIB/issues/436)). CSSR messages
+  carry the time of week only, and the decoder follows the week from each
+  subtype's TOW sequence. That state (`week_ref`, `tow_ref`) was shared by both
+  channels, whereas upstream keeps it per L6 stream. A channel silent across
+  the rollover resumes with the previous week's `tow0`, so its first clock
+  before an ST1 is dated near the end of that week. The next clock of the
+  other channel then looked like a rollover, and the shared week moved one
+  week ahead. Every clock was then newer than the observation time and never
+  found again (`clock not found`), so the output stayed Single. The state is
+  now per channel, in `clas_l6buf_t`. On the 5.9-day live mosaic-G5 RT replay
+  with `l6_merge = 1`, the fix rate goes 38.85 % → 98.95 % (Single 308,884 →
+  166 epochs; 98.87 % without merge). With `l6_merge = 0` and in claslib
+  post-processing the output is byte-identical. New API `clas_set_week_ref()`
+  / `clas_week_ref_isset()`. `week_ref`, `tow_ref` and the unused `obs_ref`
+  leave `clas_ctx_t` (API/ABI change). The week is set once, at startup, so a
+  channel first received after a later rollover has no earlier TOW to detect
+  it from: its first ST1 now takes the week of the channel already decoding
+  (Greptile #454).
+
+### MADOCA-PPP
+
+- **Real-time L6E and L6D-iono messages are no longer decoded across a lost
+  frame** ([#363](https://github.com/h-shiono/MRTKLIB/issues/363), the
+  MADOCA side of the v0.7.14 CLAS fix). The decoders assemble a message from
+  the frames after its subframe indicator and never checked that they were
+  consecutive. When a receiver input loss of 1–2 s took the last frame of one
+  message and the head of the next, the next message's second frame completed
+  the first one, which was then decoded from shifted bits. On 5.9 days of
+  mosaic-G5 SBF this happened 158–359 times per L6E PRN and 53 times on L6D
+  PRN 200, in almost every hour. The SBF / UBX decoders now pass the receiver
+  frame time to the L6E decoder (`decode_qzss_l6frame()`) and `rtksvr` passes
+  it to the L6D-iono decoder (`mdcl6d_t.ftag`); a frame that continues a
+  message but does not follow the previous frame by 1 s discards the message
+  until the next subframe indicator. Every MADOCA-PPP message starts with one
+  and QZNMA frames on the same PRN fall between messages, so a clean stream
+  decodes as before. RT replay of four 2-hour windows (`qzs-madoca-ppp`
+  preset, PPP-AR + L6D iono, first 30 min excluded): the metre-level
+  excursions that followed a shifted decode by 4–6 s are gone (maximum
+  horizontal / vertical error 2.34 / 4.41 m → 0.09 / 0.20 m over all
+  windows); H95 improves in 3 of 4 windows (e.g. 10.1 → 4.0 cm) and the fix
+  rate changes by +13.4, +1.6, +1.4 and −3.4 pt. `.l6e` / `.l6d` files and
+  L6E streams carry no frame time and decode as before; MADOCA
+  post-processing is byte-identical. API change: `decode_qzss_l6frame()`
+  gains a `tag` argument, new `set_mcssr_ftag()`, `mdcl6d_t` gains `ftag`.
+
+### cssr2rtcm3
+
+- **OSR corrections bridge a lost correction set with the last good one**
+  ([#442](https://github.com/h-shiono/MRTKLIB/issues/442)). `clas_ssr2osr()`
+  (`mrtk cssr2rtcm3`, `mrtk ssr2obs`, `mrtk ssr2osr`) produced no output
+  for an epoch whose grid or complete correction set was not available. This
+  happens, for example, when the #363 frame-time check discards a subframe
+  after a lost L6 frame. Upstream claslib `cssr2osr.c` and the MRTKLIB
+  PPP-RTK engine (v0.7.4) instead use the last good set (BackupCSSR) for up
+  to 180 s; the OSR path had lost this in the port. It now does the same,
+  single-channel. On `clas_l6gap-v1` the converter outputs 1164 instead of
+  1067 epochs, and its five outages of 13–33 s are gone. Through
+  `mrtk post` VRS-RTK with the rover observations of the same capture, Fix
+  goes 96.5 % → 99.5 % (Float 35 → 5 epochs), 2D95 stays 3.0 cm, no misfix,
+  and the former outage windows stay Fix (maximum horizontal error
+  20.2 → 2.8 cm). On a 4.9-day replay of a live SBF capture, converter output
+  availability goes 92.30 % → 95.82 % (outages 2809 → 1408, 32266 → 17779 s;
+  sub-10 s outages 807 → 36). claslib
+  `ssr2obs` / `ssr2osr` regression outputs are byte-identical (the path does
+  not fire on the bundled data). A backup is no longer restored after an L6
+  facility change: the change clears the correction bank but not the backup,
+  so the previous facility's orbit, bias and atmosphere were combined with a
+  clock from the new facility's bank. This also applies to PPP-RTK, which
+  shares the backup (upstream claslib has the same gap). New test
+  `cssr2rtcm3_clas_l6gap` gates the converter on `clas_l6gap-v1` (at least
+  1150 epochs, no interval over 5 s; 1067 epochs and 33 s without the
+  bridge).
+
+- **Raw L6 input removed; `mrtk cssr2rtcm3` takes SBF only**
+  ([#442](https://github.com/h-shiono/MRTKLIB/issues/442)). Breaking CLI
+  change: `-in` must be `sbf://URI`, and `-2ch` / `-pos` are gone. These now
+  exit with an error that points to `sbf://`. The raw L6 path (`-in` without
+  `sbf://`, a second L6 stream on `-2ch`, position from NMEA GGA on `-pos`)
+  had emitted no RTCM3 since v0.6.5: output is triggered by the SBF PVT block
+  (95d58ca), which that path never received. On the `clas_l6gap-v1` window
+  the SBF input gives 1067 epochs and the same L6D frames as a raw `.l6d`
+  file give none. A raw L6 byte stream also carries no frame time, so the
+  #363 check for a frame lost inside a subframe (`clas_set_l6tag()`) cannot
+  work on it. `-nav` is optional (bootstrap before the SBF navigation data
+  arrives), and the CSSR week reference always comes from the first SBF time
+  stamp. SBF output on `clas_l6gap-v1` is byte-identical.
+
+- **Output epoch follows the receiver instead of stepping behind after input
+  gaps** ([#442](https://github.com/h-shiono/MRTKLIB/issues/442)). The
+  converter output at most one epoch per read, one interval after the last
+  one. After an input gap it therefore produced virtual observations for past
+  epochs, 2–10 s behind the receiver, and when the lag passed 10 s it reset
+  and the output time jumped forward by 10 s or more. That explains the
+  10–19 s output gaps that remained after the BackupCSSR bridge (29 resets =
+  29 gaps on three hours of a live capture). The epoch is now the time of the
+  latest valid PVT, saved when the PVT block is decoded (`raw->time` moves
+  with every SBF block), truncated to the `-t` grid in GPS week seconds
+  (`-t` must be > 0). A PVT on or before the last output epoch (duplicate or
+  backward time) is skipped and counted as `stale`; the 10 s reset is gone.
+  On a 4.9-day replay of a live SBF capture, output gaps of 10–19 s go
+  1276 → 132 and outage time 17779 → 9206 s. Counted against the seconds in
+  which the receiver had a valid PVT (days 296–298), the output covers
+  97.8–98.3 % instead of 95.4–96.2 %, and no epoch is output at a second
+  without a PVT (the old scheduler output 1054–2079 a day). The remaining
+  ≥ 10 s gaps on day 297 (60) all follow an input loss within 30 s and are
+  OSR failures after a discarded subframe (#363), not the scheduler. On
+  `clas_l6gap-v1`: 1162 epochs, longest interval 3 s (was 11 s), output
+  epoch = PVT second. `mrtk post` VRS-RTK on that window is unchanged within
+  noise (Fix 98.5 → 98.1 %, 2D95 3.0 → 3.1 cm), because post-processing
+  pairs base and rover by time and does not see the delay. In a real-time
+  replay (`mrtk run` VRS-RTK fed by the converter at ×1, rtkrcv started
+  first) on three hours of the live capture, the age of differential goes
+  from a mean of about 6 s (p95 11 s) to 1.1 s (p95 4 s), while Fix
+  (95.0 → 94.4 %) and the fixed-solution scatter (2D95 16.8 → 17.1 cm)
+  stay within run-to-run noise. The late output therefore did not limit RT
+  positioning on this data, and the post-processing / RT Fix gap of #97 /
+  #98 is not explained by it. New unit test
+  `utest_cssr2rtcm3_sched` (grid, gaps, duplicate / backward PVT, week
+  rollover, `-t 5` / `-t 0.5`); `cssr2rtcm3_clas_l6gap` also checks that the
+  RTCM3 MSM epochs equal the logged epochs, increase strictly and lie within
+  one interval before their PVT, and gains a `-t 5` variant.
+
+### Tests and test data
+
+- RT replay tests run each `mrtk run` in its own empty working directory.
+  `mrtk run` reads `rtkrcv.nav` from its working directory at start and
+  rewrites it at exit, and all replays shared the source tree as working
+  directory, so each one started with the broadcast ephemerides the previous
+  one had left (the test order decided the initial navigation data), and
+  concurrent replays would race on the file.
+- RT replay tests run concurrently: the `rtkrcv_port` resource lock and
+  `RUN_SERIAL` on the handover / L6-gap replays are removed (each replay
+  already has its own console port). The replays mostly sleep (~6 % CPU),
+  so they were the whole wall time of a run: full suite on 8 cores
+  2281 s → 476–482 s at `-j16` (3 runs, all passing). Every RT output keeps
+  the serial run's epoch count, first / last epoch and maximum gap, and all
+  but one keep its fix share. `rtkrcv_rt_clas_sf1gap` re-fixes ~150 s later
+  after one long float stretch (16:40:49, fix share 32.7 → 27.7–28.4 %):
+  that epoch is a marginal AR decision that load alone moves (8 busy cores
+  and a single replay reproduce it), and the test gates the subframe-1
+  recovery, which is unchanged: the same three loss events are evaluated in
+  every run (Single 18–19 s, limit 25 s), and with the #406 fix disabled
+  the check still fails all three at `-j16`. `-j24` oversubscribes the host
+  and `rtkrcv_rt` drops epochs, so the documented default is `-j16` on this
+  8-core host. CI is unchanged (`-j4 -LE realtime`). No change to the
+  positioning algorithms; RT replay results can differ under load as above.
+
+### Documentation
+
+- BeiDou PRN reassignment guide: cites the official China Satellite
+  Navigation Office table (2026-03-20), adds the GEO orbital slots and the
+  C59 ↔ C62 swap of 2026-03-31 that matters for PRN-based GEO matching
+  (PR #440).
+- `docs/reference/icd/`: the ICD catalog is grouped by issuer, lists the
+  newly held documents (IS-QZSS-PNT-006, MDC-005 / SAS-002 drafts, Galileo
+  OSNMA, SouthPAN SDDs, RINEX 3.01–4.02), and `.gitignore` now covers PDFs in
+  the issuer subdirectories (PR #441).
+
+## [v0.7.14] - 2026-11-02
+
+**CLAS real-time robustness: L6 frame losses and the two-channel merge.**
+Four real-time CLAS PPP-RTK faults found on live mosaic-G5 data are
+fixed. A lost subframe 1 no longer costs ~17 s of Single (#406). A lost
+L6 frame inside a subframe is detected from the receiver frame time and the
+subframe discarded, instead of decoding shifted bits as garbage corrections
+that drove metre-level Float, false fixes and the #381 reset loop (#363); the
+ST1 mask width check, wrong in the same way in upstream claslib since 0.8.0,
+is fixed for this. A lost top-of-hour ST1 no longer dates the following
+messages one hour old (#392). With `l6_merge`, an epoch in which one channel
+already carries the new clock no longer finds no reference satellite (#380).
+claslib post-processing is byte-identical. `raw_t` and `clas_l6buf_t` gain
+fields (ABI change); new API `clas_set_l6tag()`. New dataset
+`clas_l6gap-v1`.
+
+### CLAS
+
+- **Losing subframe 1 of a CLAS frame no longer costs ~17 s of Single**
+  ([#406](https://github.com/h-shiono/MRTKLIB/issues/406),
+  [#242](https://github.com/h-shiono/MRTKLIB/issues/242)). Subframe 1 carries
+  the only code bias (ST4) of networks whose ST6 is phase-only. When it was
+  lost for frame T, the correction set for T+30 looked for a code bias no
+  newer than the phase bias T, found T−30 (past its 60 s validity) and
+  failed, so PPP-RTK fell back to the previous set, whose orbit had expired,
+  until the next network phase bias (~T+47). The code bias of frame T+30 is
+  now used, as the existing consistency check (code bias up to 30 s newer
+  than phase bias) allows, and the OSR check accepts the same window. On
+  three hours of live mosaic-G5 replay, 13 of 15 such outages shrink from
+  17 s to 1–3 s (the orbit T−30 itself expires at T+31); the other two had
+  no valid corrections (IOD SSR change in the lost mask, consecutive losses).
+  Output on loss-free data is byte-identical. Upstream claslib has the same
+  lookup. New tests `utest_clas_bank` and `rtkrcv_rt_clas_sf1gap`.
+  The correction set now pairs code and phase biases by signal, not by bank
+  slot: a slot order follows the mask of its own epoch, so a code bias from
+  another mask (newer here, or up to 30 s older as upstream allows) could be
+  applied to a different signal. Output on the replayed data is
+  byte-identical.
+- **A CLAS L6 frame lost inside a subframe no longer decodes as shifted
+  bits** ([#363](https://github.com/h-shiono/MRTKLIB/issues/363)). The
+  subframe is assembled by counting frames after the subframe indicator, and
+  the L6 header has no frame counter, so after a lost frame (RS failure or a
+  1–2 s input loss) the following frames were appended at the wrong offset.
+  The garbage that decoded from them, such as STEC of several hundred TECU or
+  code biases metres off, drove the #381 reset loop, metre-level Float and
+  false fixes. The receiver time of each frame (SBF QZSRawL6 TOW,
+  UBX-RXM-QZSSL6 time tag) is now passed to the CLAS decoder through the new
+  `clas_set_l6tag()`, and the rest of a subframe with a frame missing is
+  discarded. Raw L6 byte streams and files carry no time and are unchanged.
+  Two fixes were needed for this to pay off:
+  - The ST1 mask width check counted the header from the wrong bit and read
+    ngnss from the satellite mask, and for a GNSS with a cell mask it read
+    the satellite and signal masks again from the cell-mask bits. A mask that
+    fits in the first frame waited for the second one, and a frame lost right
+    after it cost the whole mask. It is now decoded from the first frame.
+    Upstream claslib has had the same check since 0.8.0 (0.7.5 was right).
+  - When the code bias was lost in two consecutive frames, no code bias older
+    than the phase bias was left and the correction set failed before the
+    #406 substitution of the next one was reached; it now substitutes in that
+    case too.
+
+  On three hours of live mosaic-G5 replay: Fix 92.2 % → 98.4 % (hour with
+  five #381 loops; Float max error 58 m → 0.16 m) and 90.1 % → 92.5 % with 42
+  false fixes over 30 cm → 0 (Float max 5.4 m → 0.20 m); the third hour has
+  no such loss and is byte-identical. Where subframe 1 was damaged in two
+  consecutive frames, the solution is now Single for ~30 s while no code bias
+  within its 60 s validity exists, instead of a metre-off Float. claslib
+  post-processing (no time tags) is byte-identical.
+- **Losing the ST1 mask at the top of the hour no longer dates the CSSR
+  messages one hour old**
+  ([#392](https://github.com/h-shiono/MRTKLIB/issues/392)). ST2–ST12 carry
+  only the hourly epoch, and the full TOW base advanced only on ST1. An
+  hourly epoch more than 30 min older than the last decoded one now advances
+  the base by an hour (and wraps at the end of the week). Without this, the
+  #406 recovery cannot apply at the top of the hour. Covered by unit tests
+  only: none of the replayed hours has a loss at the hour top.
+- **With `l6_merge`, an epoch where one L6 channel is one clock update
+  behind no longer drops to Single**
+  ([#380](https://github.com/h-shiono/MRTKLIB/issues/380)). The real-time
+  reference-satellite search took ch0 whenever ch0 was valid and skipped the
+  satellite if ch0's clock was 5 s old, without trying ch1. When the other
+  channel's frame with the new clock was decoded first, no reference
+  satellite was found ("no double-differenced residual"): 2 epochs of Single
+  and a Float re-convergence. The first channel that is both valid and fresh
+  is now used; the 5 s threshold is unchanged. On a 1-hour live mosaic-G5
+  replay (simpleRTK4 Pro), `l6_merge = 1` goes from 97.48 % to 99.07 % Fix,
+  the same as `l6_merge = 0`, which is byte-identical. Post-processing reads
+  both channels ahead and is unaffected. No regression test: the race
+  reproduced only on the full-rate capture from its start, not on shorter
+  or block-filtered slices.
+- New tests `utest_clas_l6` (frame continuity with synthetic and captured
+  frames, hourly and weekly epoch wrap) and `rtkrcv_clas_l6gap_{nomerge,merge}`
+  (RT replay of 20 min of the live capture, dataset `clas_l6gap-v1`: Fix and
+  Float within 1 m, fix rate ≥ 95 %; the old decoder had Float at 6–27 m).
+  ABI: `raw_t` gains `l6tag`, `clas_l6buf_t` gains `ftag`, `ftag_last` and
+  `tow_last`.
+
+## [v0.7.13] - 2026-10-31
+
+**MADOCALIB 2.2 sync: the BeiDou PRN reassignment.** Between 2026-04-10 and
+04-21 BeiDou moved BDS-3 satellites onto PRN 1–18 and the BDS-3 IGSO
+satellites from C38–C40 to C06–C08; MRTKLIB treated every PRN below 19 as
+BDS-2. The BDS-2 / BDS-3 split is now configured — `[positioning] bds2_sats`
+and `[ambiguity_resolution] bds3_igso_sats`, defaults as MADOCALIB 2.2 (no
+BDS-2, IGSO C06–C08), with a warning when BeiDou is enabled and `bds2_sats`
+is absent — and the MADOCA-PPP decoder reads BDS-3 satellites sent in GNSS
+ID 3 with the BDS-3 signal table (IS-QZSS-MDC-005)
+([#401](https://github.com/h-shiono/MRTKLIB/issues/401)). **Configurations
+that enable BeiDou should set `bds2_sats`** (`["C09", "C10"]` after
+2026-04-21, `["C01-C18"]` before 2026-04-10); bundled configurations are
+pinned to their data. `prcopt_t` gains three fields (ABI change). Also:
+three MADOCA ST4 / ST5 decoder faults (two still present in MADOCALIB 2.2),
+`mrtk bias -bds2prn` (#403), and an MDC-005 regression on the MADOCALIB 2.2
+sample.
+
+### MADOCA-PPP
+
+- **IS-QZSS-MDC-005: BeiDou signal masks in GNSS ID 3** (MADOCALIB 2.2,
+  [#401](https://github.com/h-shiono/MRTKLIB/issues/401)). Since the BeiDou
+  PRN reassignment of April 2026, MDC-005 may send BDS-3 satellites on
+  PRN 1–18 in GNSS ID 3; their code / phase biases are now read with the
+  BDS-3 (GNSS ID 7) signal table. A signal mask bit undefined in the table
+  in use is skipped. Before, it indexed `cbias[-1]` / `pbias[-1]` (an
+  out-of-bounds stack write, confirmed under ASan).
+- **ST4 / ST5 cell mask kept in step after a skipped cell.** A cell skipped
+  as undefined (or for an unsupported satellite) left the cell-mask cursor on
+  that cell; with a sparse cell mask the decoder then read a bias for an
+  absent cell and every later bias of the message was shifted. MADOCALIB 2.2
+  has the same loop; MRTKLIB now advances the cursor on every cell. No change
+  on the bundled data (outputs byte-identical).
+- **ST4 / ST5 no longer store biases for an unsupported satellite**
+  ([#402](https://github.com/h-shiono/MRTKLIB/issues/402)). A masked
+  satellite that `satno()` rejects (sat 0, e.g. a GPS PRN above 32) had its
+  code / phase biases written to `ssr[-1]`, over the `rtcm_t` members before
+  `ssr[]`. Its cells are still read, then skipped, as ST2 / ST3 / ST7 already
+  did. Inherited from MADOCALIB (2.1 and 2.2).
+
+### BeiDou PRN reassignment
+
+- **BDS-2 / BDS-3 classification of PRN 1–18 is now configured, not inferred
+  from the PRN** (MADOCALIB 2.2, [#401](https://github.com/h-shiono/MRTKLIB/issues/401)).
+  Between 2026-04-10 and 04-21 BeiDou moved BDS-3 satellites onto PRN 1–18
+  (C01–C08, C11–C14). Two BDS-2 IGSO satellites remain, on C09 and C10. The
+  BDS-3 IGSO satellites moved from C38–C40 to C06–C08, and C38–C40 are now
+  MEO. MRTKLIB treated every PRN below 19 as BDS-2, so current data used the
+  wrong signal model, clock group and PPP-AR grouping for those satellites.
+  - New `[positioning] bds2_sats` (legacy `pos2-bds2prn`): the BDS-2
+    satellites in PRN 1–18. Default: none (as MADOCALIB 2.2).
+  - New `[ambiguity_resolution] bds3_igso_sats` (legacy `pos2-bds3igso`): the
+    BDS-3 IGSO satellites, which PPP-AR never takes as the reference. Default
+    `C06-C08`; it replaces the hard-coded C38–C40.
+  - `mrtk post` and `mrtk run` warn when BeiDou is enabled and `bds2_sats` is
+    not set. `bds2_sats = []` states "no BDS-2" and silences the warning.
+    A malformed entry (`C09x`, `C09-C10-C11`) or a list longer than 255
+    characters is rejected with a warning, not partly applied
+    (`mrtk bias -bds2prn`: a list over 1023 characters is an error).
+  - Bundled configurations are pinned to their data. Pre-reassignment data
+    (MADOCALIB 2.0 sample, PPC / GSDC benchmarks) uses `C01-C18` / `C38-C40`;
+    live and post-April data uses `C09, C10`.
+  - `mrtk bias` gains `-bds2prn LIST` (`--bds2-sats`; the name of MADOCALIB
+    2.2's `cssr2ssr` option), since it reads no configuration file
+    ([#403](https://github.com/h-shiono/MRTKLIB/issues/403)). Without it,
+    PRN 1–18 is all BDS-3 and a warning is printed.
+  - New guide: [BeiDou PRN Reassignment](docs/guide/beidou-prn-reassignment.md).
+
+  **Migration.** If your configuration enables BeiDou, add `bds2_sats`:
+  `["C09", "C10"]` for data after 2026-04-21, `["C01-C18"]` (plus
+  `bds3_igso_sats = ["C38-C40"]` for PPP-AR) for data before 2026-04-10.
+  `prcopt_t` gains `bds2prn`, `bds3igso` and `bds2prn_set` (appended; ABI
+  change for external drivers). New API: `set_bds2prn()`, `is_bds2prn()`,
+  `set_bds3igso()`, `is_bds3igso()`, `bds_gen()`, `set_bdsopt()`.
+
+### Tests and test data
+
+- MDC-005 regression: MADOCALIB 2.2 sample (MIZU 2026/03/28, L6E PRN 207),
+  new dataset `madocalib_mdc005-v1`. PPP and PPP-AR are checked for parity
+  with upstream 2.2 (the internal-LU build is bit-identical to upstream on
+  the same platform) and for absolute accuracy against the IGS week-2411
+  SINEX. Parity tolerances: PPP 0.16 m, PPP-AR 0.090 m. The references are
+  macOS upstream output; upstream built on Linux differs from them by up to
+  3D RMS 12.07 cm (PPP float, still converging), so the tolerances cover
+  the platform difference and the absolute checks gate accuracy. Plus `utest_mcssr_bd3`,
+  a synthetic ST1/ST4/ST5 message that covers the undefined-bit skip, the
+  GNSS ID 3 BDS-3 decode, and the BeiDou generation API. `utest_t_toml`
+  covers `bds2_sats` / `bds3_igso_sats` and the "not set" flag.
+- `madocalib_pppar_ion_l6d_template` no longer compares two runs byte for
+  byte, which failed intermittently on Accelerate
+  ([#404](https://github.com/h-shiono/MRTKLIB/issues/404)). It checks that no
+  `.l6d` input is reported as ignored, that the solution has the same epochs
+  as the legacy-name run, and compares it within the `pppar_ion` tolerance (Accelerate run-to-run:
+  up to 0.08 cm 3D RMS; iono files ignored: 33 cm).
+
+## [v0.7.12] - 2026-10-29
+
+**QZSS L6 service routing.** QZSS L6 frames are now classified by their
+header (vendor ID + MADOCA service ID) everywhere — UBX, SBF, raw streams,
+`mrtk post` — instead of by PRN or receiver container, fixing lost QZS5
+(PRN 197) CLAS frames, MADOCA iono frames in the CLAS demux, and MADOCA SSR
+overwriting CLAS ([#351](https://github.com/h-shiono/MRTKLIB/issues/351)).
+`mrtk l6extract` names its output by header PRN
+(`{prefix}.{PRN}.l6d` / `.l6e`; **file names change**, #362), CLAS drops L6
+null messages (#344), and the first QZSS L6 **handover regression tests**
+cover real-time replay (including the single-channel relock path) and
+post-processing with absolute accuracy (#372). Large test datasets move to
+release assets of [h-shiono/mrtklib-data](https://github.com/h-shiono/mrtklib-data)
+(#386). Also: stream fixes (`SO_REUSEADDR` #367, serial write count #343,
+**64-bit byte counters with a public API change** #368), claslib 0.9.0
+guards (#347, #348, #364), and an interim fix for TOML `save` (#342).
+
+### QZSS L6 routing and decoding
+
+- **QZSS L6 frames are classified by their header, not by PRN or receiver
+  container ([#351](https://github.com/h-shiono/MRTKLIB/issues/351),
+  epic [#356](https://github.com/h-shiono/MRTKLIB/issues/356)).** New
+  `include/mrtklib/mrtk_l6.h` / `src/data/mrtk_l6.c`: one stateless parser
+  for the 49-bit L6 header (`l6_parse_header()`); the service comes from the
+  vendor ID and the MADOCA correction service ID (IS-QZSS-L6-008,
+  IS-QZSS-MDC-004, IS-QZSS-SAS-001), never from the PRN. It replaces six
+  duplicated header extractions ([PR #366](https://github.com/h-shiono/MRTKLIB/pull/366),
+  no behaviour change). On top of it, UBX and SBF L6 frames are routed by
+  service ([PR #369](https://github.com/h-shiono/MRTKLIB/pull/369)):
+  - UBX (NEO-D9C) MADOCA-PPP ionospheric frames (L6D PRN 200/201) no longer
+    enter the CLAS demux (return 16); with `l6_merge = 0` an iono PRN could
+    hold the CLAS channel.
+  - SBF no longer treats **PRN 197 (QZS5, CLAS since IS-QZSS-MDC rev 002)**
+    as ionospheric, so QZS5 CLAS frames are no longer lost (also reaches
+    `mrtk cssr2rtcm3`).
+  - CLAS inputs skip MADOCA-PPP / QZNMA / reserved-vendor frames.
+  - `format = "l6e"` in CLAS / PPP-RTK mode no longer overwrites CLAS SSR
+    with MADOCA SSR.
+  - QZNMA frames get their own return code **17** (for the future CLAS CMA
+    consumer, #353).
+
+  `mrtk post` accepts the claslib 0.9.0 extensions `.l6d` (routed by content:
+  CLAS, or MADOCA iono for PRN 200/201) and `.l6e` (MADOCA-PPP L6E; reserved
+  for CLAS CMA in CLAS mode), and no longer hands L6 files to the RINEX reader
+  ([PR #370](https://github.com/h-shiono/MRTKLIB/pull/370)). New tests
+  `utest_l6_header`, `utest_l6_route` and `claslib_ppp_rtk_2023` (upstream
+  claslib 0.9.0 parity with CMA off, 3D RMS 3.0 cm).
+
+- `mrtk post` `.l6d` classification fixes (found in the v0.7.12 release
+  review): a time-keyword path (`%Y%n…`) is expanded at the session start
+  for the content check, so a generically named MADOCA ionosphere `.l6d`
+  template is no longer ignored outside CLAS mode; and `l6_file_service()`
+  reads the file until the first classifiable frame instead of only the first
+  64 KB, so a long leading run of null messages no longer hides the service.
+  New ctest `madocalib_pppar_ion_l6d_template` (solution identical to the
+  legacy `*.200/201.l6` run; the old code ignored both files) and
+  `utest_l6_header` cases across the read-chunk boundary.
+
+- **`mrtk l6extract` output file names changed
+  ([#362](https://github.com/h-shiono/MRTKLIB/issues/362)).** QZSS L6
+  frames are now written to `{prefix}.{PRN}.l6d` / `{prefix}.{PRN}.l6e`
+  (e.g. `l6.199.l6d`, `l6.205.l6e`) instead of
+  `{prefix}_J{PRN}_{l6d|l6e}.l6`. Scripts that pick up the old names must
+  be updated. The new names follow the official MADOCA L6E naming and are
+  read by `mrtk post` directly (`.l6d` is routed by content, so a
+  `*.200.l6d` / `*.201.l6d` file goes to the MADOCA iono decoder).
+  The signal (L6D/L6E) and PRN now come from the L6 frame header instead
+  of the receiver container, which fixes three misclassifications:
+  - mosaic-CLAS SBF block 4069 (L6D, `Source = 1`) was written as L6E;
+  - L6E header PRNs 210/211 (QZS6/QZS7) were dropped;
+  - UBX L6E frames were named by the satellite PRN (e.g. 195) instead of
+    the L6E PRN (205).
+  Frames with a bad L6 preamble are skipped and counted in the summary.
+  Galileo HAS `.has` output is unchanged.
+
+- **CLAS: L6 null messages are dropped
+  ([#344](https://github.com/h-shiono/MRTKLIB/issues/344)).** A null
+  message (message type ID 0, alert flag 1, data all `0xAA`; IS-QZSS-L6-008
+  5.4.4: CLAS must not be used) was spliced into the CLAS subframe being
+  assembled and, from a UBX/SBF receiver, routed to the CLAS demux as
+  transmit pattern 0. `clas_input_cssr()` now skips it without touching the
+  subframe assembly or the delivery state (as upstream claslib 0.9.0), and
+  UBX/SBF L6D null frames are no longer returned as CLAS frames. Corrections
+  already decoded are kept. L6E null frames still go to the MADOCA decoder,
+  which reports the alert without clearing corrections (IS-QZSS-MDC-004
+  5.4.2). No capture contains a null message, so the new ctests
+  `claslib_l6_null_drop_*` insert synthetic null frames into the 2019 and
+  2025 CLAS files and require `mrtk dump` output identical to the clean
+  file; `utest_l6_route` covers the receiver paths.
+
+- RINEX 2 navigation: QZSS PRNs 98/99 (J198/J199) were read as GPS and
+  dropped; the 2-digit QZSS extension range is now 93..99 as in claslib
+  0.9.0 ([#347](https://github.com/h-shiono/MRTKLIB/issues/347)). New unit
+  test `utest_t_rinex2_qzs`.
+
+- CLAS: `clas_update_global()` skips a signal mode outside 1..`MAXCODE`
+  instead of indexing the bias arrays with it (defensive, as claslib 0.9.0;
+  [#348](https://github.com/h-shiono/MRTKLIB/issues/348)).
+
+- u-blox: the `-OUT_QZSSL6` debug counter of UBX-RXM-QZSSL6 no longer writes
+  out of bounds for svId ≥ 16
+  ([#364](https://github.com/h-shiono/MRTKLIB/issues/364)).
+
+### Tests and test data
+
+- **Test datasets move to release assets
+  ([#386](https://github.com/h-shiono/MRTKLIB/issues/386)).** Large
+  regression datasets are published as immutable release assets of
+  [h-shiono/mrtklib-data](https://github.com/h-shiono/mrtklib-data), pinned
+  by SHA256 in `tests/data/datasets.cmake`, and fetched by the ctest
+  fixtures on first use into `~/.cache/mrtklib-data`
+  (`-DMRTK_TEST_DATA_CACHE`, offline: `-DMRTK_TEST_DATA_DIR`). New build
+  target `fetch-test-data`. Configure and build stay offline. The Galileo HAS
+  dataset is the first one moved (`has-v1`; payload byte-identical); the
+  other datasets follow one per PR. New ctest `dataset_fetch_selftest`.
+
+- **QZSS L6 handover dataset
+  ([#372](https://github.com/h-shiono/MRTKLIB/issues/372)).** New test
+  dataset `handover-v1` (release asset, #386): five 15-minute windows around
+  CLAS L6 satellite handovers (NEO-D9C UBX L6 + mosaic-G5 SBF observations;
+  mosaic-CLAS SBF, including both transmit-pattern changes), with synthetic
+  file-stream time tags for synchronised `mrtk run` replay. Built by
+  `scripts/tests/make_handover_fixtures.py` (new `scripts/tests/ubx_filter.py`;
+  `sbf_filter.py` now also returns per-block tag records). New ctests
+  `handover_setup` / `handover_dataset_check`; the RT and post-processing
+  handover tests follow.
+
+- **RT replay tests through QZSS L6 handovers
+  ([#372](https://github.com/h-shiono/MRTKLIB/issues/372)).** Six
+  `rtkrcv_handover_*` ctests replay the `handover-v1` dataset with
+  `mrtk run`: NEO-D9C UBX L6 as a correction stream next to mosaic-G5 SBF
+  observations (2 channels, through the pattern-keyed demux), and mosaic-CLAS
+  single-stream with `l6_merge = 0` (all three handovers) and `= 1` (pattern
+  1 → 2). `scripts/tests/check_handover.py` gates behaviour, not RMS: no
+  solution freeze, fix before the handover, fix held again within a per-case
+  limit (the loss is typically ~30 s late, when the old satellite's
+  corrections age out), bounded non-fixed epochs, satellite count. Configs
+  come from `tests/data/handover/rtkrcv_handover.toml.in`;
+  `run_rtkrcv_test.sh` accepts an expected line count instead of a
+  reference file. Found while measuring: #389 (single-channel 195 → 199
+  outage ~80 s) and #390 (`l6_merge = 1` worse after a single-channel
+  pattern change).
+
+- **Post-processing tests through QZSS L6 handovers
+  ([#372](https://github.com/h-shiono/MRTKLIB/issues/372)).** Five
+  `post_handover_*` ctests run the `handover-v1` windows through
+  `mrtk convert` + `mrtk l6extract` + per-channel concatenation of the
+  per-PRN `.l6d` files (time order from `handover_manifest.json`) +
+  `mrtk post` (`scripts/tests/run_handover_post.py`, config
+  `tests/data/handover/rnx2rtkp_handover.toml.in`), gated by
+  `check_handover.py`. They run in CI (not `realtime`). Post-processing holds
+  fix through the handovers where the RT replays lose it for ~30–80 s;
+  #389 now tracks that RT-only fix loss.
+
+- **Handover tests: correct antenna and absolute accuracy
+  ([#372](https://github.com/h-shiono/MRTKLIB/issues/372)).** The DOY
+  2026-286 captures use a TOPCON CR-G5 without radome (`TPSCR.G5 NONE`), not
+  the ZED-F9P's Trimble Zephyr 2; the RT and post configs and
+  `tests/data/handover/README.md` are corrected. New
+  `post_handover_*_abs_check` (3D 1σ ≤ 0.25 m after 120 epochs) against the
+  antenna reference point from a 24 h static PPP-AR with CODE MGEX finals
+  (JAXA finals agree within 1.5 cm); provenance in the README.
+
+### Streams and configuration
+
+- **Stream byte counters are 64-bit (public API change,
+  [#368](https://github.com/h-shiono/MRTKLIB/issues/368)).** The
+  `mrtk relay` status line went negative after 2 GiB and wrapped at 4 GiB
+  (a few days at ~100 kbps). `stream_t.inb` / `outb` / `inbt` / `outbt` are
+  now `uint64_t`, and the byte arguments of `strsum()` and `strsvrstat()`
+  change from `int*` to `uint64_t*`:
+  `void strsum(stream_t*, uint64_t* inb, int* inr, uint64_t* outb, int* outr)`,
+  `void strsvrstat(strsvr_t*, int* stat, int* log_stat, uint64_t* byte, int* bps, char* msg)`.
+  Code calling these functions must update its variables. The `mrtk run`
+  console `stream` command now reads the counters through `strsum()` (under
+  the stream lock) and prints them as unsigned 64-bit values, as does the
+  `mrtk relay` status line. New unit test `utest_stream_bytes`.
+
+- `mrtk relay` / `mrtk run`: server sockets (`tcpsvr://`, UDP server) now
+  set `SO_REUSEADDR`, so a restart while a client is still connected no
+  longer fails with "stream server start error" for ~60 s. The
+  `SVR_REUSEADDR` define was set on the `mrtk` executable, but the code that
+  checks it is in the library
+  ([#367](https://github.com/h-shiono/MRTKLIB/issues/367)). New ctest
+  `stream_tcpsvr_rebind`.
+
+- Serial streams: `strwrite()` returned 0 for every successful serial write,
+  so the `mrtk run` console showed 0 output bytes/bps for serial outputs and
+  write-only serial outputs never became active. `writeserial()` now returns
+  the bytes written; a full output buffer (`EAGAIN`) or a short write no
+  longer marks the port as failed
+  ([#343](https://github.com/h-shiono/MRTKLIB/issues/343)). The
+  `strwrite()` doc now states the byte-count return. New unit test
+  `utest_stream_serial` (pseudo-terminal pair).
+
+- `saveopts()` now returns an error for a `.toml` file in append mode
+  instead of reporting success without writing anything. In the `mrtk run`
+  console, `save <file>.toml` therefore reports "options save error" instead
+  of "options saved" for a file that lacks every positioning option
+  (interim fix for [#342](https://github.com/h-shiono/MRTKLIB/issues/342);
+  saving the full configuration to TOML follows in v0.7.13). Use a `.conf`
+  file to save the full configuration until then.
+
 ## [v0.7.11] - 2026-09-29
 
 **MADOCA regression tests: build-independent upstream parity plus absolute

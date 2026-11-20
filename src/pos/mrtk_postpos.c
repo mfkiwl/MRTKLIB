@@ -24,8 +24,10 @@
 #include <string.h>
 
 #include "mrtklib/mrtk_antenna.h"
+#include "mrtklib/mrtk_b2b.h"
 #include "mrtklib/mrtk_bits.h"
 #include "mrtklib/mrtk_clas.h"
+#include "mrtklib/mrtk_const.h"
 #include "mrtklib/mrtk_coords.h"
 #include "mrtklib/mrtk_geoid.h"
 #include "mrtklib/mrtk_has.h"
@@ -49,9 +51,7 @@
 #include "mrtklib/mrtk_tides.h"
 #include "mrtklib/mrtk_trace.h"
 
-/* local constants (duplicated from rtklib.h to avoid rtklib.h dependency) ----*/
-#define R2D (180.0 / 3.1415926535897932384626433832795)
-#define D2R (3.1415926535897932384626433832795 / 180.0)
+/* R2D / D2R / SYS_CMP come from mrtk_const.h */
 
 #define COMMENTH "%" /* comment line indicator for solution */
 
@@ -86,6 +86,7 @@ static int nepoch = 0;                         /* number of observation epochs *
 static int iobsu = 0;                          /* current rover observation data index */
 static int iobsr = 0;                          /* current reference observation data index */
 static int isbs = 0;                           /* current sbas message index */
+static int ipvs = 0;                           /* current sbas message index for SouthPAN PVS */
 static int revs = 0;                           /* analysis direction (0:forward,1:backward) */
 static int aborts = 0;                         /* abort status */
 static sol_t* solf;                            /* forward solutions */
@@ -94,6 +95,7 @@ static double* rbf;                            /* forward base positions */
 static double* rbb;                            /* backward base positions */
 static int isolf = 0;                          /* current forward solutions index */
 static int isolb = 0;                          /* current backward solutions index */
+static int snrwarned[2] = {0};                 /* SNR mask without C/N0 warned {rover,base} */
 static char proc_rov[64] = "";                 /* rover for current processing */
 static char proc_base[64] = "";                /* base station for current processing */
 static char rtcm_file[1024] = "";              /* rtcm data file */
@@ -108,6 +110,10 @@ static has_t* gal_has = NULL;                  /* Galileo HAS decode context (he
 static char gal_has_file[1024] = "";           /* Galileo HAS data file */
 static char gal_has_path[1024] = "";           /* Galileo HAS data path */
 static FILE* fp_gal_has = NULL;                /* Galileo HAS data file pointer */
+static b2b_t* bds_b2b = NULL;                  /* BeiDou PPP-B2b decode context (heap) */
+static char bds_b2b_file[1024] = "";           /* BeiDou PPP-B2b data file */
+static char bds_b2b_path[1024] = "";           /* BeiDou PPP-B2b data path */
+static FILE* fp_bds_b2b = NULL;                /* BeiDou PPP-B2b data file pointer */
 static mdcl6d_t mdcl6d[MIONO_MAX_PRN];         /* QZSS L6D control struct */
 static char qzssl6d_file[MIONO_MAX_PRN][1024]; /* QZSS L6D data file */
 static char qzssl6d_path[MIONO_MAX_PRN][1024]; /* QZSS L6D data path */
@@ -119,6 +125,8 @@ static clas_ctx_t* clas_ctx = NULL;            /* CLAS decoder context */
 static FILE* fp_clas[CLAS_CH_NUM];             /* CLAS L6 file pointers */
 static char clas_file[CLAS_CH_NUM][1024];      /* CLAS L6 data file */
 static char clas_path[CLAS_CH_NUM][1024];      /* CLAS L6 data path */
+static clas_l6seq_t clas_seq[CLAS_CH_NUM];     /* CLAS channels assembled from L6 files (#373) */
+static int clas_seq_on = 0;                    /* CLAS channels read from clas_seq[] */
 
 /* show message and check break ----------------------------------------------*/
 static int checkbrk(const char* format, ...) {
@@ -312,16 +320,6 @@ static void update_rtcm(gtime_t time) {
         block2stat(rtcm, &navs.stat);
     }
 }
-/* QZSS L6 file extension: 0 none, 1 .l6, 2 .l6d, 3 .l6e (either case) -------*/
-static int l6_file_ext(const char* file) {
-    const char* ext = strrchr(file, '.');
-
-    if (!ext) return 0;
-    if (!strcmp(ext, ".l6") || !strcmp(ext, ".L6")) return 1;
-    if (!strcmp(ext, ".l6d") || !strcmp(ext, ".L6D")) return 2;
-    if (!strcmp(ext, ".l6e") || !strcmp(ext, ".L6E")) return 3;
-    return 0;
-}
 /* update QZSS L6E MADOCA-PPP corrections ------------------------------------*/
 static void update_qzssl6e(gtime_t time) {
     static int init_flg = 1;
@@ -408,6 +406,45 @@ static void update_gal_has(gtime_t time) {
         }
         navs.ssr_ch[0][i] = gal_has->ssr[i];
         gal_has->ssr[i].update = 0;
+    }
+}
+/* update BeiDou PPP-B2b corrections -----------------------------------------*/
+static void update_bds_b2b(gtime_t time) {
+    char path[1024];
+    int i;
+
+    /* open or swap PPP-B2b .b2b file (72-byte little-endian records) */
+    reppath(bds_b2b_file, path, time, "", "");
+
+    if (strcmp(path, bds_b2b_path)) {
+        strcpy(bds_b2b_path, path);
+
+        if (fp_bds_b2b) {
+            fclose(fp_bds_b2b);
+        }
+        fp_bds_b2b = fopen(path, "rb");
+        if (fp_bds_b2b) {
+            trace(NULL, 2, "bds_b2b file open: %s\n", path);
+        }
+    }
+    if (!fp_bds_b2b || !bds_b2b) {
+        return;
+    }
+
+    /* feed all records up to the current epoch (b2b_input_file rewinds the
+     * first future record, so a single call per epoch advances in lock-step) */
+    b2b_input_file(bds_b2b, fp_bds_b2b, time);
+
+    trace(NULL, 3, "update_bds_b2b: %s\n", time_str(time, 3));
+
+    /* copy updated PPP-B2b corrections into the SSR channel */
+    for (i = 0; i < MAXSAT; i++) {
+        if (!bds_b2b->ssr[i].update || bds_b2b->ssr[i].iod[0] != bds_b2b->ssr[i].iod[1] ||
+            timediff(time, bds_b2b->ssr[i].t0[0]) < -1E-3) {
+            continue;
+        }
+        navs.ssr_ch[0][i] = bds_b2b->ssr[i];
+        bds_b2b->ssr[i].update = 0;
     }
 }
 /* initialize QZSS L6D control struct ----------------------------------------*/
@@ -553,13 +590,10 @@ static void update_clas(gtime_t time) {
     char path[1024];
 
     /* initialize GPS week reference from observation time (once) */
-    if (clas_ctx && clas_ctx->week_ref[0] == 0 && time.time != 0) {
-        int i, week;
+    if (clas_ctx && !clas_week_ref_isset(clas_ctx) && time.time != 0) {
+        int week;
         time2gpst(time, &week);
-        for (i = 0; i < CSSR_REF_MAX; i++) {
-            clas_ctx->week_ref[i] = week;
-            clas_ctx->tow_ref[i] = -1; /* mark as unset for rollover detection */
-        }
+        clas_set_week_ref(clas_ctx, week);
         trace(NULL, 2, "clas week_ref initialized: week=%d\n", week);
     }
 
@@ -569,20 +603,22 @@ static void update_clas(gtime_t time) {
         }
 
         /* open or swap CLAS L6 file */
-        reppath(clas_file[ch], path, time, "", "");
+        if (!clas_seq_on) {
+            reppath(clas_file[ch], path, time, "", "");
 
-        if (strcmp(path, clas_path[ch])) {
-            strcpy(clas_path[ch], path);
-            if (fp_clas[ch]) {
-                fclose(fp_clas[ch]);
+            if (strcmp(path, clas_path[ch])) {
+                strcpy(clas_path[ch], path);
+                if (fp_clas[ch]) {
+                    fclose(fp_clas[ch]);
+                }
+                fp_clas[ch] = fopen(path, "rb");
+                if (fp_clas[ch]) {
+                    trace(NULL, 2, "clas l6 file open: %s\n", path);
+                }
             }
-            fp_clas[ch] = fopen(path, "rb");
-            if (fp_clas[ch]) {
-                trace(NULL, 2, "clas l6 file open: %s\n", path);
+            if (!fp_clas[ch]) {
+                continue;
             }
-        }
-        if (!fp_clas[ch]) {
-            continue;
         }
 
         /* Read CSSR through the correction set whose mask time is at the
@@ -592,7 +628,8 @@ static void update_clas(gtime_t time) {
                 clas_has_orbit_bank(clas_ctx, ch)) {
                 break;
             }
-            ret = clas_input_cssrf(clas_ctx, fp_clas[ch], ch);
+            ret = clas_seq_on ? clas_l6seq_input(clas_ctx, clas_seq + ch, ch)
+                              : clas_input_cssrf(clas_ctx, fp_clas[ch], ch);
             if (ret < -1) {
                 break; /* EOF */
             }
@@ -669,6 +706,10 @@ static int inputobs(obsd_t* obs, int solq, const prcopt_t* popt) {
         while (isbs < sbss.n) {
             time = gpst2time(sbss.msgs[isbs].week, sbss.msgs[isbs].tow);
 
+            if (sbss.msgs[isbs].band == SBS_BAND_L5) { /* L5 DFMC: SouthPAN PVS below */
+                isbs++;
+                continue;
+            }
             if (getbitu(sbss.msgs[isbs].msg, 8, 6) != 9) { /* except for geo nav */
                 sbsupdatecorr(sbss.msgs + isbs, &navs);
             }
@@ -676,6 +717,17 @@ static int inputobs(obsd_t* obs, int solq, const prcopt_t* popt) {
                 break;
             }
             isbs++;
+        }
+        /* update southpan pvs corrections: an L5 message applies from its
+         * reception time, independent of the L1 messages of the same second */
+        for (; ipvs < sbss.n; ipvs++) {
+            time = gpst2time(sbss.msgs[ipvs].week, sbss.msgs[ipvs].tow);
+            if (timediff(time, obs[0].time) > DTTOL) {
+                break;
+            }
+            if (sbss.msgs[ipvs].band == SBS_BAND_L5 && popt->correction == CORR_SOUTHPAN_PVS) {
+                sbsupdatepvs(sbss.msgs + ipvs, &navs);
+            }
         }
         /* update rtcm ssr corrections */
         if (*rtcm_file) {
@@ -688,6 +740,10 @@ static int inputobs(obsd_t* obs, int solq, const prcopt_t* popt) {
         /* update Galileo HAS PPP corrections */
         if (*gal_has_file) {
             update_gal_has(obs[0].time);
+        }
+        /* update BeiDou PPP-B2b corrections */
+        if (*bds_b2b_file) {
+            update_bds_b2b(obs[0].time);
         }
         /* update QZSS L6D MADOCA-PPP ionospheric corrections */
         if (popt->ionocorr) {
@@ -743,6 +799,10 @@ static int inputobs(obsd_t* obs, int solq, const prcopt_t* popt) {
         while (isbs >= 0) {
             time = gpst2time(sbss.msgs[isbs].week, sbss.msgs[isbs].tow);
 
+            if (sbss.msgs[isbs].band == SBS_BAND_L5) { /* L5 DFMC: SouthPAN PVS below */
+                isbs--;
+                continue;
+            }
             if (getbitu(sbss.msgs[isbs].msg, 8, 6) != 9) { /* except for geo nav */
                 sbsupdatecorr(sbss.msgs + isbs, &navs);
             }
@@ -751,6 +811,7 @@ static int inputobs(obsd_t* obs, int solq, const prcopt_t* popt) {
             }
             isbs--;
         }
+        /* no SouthPAN PVS update: postpos() runs PVS forward only */
     }
     return n;
 }
@@ -972,10 +1033,67 @@ static void combres(FILE* fp, const prcopt_t* popt, const solopt_t* sopt) {
         outsol(fp, &sol, rb, sopt);
     }
 }
+/* assign CLAS L6 files to channels ------------------------------------------
+ * Legacy: file i -> channel i, as given. Several L6 files per channel (#373),
+ * e.g. the per-PRN files of mrtk l6extract across a QZSS handover, need the
+ * channels built from the file contents: more files than channels, two files
+ * of one transmit pattern, or l6_merge off with two or more files (channel 1
+ * is not used then). Keyword paths (%Y ...) stay on the legacy path. */
+static void set_clas_files(const char** in, int n, int l6mrg) {
+    clas_l6file_t* f;
+    int chof[CLAS_L6SEQ_MAXFILE], i, j, ch, group = 0, tmpl = 0;
+
+    for (i = 0; i < n; i++) {
+        tmpl |= strchr(in[i], '%') != NULL;
+    }
+    if (n > 1 && !tmpl && (f = (clas_l6file_t*)calloc(n, sizeof(clas_l6file_t)))) {
+        for (i = 0; i < n; i++) {
+            clas_l6_scan_file(in[i], f + i);
+        }
+        group = n > CLAS_CH_NUM || !l6mrg;
+        for (i = 0; i < n && !group; i++) {
+            for (j = i + 1; j < n; j++) {
+                if (f[i].ptn >= 0 && f[i].ptn == f[j].ptn) {
+                    group = 1;
+                }
+            }
+        }
+        if (group) {
+            clas_seq_on = 1;
+            clas_l6seq_build(f, n, l6mrg, clas_seq, chof);
+            for (i = 0; i < n; i++) {
+                if ((ch = chof[i]) < 0) {
+                    showmsg("warning: CLAS L6 file not used (%s): %s",
+                            f[i].ptn < 0     ? "no CLAS frame"
+                            : f[i].nblk == 0 ? "no ST1 mask"
+                                             : "third pattern",
+                            in[i]);
+                } else if (!*clas_file[ch]) {
+                    strcpy(clas_file[ch], in[i]);
+                }
+            }
+        }
+        for (i = 0; i < n; i++) {
+            clas_l6_free_file(f + i);
+        }
+        free(f);
+    }
+    if (group) {
+        return;
+    }
+    for (i = 0; i < n; i++) {
+        if (i < CLAS_CH_NUM) {
+            strcpy(clas_file[i], in[i]);
+        } else {
+            showmsg("warning: CLAS L6 file not used (more than %d keyword paths): %s", CLAS_CH_NUM, in[i]);
+            trace(NULL, 2, "CLAS L6 file not used: %s\n", in[i]);
+        }
+    }
+}
 /* read prec ephemeris, sbas data, tec grid and open rtcm --------------------*/
-static void readpreceph(char** infile, int n, const prcopt_t* prcopt, nav_t* nav, sbs_t* sbs) {
+static void readpreceph(char** infile, int n, const prcopt_t* prcopt, nav_t* nav, sbs_t* sbs, gtime_t ts) {
     seph_t seph0 = {0};
-    int i;
+    int i, ssr_owner;
     char* ext;
 
     trace(NULL, 2, "readpreceph: n=%d\n", n);
@@ -993,7 +1111,7 @@ static void readpreceph(char** infile, int n, const prcopt_t* prcopt, nav_t* nav
     }
     /* read precise clock files */
     for (i = 0; i < n; i++) {
-        if (strstr(infile[i], "%r") || strstr(infile[i], "%b") || l6_file_ext(infile[i])) {
+        if (strstr(infile[i], "%r") || strstr(infile[i], "%b") || l6_file_type(infile[i])) {
             continue;
         }
         readrnxc(infile[i], nav);
@@ -1032,8 +1150,18 @@ static void readpreceph(char** infile, int n, const prcopt_t* prcopt, nav_t* nav
     stat_file[0] = cstat_file[0] = '\0';
     fp_stat = NULL;
 
+    /* Galileo HAS, PPP-B2b and SouthPAN PVS own nav.ssr_ch[0], as in mrtk run
+     * (#464): RTCM3 SSR and MADOCA L6E files would replace their corrections */
+    ssr_owner = prcopt->correction == CORR_GAL_HAS || prcopt->correction == CORR_BDS_B2B ||
+                prcopt->correction == CORR_SOUTHPAN_PVS;
+
     for (i = 0; i < n; i++) {
         if ((ext = strrchr(infile[i], '.')) && (!strcmp(ext, ".rtcm3") || !strcmp(ext, ".RTCM3"))) {
+            if (ssr_owner) {
+                showmsg("warning: RTCM3 SSR file ignored, corrections come from the selected service: %s", infile[i]);
+                trace(NULL, 2, "rtcm3 file ignored (ssr_ch[0] owned by the correction source): %s\n", infile[i]);
+                break;
+            }
             strcpy(rtcm_file, infile[i]);
             if (!rtcm) {
                 rtcm = (rtcm_t*)calloc(1, sizeof(rtcm_t));
@@ -1053,8 +1181,8 @@ static void readpreceph(char** infile, int n, const prcopt_t* prcopt, nav_t* nav
         }
     }
 
-    /* Galileo HAS .has file (first match only) */
-    for (i = 0; i < n; i++) {
+    /* Galileo HAS .has file (first match only), only for correction = gal-has */
+    for (i = 0; i < n && prcopt->correction == CORR_GAL_HAS; i++) {
         if ((ext = strrchr(infile[i], '.')) && (!strcmp(ext, ".has") || !strcmp(ext, ".HAS"))) {
             strcpy(gal_has_file, infile[i]);
             if (!gal_has) {
@@ -1068,27 +1196,58 @@ static void readpreceph(char** infile, int n, const prcopt_t* prcopt, nav_t* nav
         }
     }
 
+    /* BeiDou PPP-B2b .b2b file (first match only), only for correction = bds-b2b:
+     * otherwise its corrections would replace those of the selected service */
+    for (i = 0; i < n && prcopt->correction == CORR_BDS_B2B; i++) {
+        if ((ext = strrchr(infile[i], '.')) && (!strcmp(ext, ".b2b") || !strcmp(ext, ".B2B"))) {
+            strcpy(bds_b2b_file, infile[i]);
+            if (!bds_b2b) {
+                bds_b2b = b2b_new();
+                if (!bds_b2b) {
+                    bds_b2b_file[0] = '\0';
+                    break;
+                }
+            }
+            break;
+        }
+    }
+    /* PPP-B2b orbit/clock corrections reference the B-CNAV1 (B1C) ephemeris,
+     * not the D1/D2 AODE; switch the BDS ephemeris selection accordingly. */
+    setseleph(SYS_CMP, prcopt->correction == CORR_BDS_B2B ? 1 : 0);
+    /* SouthPAN PVS corrects the Galileo F/NAV ephemeris (E1/E5a clock) */
+    setseleph(SYS_GAL, prcopt->correction == CORR_SOUTHPAN_PVS ? 1 : 0);
+
     /* QZSS L6 files (.l6 / .l6d / .l6e): MADOCA-PPP iono L6D, CLAS L6D, MADOCA-PPP L6E.
      * Legacy .l6: *.200.l6 / *.201.l6 are iono, others CLAS in CLAS mode, else L6E.
      * .l6d: iono by name (*.200.l6d / *.201.l6d) or by the first frame header,
-     *       otherwise CLAS (CLAS mode only).
+     *       otherwise CLAS (CLAS mode only). A time-keyword path (%Y ...) is
+     *       expanded at the session start for the content check only; the
+     *       template itself is kept for the per-epoch file switching.
      * .l6e: MADOCA-PPP L6E; in CLAS mode reserved for CLAS CMA (not yet used). */
     {
         int nf_l6d = 0, nf_clas = 0;
+        const char* clas_in[CLAS_L6SEQ_MAXFILE];
         int clas_mode = (prcopt->mode == PMODE_PPP_RTK) ||
                         (prcopt->mode >= PMODE_SSR2OSR && prcopt->mode <= PMODE_SSR2OSR_FIXED) ||
                         strstr(prcopt->pppopt, "-clas") != NULL;
 
         for (i = 0; i < n; i++) {
-            int type = l6_file_ext(infile[i]), is_l6d = type == 2, is_l6e = type == 3, iono;
+            l6_file_type_t type = l6_file_type(infile[i]);
+            int is_l6d = type == L6_FILE_L6D, is_l6e = type == L6_FILE_L6E, iono;
 
-            if (!type) {
+            if (type == L6_FILE_NONE) {
                 continue;
             }
             ext = strrchr(infile[i], '.');
             iono = !is_l6e && ext - infile[i] >= 4 && (!strncmp(ext - 4, ".200", 4) || !strncmp(ext - 4, ".201", 4));
             if (is_l6d && !iono) {
-                iono = l6_file_service(infile[i]) == L6_SVC_MADOCA_IONO;
+                char probe[1024];
+                if (strchr(infile[i], '%') && ts.time) {
+                    reppath(infile[i], probe, ts, "", "");
+                } else {
+                    snprintf(probe, sizeof(probe), "%s", infile[i]);
+                }
+                iono = l6_file_service(probe) == L6_SVC_MADOCA_IONO;
             }
             if (iono) { /* MADOCA-PPP L6D iono (PRN 200/201) — always detected */
                 if (nf_l6d < MIONO_MAX_PRN) {
@@ -1098,12 +1257,18 @@ static void readpreceph(char** infile, int n, const prcopt_t* prcopt, nav_t* nav
                 showmsg("warning: CLAS CMA input not supported yet, ignored: %s", infile[i]);
                 trace(NULL, 2, "L6E file ignored in CLAS mode (CMA not supported): %s\n", infile[i]);
             } else if (clas_mode && !is_l6e) { /* CLAS L6D */
-                if (nf_clas < CLAS_CH_NUM) {
-                    strcpy(clas_file[nf_clas++], infile[i]);
+                if (nf_clas < CLAS_L6SEQ_MAXFILE) {
+                    clas_in[nf_clas++] = infile[i];
+                } else {
+                    showmsg("warning: CLAS L6 file not used (more than %d files): %s", CLAS_L6SEQ_MAXFILE, infile[i]);
+                    trace(NULL, 2, "CLAS L6 file not used (more than %d files): %s\n", CLAS_L6SEQ_MAXFILE, infile[i]);
                 }
             } else if (is_l6d) {
                 showmsg("warning: L6D file ignored outside CLAS mode: %s", infile[i]);
                 trace(NULL, 2, "L6D file ignored outside CLAS mode: %s\n", infile[i]);
+            } else if (ssr_owner) {
+                showmsg("warning: L6E file ignored, corrections come from the selected service: %s", infile[i]);
+                trace(NULL, 2, "L6E file ignored (ssr_ch[0] owned by the correction source): %s\n", infile[i]);
             } else if (!*qzssl6e_file) { /* MADOCA-PPP L6E (first match only) */
                 strcpy(qzssl6e_file, infile[i]);
                 if (!l6e) {
@@ -1127,6 +1292,8 @@ static void readpreceph(char** infile, int n, const prcopt_t* prcopt, nav_t* nav
         if (nf_l6d > 0 && !nav->pppiono) {
             nav->pppiono = (pppiono_t*)calloc(1, sizeof(pppiono_t));
         }
+
+        set_clas_files(clas_in, nf_clas, prcopt->l6mrg);
 
         /* initialize CLAS context if files found */
         if (nf_clas > 0 && !clas_ctx) {
@@ -1197,7 +1364,22 @@ static void freepreceph(nav_t* nav, sbs_t* sbs) {
     }
     gal_has_file[0] = gal_has_path[0] = '\0';
 
+    /* free BeiDou PPP-B2b context */
+    if (fp_bds_b2b) {
+        fclose(fp_bds_b2b);
+        fp_bds_b2b = NULL;
+    }
+    if (bds_b2b) {
+        b2b_free(bds_b2b);
+        bds_b2b = NULL;
+    }
+    bds_b2b_file[0] = bds_b2b_path[0] = '\0';
+
     /* free CLAS context */
+    for (i = 0; i < CLAS_CH_NUM; i++) {
+        clas_l6seq_free(clas_seq + i);
+    }
+    clas_seq_on = 0;
     if (clas_ctx) {
         for (i = 0; i < CLAS_CH_NUM; i++) {
             if (fp_clas[i]) {
@@ -1208,6 +1390,35 @@ static void freepreceph(nav_t* nav, sbs_t* sbs) {
         clas_ctx_free(clas_ctx);
         free(clas_ctx);
         clas_ctx = NULL;
+    }
+}
+/* warn when the SNR mask is on but a receiver's obs carry no C/N0 -----------
+ * testsnr() leaves unknown C/N0 unmasked, so the mask silently does nothing
+ * for such input (#477); once per postpos() call, not per session */
+static void warn_snrmask_no_cn0(const obs_t* obs, const prcopt_t* prcopt) {
+    static const char* name[2] = {"rover", "base"};
+    int has_obs[2] = {0}, has_snr[2] = {0}, i, j, r;
+
+    for (i = 0; i < obs->n; i++) {
+        r = obs->data[i].rcv - 1;
+        if (r < 0 || r > 1) {
+            continue;
+        }
+        has_obs[r] = 1;
+        for (j = 0; j < NFREQ + NEXOBS && !has_snr[r]; j++) {
+            if (obs->data[i].SNR[j] > 0) {
+                has_snr[r] = 1;
+            }
+        }
+    }
+    for (r = 0; r < 2; r++) {
+        if (prcopt->snrmask.ena[r] && has_obs[r] && !has_snr[r] && !snrwarned[r]) {
+            snrwarned[r] = 1;
+            fprintf(stderr,
+                    "warning : SNR mask is enabled for the %s but its observations have no C/N0 (S), "
+                    "so the mask is not applied\n",
+                    name[r]);
+        }
     }
 }
 /* read obs and nav data -----------------------------------------------------*/
@@ -1240,7 +1451,7 @@ static int readobsnav(gtime_t ts, gtime_t te, double ti, char** infile, const in
             ind = index[i];
             nobs = obs->n;
         }
-        if (l6_file_ext(infile[i])) {
+        if (l6_file_type(infile[i])) {
             continue; /* QZSS L6 frames, not RINEX (".l6d" would also trip the
                        * Hatanaka 4th-char-'d' test in rtk_uncompress) */
         }
@@ -1275,6 +1486,8 @@ static int readobsnav(gtime_t ts, gtime_t te, double ti, char** infile, const in
     }
     /* sort observation data */
     nepoch = sortobs(obs);
+
+    warn_snrmask_no_cn0(obs, prcopt);
 
     /* delete duplicated ephemeris */
     uniqnav(nav);
@@ -1474,6 +1687,33 @@ static int openses(mrtk_ctx_t* ctx, const prcopt_t* popt, const solopt_t* sopt, 
         }
     }
     return 1;
+}
+/* set bias-sinex and fcb file paths -------------------------------------------
+ * a .bia/.fcb input file takes precedence over the file options. the paths are
+ * kept unexpanded: udbiass() expands their keywords at each epoch. this must
+ * run for every ts/te combination; upstream set them only when both ts and te
+ * were given (#475) */
+static void setbiapath(char** infile, int n, const filopt_t* fopt, nav_t* nav) {
+    char* ext;
+    int i;
+
+    nav->biapath[0] = nav->fcbpath[0] = '\0';
+    for (i = 0; i < n; i++) {
+        if (!(ext = strrchr(infile[i], '.'))) {
+            continue;
+        }
+        if (!strcmp(ext, ".bia") || !strcmp(ext, ".BIA")) {
+            strcpy(nav->biapath, infile[i]);
+        } else if (!strcmp(ext, ".fcb") || !strcmp(ext, ".FCB")) {
+            strcpy(nav->fcbpath, infile[i]);
+        }
+    }
+    if (!*nav->biapath && *fopt->bia) {
+        strcpy(nav->biapath, fopt->bia);
+    }
+    if (!*nav->fcbpath && *fopt->fcb) {
+        strcpy(nav->fcbpath, fopt->fcb);
+    }
 }
 /* close procssing session ---------------------------------------------------*/
 static void closeses(mrtk_ctx_t* ctx, nav_t* nav, pcvs_t* pcvs, pcvs_t* pcvr) {
@@ -1695,7 +1935,7 @@ static int execses(mrtk_ctx_t* ctx, gtime_t ts, gtime_t te, double ti, const prc
         freeobsnav(&obss, &navs);
         return 0;
     }
-    iobsu = iobsr = isbs = revs = aborts = 0;
+    iobsu = iobsr = isbs = ipvs = revs = aborts = 0;
 
     /* check and set station name */
     if (strlen(popt_.staname) == 0) {
@@ -1828,7 +2068,7 @@ static int execses_b(mrtk_ctx_t* ctx, gtime_t ts, gtime_t te, double ti, const p
     trace(ctx, 3, "execses_b: n=%d outfile=%s\n", n, outfile);
 
     /* read prec ephemeris and sbas data */
-    readpreceph(infile, n, popt, &navs, &sbss);
+    readpreceph(infile, n, popt, &navs, &sbss, ts);
 
     for (i = 0; i < n; i++) {
         if (strstr(infile[i], "%b")) {
@@ -1918,7 +2158,7 @@ static int execses_b(mrtk_ctx_t* ctx, gtime_t ts, gtime_t te, double ti, const p
  *              .sp3,.SP3,.eph*,.EPH*: precise ephemeris (sp3c)
  *              .sbs,.SBS,.ems,.EMS  : sbas message log files (rtklib or ems)
  *              .rtcm3,.RTCM3        : ssr message log files (rtcm3)
- *              .l6,.l6d,.l6e (any case): QZSS L6 frame files (CLAS, MADOCA-PPP)
+ *              .l6,.l6d,.l6e        : QZSS L6 frame files, case-insensitive (CLAS, MADOCA-PPP)
  *              .*i,.*I              : tec grid files (ionex)
  *              others               : rinex obs, nav, gnav, hnav, qnav or clock
  *
@@ -1946,10 +2186,25 @@ extern int postpos(mrtk_ctx_t* ctx, gtime_t ts, gtime_t te, double ti, double tu
 
     trace(ctx, 3, "postpos : ti=%.0f tu=%.0f n=%d outfile=%s\n", ti, tu, n, outfile);
 
+    /* a SouthPAN PVS correction is valid for 100 s from its reception: the
+     * backward pass would apply corrections received after the observation */
+    if (popt->correction == CORR_SOUTHPAN_PVS && popt->soltype != 0) {
+        showmsg("error : correction=southpan-pvs supports solution_type = \"forward\" only");
+        trace(ctx, 1, "southpan-pvs with soltype=%d\n", popt->soltype);
+        return -1;
+    }
+
+    /* BeiDou generation of PRN 1-18 and BDS-3 IGSO (#401): set before reading
+       files, since RINEX reading already depends on the generation */
+    set_bdsopt(popt, 1);
+
+    snrwarned[0] = snrwarned[1] = 0;
+
     /* open processing session */
     if (!openses(ctx, popt, sopt, fopt, &navs, &pcvss, &pcvsr)) {
         return -1;
     }
+    setbiapath(infile, n, fopt, &navs);
 
     if (ts.time != 0 && te.time != 0 && tu >= 0.0) {
         if (timediff(te, ts) < 0.0) {
@@ -1995,7 +2250,7 @@ extern int postpos(mrtk_ctx_t* ctx, gtime_t ts, gtime_t te, double ti, double tu
             for (j = k = nf = 0; j < n; j++) {
                 ext = strrchr(infile[j], '.');
 
-                if ((ext && (!strcmp(ext, ".rtcm3") || !strcmp(ext, ".RTCM3"))) || l6_file_ext(infile[j])) {
+                if ((ext && (!strcmp(ext, ".rtcm3") || !strcmp(ext, ".RTCM3"))) || l6_file_type(infile[j])) {
                     strcpy(ifile[nf++], infile[j]);
                 } else {
                     /* include next day precise ephemeris or rinex brdc nav */
@@ -2007,12 +2262,6 @@ extern int postpos(mrtk_ctx_t* ctx, gtime_t ts, gtime_t te, double ti, double tu
                         ttte = timeadd(ttte, 7200.0);
                     }
                     nf += reppaths(infile[j], ifile + nf, MAXINFILE - nf, tts, ttte, "", "");
-                }
-                if (ext && (!strcmp(ext, ".bia") || !strcmp(ext, ".BIA"))) {
-                    strcpy(navs.biapath, infile[j]);
-                }
-                if (ext && (!strcmp(ext, ".fcb") || !strcmp(ext, ".FCB"))) {
-                    strcpy(navs.fcbpath, infile[j]);
                 }
                 while (k < nf) {
                     index[k++] = j;
@@ -2027,12 +2276,6 @@ extern int postpos(mrtk_ctx_t* ctx, gtime_t ts, gtime_t te, double ti, double tu
                 flag = 0;
             }
 
-            if (strlen(navs.biapath) == 0 && strlen(fopt->bia) > 0) {
-                strcpy(navs.biapath, fopt->bia);
-            }
-            if (strlen(navs.fcbpath) == 0 && strlen(fopt->fcb) > 0) {
-                strcpy(navs.fcbpath, fopt->fcb);
-            }
             /* execute processing session */
             stat = execses_b(ctx, tts, tte, ti, popt, sopt, fopt, flag, ifile, index, nf, ofile, rov, base);
 

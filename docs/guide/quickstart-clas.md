@@ -35,12 +35,46 @@ and navigation data. All files below are **bundled** with MRTKLIB.
 
 All bundled files are located in `tests/data/claslib/`.
 
-!!! warning "ANTEX File: Use IGS14, Not IGS20"
-    CLAS corrections are based on the **ITRF2014** reference frame. You must
-    use an IGS14-based ANTEX file (e.g., `igs14.atx` or `igs14_L5copy.atx`).
+!!! note "`igs14_L5copy.atx` is an igs20 file"
+    CLAS is defined in ITRF2020 (IGb20) as of IS-QZSS-L6-008 (2026-03-18). Despite
+    its name, the CLASLIB ANTEX file has been built from IGS `igs20.atx` since
+    CLASLIB 0.7.4, with the L2 values of some ground antennas copied to L5. A
+    stock `igs20.atx` has no L5 values for those antennas, so L5 gets no antenna
+    correction on them. The file must also contain the antenna and radome of your
+    receiver.
 
-    The latest IGS20-based ANTEX (`igs20.atx`) uses ITRF2020, which introduces
-    millimeter-to-centimeter frame differences that degrade positioning accuracy.
+### Refreshing the ANTEX and ERP files
+
+Two scripts regenerate these files from IGS products. They need only Python.
+Keep the output outside the repository.
+
+**ANTEX.** Pass the GPS week of an `igs20` file in the IGS archive, or `latest`:
+
+```bash
+python scripts/tools/make_clas_atx.py --week 2437 -o igs14_L5copy.atx
+```
+
+Each listed ground antenna gets a GPS L5 block with the values of its L2 block.
+The script differs from CLASLIB in one way: it does not copy L2 to L5 on the
+satellite antenna `BLOCK IIA` G01.
+
+**ERP.** Extend an existing `igu00p01.erp` with the IGS ultra-rapid files
+published since it was last updated:
+
+```bash
+python scripts/tools/update_igu_erp.py -i igu00p01.erp -o igu00p01_new.erp \
+  --cache-dir ~/.cache/igu
+```
+
+Run it once a week or so; rerunning only fetches what is new. Files come from
+the BKG mirror over HTTPS. When the tool reports missing issues, `--allow-http`
+also tries SOPAC, which serves only plain HTTP. Add `--full` to
+re-apply every issue since 2023, which also overwrites five rows in the CLASLIB
+0.9.1 file that do not follow the update rule. Point `files.receiver_atx` and
+`files.eop` at the new files to use them.
+
+How these files are built, and the record of those five rows, are in
+[CLAS support files](../design/clas-support-files.md).
 
 ---
 
@@ -74,6 +108,64 @@ $GNGGA,160131.00,3908.109031,N,14107.972285,E,4,08,...
 - **Q=1 (SPP)** — Initial convergence or missing corrections
 
 Typical fix rate for this dataset: **>99%** (after initial convergence).
+
+### GGA Station ID: CLAS L6 Source
+
+In PPP-RTK mode, the last GGA field before the checksum (field 14,
+*differential reference station ID*) names the L6 source of the corrections
+used for the epoch. Field 13 next to it is the correction age (s).
+
+```
+$GNGGA,160146.00,3606.2180291,N,14005.1791136,E,4,11,1.0,31.791,M,38.037,M,4.0,0101*62
+                                                                        age ─┘ └─ station ID
+```
+
+The 4-digit ID is `P1×100 + P2×10 + F` (0000–0779, within the NMEA range
+0000–1023):
+
+| Digit | Meaning |
+|-------|---------|
+| `P1` | L6 PRN − 192 of channel 1 |
+| `P2` | L6 PRN − 192 of channel 2 (`0` with one channel, or when channel 2 has no corrections) |
+| `F` | Facility ID + 1 (`1`–`4`); `9` when the two channels carry different facilities |
+
+`0000` means no CLAS corrections were used (Q=1 / SPP epochs).
+
+| L6 PRN | 193 | 194 | 195 | 196 | 197 | 199 |
+|--------|-----|-----|-----|-----|-----|-----|
+| Digit  | 1   | 2   | 3   | 4   | 5   | 7   |
+
+Examples:
+
+| ID | Reading |
+|----|---------|
+| `0101` | One channel, PRN 193, facility 1 (the bundled 2019 dataset) |
+| `0243` | `l6_merge`: PRN 194 + PRN 196, facility 3 (the bundled 2025 two-channel dataset) |
+| `0203` | `l6_merge` enabled, only channel 1 has corrections |
+| `0459` | `l6_merge`: PRN 196 + PRN 197, channels on different facilities |
+
+The PRN is the one that delivered the clock correction in use, so a
+QZSS handover (a digit in `P1`/`P2` changes) or a facility switch (`F`
+changes, after which the engine resets its filter) can be read directly from
+the NMEA log and lined up with fix drops.
+
+!!! note "Facility ID"
+    `F` is the facility ID as normalized by the decoder, not the raw bits 4–3
+    of the L6 message type ID. The raw bits depend on the transmit pattern, so
+    two channels from the same facility can carry different raw values (the
+    2025 dataset has raw 1 on PRN 194 and raw 0 on PRN 196; both are facility 3
+    here).
+
+To write `0000` as before, set:
+
+```toml
+[output]
+clas_nmea_source_id = false
+```
+
+The ID is written for CLAS PPP-RTK only; VRS-RTK and the other modes write
+`0000`. The GGA that `mrtk run` sends upstream to an NTRIP caster always
+writes `0000`.
 
 ---
 
@@ -186,6 +278,7 @@ Controls how far from the rover position to search for CLAS grid points.
 |:-----|:------------|
 | `conf/claslib/rnx2rtkp.toml` | Post-processing, single-channel L6 |
 | `conf/claslib/rnx2rtkp_vrs.toml` | Post-processing, VRS-RTK mode |
+| `conf/claslib/rnx2rtkp_L1CL5_vrs.toml` | Post-processing, VRS-RTK with QZS L1C + L5 (VRS observations from `mrtk ssr2obs -k conf/claslib/ssr2obs_L1CL5.toml`) |
 | `conf/claslib/rtkrcv.toml` | Real-time, single-channel L6 (file replay) |
 | `conf/claslib/rtkrcv_2ch.toml` | Real-time, dual-channel L6 (file replay) |
 | `conf/claslib/rtkrcv_ubx_clas.toml` | Real-time, u-blox F9P + D9C (live) |
@@ -205,7 +298,7 @@ Controls how far from the rover position to search for CLAS grid points.
 ### Fix Rate Lower Than Expected
 
 1. **nf=3 instead of nf=2** — Most common cause. See [Frequency](#frequency-must-be-l1-2) above.
-2. **Wrong ANTEX** — Using `igs20.atx` instead of `igs14.atx` introduces frame errors.
+2. **Wrong ANTEX** — The antenna or radome is missing from the file, or a stock `igs20.atx` is used, which has no L5 values for some antennas.
 3. **Receiver type mismatch** — Check `[positioning.clas].receiver_type` matches `isb.tbl`.
 
 ### `clas grid file error`

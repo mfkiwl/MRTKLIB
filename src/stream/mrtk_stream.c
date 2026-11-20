@@ -165,6 +165,7 @@ typedef struct {                /* ntrip control type */
     int ver_neg;                /* negotiated version after handshake */
     int chunked;                /* chunked transfer encoding flag */
     int v2_tried;               /* v2 attempt flag for AUTO fallback */
+    int req_v2;                 /* last server request sent was v2 (POST, chunked) */
     int nb;                     /* response buffer size */
     char url[MAXSTRPATH];       /* url for proxy */
     char host[256];             /* host header value (addr:port) */
@@ -403,15 +404,20 @@ static int readserial(serial_t* serial, uint8_t* buff, int n, char* msg) {
 }
 /* write serial --------------------------------------------------------------*/
 static int writeserial(serial_t* serial, uint8_t* buff, int n, char* msg) {
-    int ns = 0;
-
-    tracet(NULL, 3, "writeserial: dev=%d n=%d\n", serial->dev, n);
+    int ns;
 
     if (!serial) {
         return 0;
     }
-    if (write(serial->dev, buff, n) < n) {
-        serial->error = 1;
+    tracet(NULL, 3, "writeserial: dev=%d n=%d\n", serial->dev, n);
+
+    /* non-blocking port: a full output buffer (EAGAIN) or a short write is not
+     * a device error; the unsent part is not resent */
+    if ((ns = (int)write(serial->dev, buff, n)) < 0) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            serial->error = 1;
+        }
+        ns = 0;
     }
     tracet(NULL, 5, "writeserial: exit dev=%d ns=%d\n", serial->dev, ns);
     return ns;
@@ -1545,6 +1551,7 @@ static int reqntrip_s(ntrip_t* ntrip, char* msg) {
 
     tracet(NULL, 3, "reqntrip_s: send request state=%d ns=%d v2=%d\n", ntrip->state, (int)(p - buff), use_v2);
     tracet(NULL, 5, "reqntrip_s: n=%d buff=\n%s\n", (int)(p - buff), buff);
+    ntrip->req_v2 = use_v2;
     ntrip->state = 1;
     return 1;
 }
@@ -1629,7 +1636,9 @@ static int rspntrip_s(ntrip_t* ntrip, char* msg) {
     ntrip->buff[ntrip->nb] = '\0';
     tracet(NULL, 5, "rspntrip_s: n=%d buff=\n%s\n", ntrip->nb, ntrip->buff);
 
-    if ((p = strstr((char*)ntrip->buff, NTRIP_RSP_OK_SVR))) { /* v1 ok */
+    /* HTTP status/header text may contain "OK\r\n" too. Let the HTTP parser
+     * finish the headers and select v2 before enabling chunked output. */
+    if (strncmp((char*)ntrip->buff, "HTTP/", 5) && (p = strstr((char*)ntrip->buff, NTRIP_RSP_OK_SVR))) { /* v1 ok */
         q = (char*)ntrip->buff;
         p += strlen(NTRIP_RSP_OK_SVR);
         ntrip->nb -= (int)(p - q);
@@ -1647,15 +1656,17 @@ static int rspntrip_s(ntrip_t* ntrip, char* msg) {
         status = http_status_code(ntrip->buff, ntrip->nb);
 
         if (status == 200) {
+            /* chunked output only if the request advertised it: a v1 SOURCE
+             * answered with an HTTP status line stays v1 (raw body) */
             ntrip->state = 2;
-            ntrip->ver_neg = NTRIP_VER_2;
+            ntrip->ver_neg = ntrip->req_v2 ? NTRIP_VER_2 : NTRIP_VER_1;
             /* shift remaining data to start of buffer */
             ntrip->nb -= body_off;
             if (ntrip->nb > 0) {
                 memmove(ntrip->buff, ntrip->buff + body_off, ntrip->nb);
             }
             sprintf(msg, "%s/%s", ntrip->tcp->svr.saddr, ntrip->mntpnt);
-            tracet(NULL, 3, "rspntrip_s: v2 response ok nb=%d\n", ntrip->nb);
+            tracet(NULL, 3, "rspntrip_s: http response ok ver=%d nb=%d\n", ntrip->ver_neg, ntrip->nb);
             return 1;
         }
         /* HTTP error response */
@@ -3383,7 +3394,7 @@ extern int strread(stream_t* stream, uint8_t* buff, int n) {
  * args   : stream_t *stream I   stream
  *          unsinged char *buff I data buffer
  *          int    n         I   data length
- * return : status (0:error,1:ok)
+ * return : bytes written (0: nothing written or error; -1: error for some types)
  * notes  : write data to buffer and return immediately
  *-----------------------------------------------------------------------------*/
 extern int strwrite(stream_t* stream, uint8_t* buff, int n) {
@@ -3575,13 +3586,13 @@ extern int strstatx(stream_t* stream, char* msg) {
 /* get stream statistics summary -----------------------------------------------
  * get stream statistics summary
  * args   : stream_t *stream I   stream
- *          int    *inb      IO   bytes of input  (NULL: no output)
+ *          uint64_t *inb    IO   bytes of input  (NULL: no output)
  *          int    *inr      IO   bps of input    (NULL: no output)
- *          int    *outb     IO   bytes of output (NULL: no output)
+ *          uint64_t *outb   IO   bytes of output (NULL: no output)
  *          int    *outr     IO   bps of output   (NULL: no output)
  * return : none
  *-----------------------------------------------------------------------------*/
-extern void strsum(stream_t* stream, int* inb, int* inr, int* outb, int* outr) {
+extern void strsum(stream_t* stream, uint64_t* inb, int* inr, uint64_t* outb, int* outr) {
     tracet(NULL, 4, "strsum:\n");
 
     strlock(stream);

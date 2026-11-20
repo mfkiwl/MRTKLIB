@@ -774,8 +774,10 @@ static void detslp_ll(rtk_t* rtk, const obsd_t* obs, int i, int rcv) {
             setbitu(&rtk->ssat[sat - 1].slip[f], 2, 2, obs[i].LLI[f]);
         }
 
-        /* save slip and half-cycle valid flag */
-        rtk->ssat[sat - 1].slip[f] |= (uint8_t)slip;
+        /* save slip and half-cycle valid flag: the bits above them in slip[]
+           hold the previous LLI saved above, so LLI_HALFA / LLI_HALFS /
+           LLI_BOCTRK of a raw observation must not reach it (#160) */
+        rtk->ssat[sat - 1].slip[f] |= (uint8_t)(slip & (LLI_SLIP | LLI_HALFC));
         rtk->ssat[sat - 1].half[f] = (obs[i].LLI[f] & 2) ? 0 : 1;
     }
 }
@@ -2247,6 +2249,12 @@ extern void rtkinit(rtk_t* rtk, const prcopt_t* opt) {
     rtk->holdamb = 0;
     rtk->opt = *opt;
     rtk->sol.thres = (float)opt->thresar[0];
+
+    /* BeiDou generation of PRN 1-18, BDS-3 IGSO (#401) and GEO (#417) */
+    if (!set_bdsopt(opt, 0)) {
+        errmsg(rtk, "invalid bds2_sats=%s, bds3_igso_sats=%s or bds_geo_sats=%s\n", opt->bds2prn, opt->bds3igso,
+               opt->bdsgeo);
+    }
 }
 /* free rtk control ------------------------------------------------------------
  * free memory for rtk control struct

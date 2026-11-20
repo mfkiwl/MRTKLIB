@@ -212,7 +212,13 @@ static void update_sbs(rtksvr_t* svr, sbsmsg_t* sbsmsg, int index) {
             }
             svr->sbsmsg[i] = *sbsmsg;
         }
-        sbsupdatecorr(sbsmsg, &svr->nav);
+        if (sbsmsg->band == SBS_BAND_L5) {
+            if (svr->rtk.opt.correction == CORR_SOUTHPAN_PVS) {
+                sbsupdatepvs(sbsmsg, &svr->nav);
+            }
+        } else {
+            sbsupdatecorr(sbsmsg, &svr->nav);
+        }
     }
     svr->nmsg[index][3]++;
 }
@@ -331,9 +337,19 @@ static void update_lcl(rtksvr_t* svr, int index) {
  * must not overwrite the CLAS biases, whether it comes from a mixed UBX/SBF
  * L6D+L6E stream (code 15) or a raw L6E stream (STRFMT_L6E, code 10). In
  * PPP/MADOCA mode svr->clas is NULL and MADOCA SSR is applied like any other
- * ssr_ch[0] source; RTCM3 SSR (code 10) is applied in every mode.
+ * ssr_ch[0] source; RTCM3 SSR (code 10) is applied in every mode except
+ * Galileo HAS, PPP-B2b and SouthPAN PVS (#464): their own decoders own
+ * ssr_ch[0], and corr_meas() applies the biases of that source, so a MADOCA /
+ * RTCM3 entry there would silently replace the corrections of some satellites.
+ * The UBX / SBF L6 decoders return code 15 for any MADOCA L6E frame, whatever
+ * the correction source.
  *-----------------------------------------------------------------------------*/
 extern int rtksvr_ssr_applicable(const rtksvr_t* svr, int index, int ret) {
+    int corr = svr->rtk.opt.correction;
+
+    if (corr == CORR_GAL_HAS || corr == CORR_BDS_B2B || corr == CORR_SOUTHPAN_PVS) {
+        return 0;
+    }
     if (!svr->clas) {
         return 1;
     }
@@ -370,6 +386,21 @@ static void update_svr(rtksvr_t* svr, int ret, obs_t* obs, nav_t* nav, int ephsa
     } else if (ret == -1) { /* error */
         svr->nmsg[index][9]++;
     }
+}
+/* current rover observation time ----------------------------------------------
+ * The rover decodes into rtcm[0] (RTCM2/3) or raw[0] (receiver-raw formats).
+ * rtksvrstart() sets both to the start time (file tag time, else wall clock)
+ * and only the decoding one advances. With raw[0] read for an RTCM3 rover, the
+ * CLAS L6 rate limit held L6 against the start time once it ran 60 s ahead
+ * (#365); the demux re-lock timeout never fired (#205). The clock is chosen by
+ * format, not as the fresher one: a raw rover replaying older data over TCP has
+ * a wall-clock rtcm[0] ahead of its data, which the fresher-of rule would keep
+ * picking (week anchored from the wall clock, demux clock frozen). */
+static gtime_t rover_time(const rtksvr_t* svr) {
+    if (svr->format[0] == STRFMT_RTCM2 || svr->format[0] == STRFMT_RTCM3) {
+        return svr->rtcm[0].time;
+    }
+    return svr->raw[0].time;
 }
 /* decode receiver raw/rtcm data ---------------------------------------------*/
 static int decoderaw(rtksvr_t* svr, int index) {
@@ -419,7 +450,7 @@ static int decoderaw(rtksvr_t* svr, int index) {
                  * the trop age limit (120 s). */
                 {
                     gtime_t l6t = svr->clas->l6buf[ch].time;
-                    gtime_t obst = svr->raw[0].time;
+                    gtime_t obst = rover_time(svr);
                     if (l6t.time > 0 && obst.time > 0 && timediff(l6t, obst) > 60.0) {
                         /* shift unconsumed bytes to start of buffer */
                         int remain = svr->nb[index] - i;
@@ -432,15 +463,12 @@ static int decoderaw(rtksvr_t* svr, int index) {
                 }
 
                 /* initialize GPS week reference from obs time (once) */
-                if (svr->clas->week_ref[0] == 0) {
-                    gtime_t t = svr->raw[0].time;
+                if (!clas_week_ref_isset(svr->clas)) {
+                    gtime_t t = rover_time(svr);
                     if (t.time > 0) {
-                        int j, week;
+                        int week;
                         time2gpst(t, &week);
-                        for (j = 0; j < CSSR_REF_MAX; j++) {
-                            svr->clas->week_ref[j] = week;
-                            svr->clas->tow_ref[j] = -1;
-                        }
+                        clas_set_week_ref(svr->clas, week);
                     }
                 }
                 clas_input_cssr(svr->clas, svr->buff[index][i], ch);
@@ -510,16 +538,10 @@ static int decoderaw(rtksvr_t* svr, int index) {
              * locked channel's subframe stream is not corrupted by mixing. */
             l6_header_t hdr;
             l6_parse_header(svr->rtcm[index].buff, &hdr);
-            /* current rover observation time drives the demux re-lock
-             * timeout. The rover decodes into raw[0] (receiver-raw formats)
-             * or rtcm[0] (RTCM2/3); pick whichever is fresher so the clock
-             * advances for RTCM3 rovers too — otherwise the timeout never
-             * fires and a set satellite's stale lock is never released (#205). */
-            gtime_t now = svr->raw[0].time;
-            if (!now.time || (svr->rtcm[0].time.time && timediff(svr->rtcm[0].time, now) > 0)) {
-                now = svr->rtcm[0].time;
-            }
-            ch = clas_route_l6frame(svr->clas, hdr.prn, hdr.ptn, svr->rtk.opt.l6mrg, now);
+            /* rover time drives the demux re-lock timeout: with a clock that
+             * does not advance, a set satellite's stale lock is never
+             * released (#205) */
+            ch = clas_route_l6frame(svr->clas, &hdr, svr->raw[index].l6tag, svr->rtk.opt.l6mrg, rover_time(svr));
             if (ch < 0) {
                 continue;
             }
@@ -527,19 +549,17 @@ static int decoderaw(rtksvr_t* svr, int index) {
             trace(NULL, 3, "L6 redirect: fmt=%d ch=%d prn=%d index=%d\n", svr->format[index], ch,
                   svr->rtcm[index].buff[4], index);
             /* initialize week_ref from obs time (once) */
-            if (svr->clas->week_ref[0] == 0) {
-                gtime_t t = svr->raw[0].time;
+            if (!clas_week_ref_isset(svr->clas)) {
+                gtime_t t = rover_time(svr);
                 if (t.time > 0) {
-                    int j, week;
+                    int week;
                     time2gpst(t, &week);
-                    for (j = 0; j < CSSR_REF_MAX; j++) {
-                        svr->clas->week_ref[j] = week;
-                        svr->clas->tow_ref[j] = -1;
-                    }
+                    clas_set_week_ref(svr->clas, week);
                     trace(NULL, 2, "L6 redirect: week_ref initialized to %d\n", week);
                 }
             }
             /* feed 250-byte L6 frame from rtcm->buff to CLAS decoder */
+            clas_set_l6tag(svr->clas, ch, svr->raw[index].l6tag);
             for (k = 0; k < 250; k++) {
                 clas_input_cssr(svr->clas, svr->rtcm[index].buff[k], ch);
                 cret = clas_decode_msg(svr->clas, ch);
@@ -604,6 +624,7 @@ static int decoderaw(rtksvr_t* svr, int index) {
                     }
                 }
                 if (svr->mdciono[0].time.time) { /* feed only once the week is anchored */
+                    svr->mdciono[j].ftag = svr->raw[index].l6tag;
                     for (k = 0; k < 250; k++) {
                         if (input_qzssl6d(&svr->mdciono[j], svr->rtcm[index].buff[k]) == 10 &&
                             svr->mdciono[j].re.rvalid) {
@@ -639,6 +660,26 @@ static int decoderaw(rtksvr_t* svr, int index) {
                     svr->has->ssr[k].update = 0;
                 }
                 trace(NULL, 2, "HAS MT1 decoded: prn=%d index=%d\n", svr->raw[index].has_prn, index);
+            }
+        }
+        /* route a staged BeiDou PPP-B2b message (any SBF stream slot) to the
+         * B2b decoder; on updated corrections (ret==10) copy into the SSR
+         * channel with the same IOD/time gating as mrtk_postpos.c
+         * update_bds_b2b(). */
+        if (svr->b2b && ret == 14) {
+            gtime_t btime = svr->raw[index].b2b_time;
+            int bret = b2b_input_msg(svr->b2b, svr->raw[index].b2b_prn, svr->raw[index].b2b_msg, btime);
+            if (bret == 10) {
+                int k;
+                for (k = 0; k < MAXSAT; k++) {
+                    if (!svr->b2b->ssr[k].update || svr->b2b->ssr[k].iod[0] != svr->b2b->ssr[k].iod[1] ||
+                        timediff(btime, svr->b2b->ssr[k].t0[0]) < -1E-3) {
+                        continue;
+                    }
+                    svr->nav.ssr_ch[0][k] = svr->b2b->ssr[k];
+                    svr->b2b->ssr[k].update = 0;
+                }
+                trace(NULL, 2, "PPP-B2b corrections decoded: prn=%d index=%d\n", svr->raw[index].b2b_prn, index);
             }
         }
         /* observation data received */
@@ -898,6 +939,13 @@ static void* rtksvrthread(void* arg) {
             }
         }
         for (i = 0; i < fobs[0]; i++) { /* for each rover observation data */
+            /* An empty rover epoch (e.g. SBF MeasEpoch with no satellites during
+             * a signal blockage) has nothing to position: rtkpos() would read
+             * obs[0] beyond the epoch and the solution would be written again
+             * under the previous epoch's time (#382). postpos skips n == 0 too. */
+            if (svr->obs[0][i].n <= 0) {
+                continue;
+            }
             obs.n = 0;
             for (j = 0; j < svr->obs[0][i].n && obs.n < MAXOBS * 2; j++) {
                 obs.data[obs.n++] = svr->obs[0][i].data[j];
@@ -1083,6 +1131,7 @@ extern int rtksvrinit(rtksvr_t* svr) {
     svr->bl_reset = 10.0;
     svr->clas = NULL;
     svr->has = NULL;
+    svr->b2b = NULL;
     svr->mdciono = NULL;
     rtk_initlock(&svr->lock);
 
@@ -1113,6 +1162,10 @@ extern void rtksvrfree(rtksvr_t* svr) {
     if (svr->has) {
         has_free(svr->has);
         svr->has = NULL;
+    }
+    if (svr->b2b) {
+        b2b_free(svr->b2b);
+        svr->b2b = NULL;
     }
     if (svr->mdciono) {
         free(svr->mdciono);
@@ -1305,6 +1358,26 @@ extern int rtksvrstart(rtksvr_t* svr, int cycle, int buffsize, int* strs, char**
             tracet(NULL, 1, "rtksvrstart: HAS context alloc error\n");
         }
     }
+
+    /* initialize BeiDou PPP-B2b context for B2b float PPP (correction = bds-b2b).
+     * Any input stream may carry SBF BDSRawB2b messages; routing is index-agnostic.
+     * A context left by a previous run (rtkrcv `load` + `restart`) is freed, so
+     * another correction source is not overwritten by B2b and a new B2b run
+     * starts without the old mask and corrections. */
+    if (svr->b2b) {
+        b2b_free(svr->b2b);
+        svr->b2b = NULL;
+    }
+    if (prcopt->correction == CORR_BDS_B2B) {
+        svr->b2b = b2b_new();
+        if (!svr->b2b) {
+            tracet(NULL, 1, "rtksvrstart: PPP-B2b context alloc error\n");
+        }
+    }
+    /* PPP-B2b orbit corrections reference the B-CNAV1 ephemeris (SBF BDSCNav1,
+     * ephemeris set 1), not the D1/D2 AODE; as postpos(). */
+    setseleph(SYS_CMP, prcopt->correction == CORR_BDS_B2B ? 1 : 0);
+    setseleph(SYS_GAL, prcopt->correction == CORR_SOUTHPAN_PVS ? 1 : 0);
 
     /* free any iono state left over from a previous run so an in-process restart
      * (the rtkrcv shell can `load` a new config and `restart` in the same

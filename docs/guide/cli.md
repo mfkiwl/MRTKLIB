@@ -48,6 +48,31 @@ They are recognised by extension:
 The extensions are case-insensitive (`.L6`, `.L6D`, `.L6E`). L6 files are never
 read as RINEX.
 
+**CLAS channels.** One or two CLAS files are read one per channel, in
+command-line order (channel 1 only with `l6_merge = 1`). Several files per
+channel, such as the per-PRN files of `mrtk l6extract` across a QZSS
+satellite handover, are combined by `mrtk post` itself whenever there are more
+than two CLAS files, two files of the same transmit pattern, or two or more
+files with `l6_merge = 0`:
+
+- With `l6_merge = 1`, each transmit pattern takes one channel, in order of
+  first appearance (as in `mrtk run`); with `l6_merge = 0`, all files go to
+  channel 0.
+- Within a channel the files are read in time order, taken from the CSSR ST1
+  mask epochs (one block per 30 s CSSR cycle), so the file order on the
+  command line does not matter. Where files overlap in time, the current file
+  is kept and another one is taken only where the current one has a gap, so
+  the decoder never steps back in time. Without overlap the result is the
+  same as concatenating the files. ST1 carries the time of week only: the
+  files of one run must span less than 3.5 days.
+- A file without CLAS frames or without an ST1 mask, or of a third transmit
+  pattern, is not used (with a warning).
+
+When two patterns start in the same 30 s cycle, the pattern of the file given
+first takes channel 0. Keyword paths (`%Y`, ...) are always read one file per
+channel.
+Design notes: [CLAS L6 channels from several files](../design/clas-l6-multi-file.md).
+
 **Examples:**
 
 ```bash
@@ -66,6 +91,10 @@ mrtk post --config conf/claslib/rnx2rtkp.toml obs.obs nav.nav \
 
 # CLAS PPP-RTK with claslib-style .l6d input
 mrtk post --config conf/claslib/rnx2rtkp.toml obs.bnx 2023044J.l6d
+
+# CLAS PPP-RTK from the per-PRN files of mrtk l6extract (handover across files)
+mrtk l6extract -o l6 rover.ubx
+mrtk post --config conf/claslib/rnx2rtkp.toml obs.obs nav.nav l6.19*.l6d
 ```
 
 ---
@@ -237,15 +266,15 @@ mrtk cssr2rtcm3 [options] [-nav file ...]
 | Option | Description |
 |--------|-------------|
 | `-k`, `--config FILE` | Configuration file (TOML or legacy `.conf`) |
-| `-in`, `--input URI` | L6 CSSR input stream; use `sbf://…` for single-stream SBF (auto-extracts L6D, PVT, NAV) |
-| `-2ch URI` | Second L6 input stream (channel 2) |
+| `-in`, `--input sbf://URI` | SBF input stream (required); the converter takes the L6D frames, navigation data and PVT position from it |
 | `-out`, `--output URI` | Output RTCM3 stream (e.g. `tcpsvr://:2101`) |
-| `-pos URI` | NMEA GGA input stream for rover position (optional) |
-| `-p LAT,LON,HGT` | Fixed user position (deg, m) |
-| `-nav`, `--nav FILE…` | Navigation file(s) (RINEX NAV) |
+| `-p LAT,LON,HGT` | Fixed user position (deg, m); default: the first PVT position, latched |
+| `-nav`, `--nav FILE…` | Navigation file(s) (RINEX NAV), optional bootstrap before the SBF navigation data arrives |
 | `-d`, `--trace LEVEL` | Trace level (0-5) |
 | `-t`, `--interval SEC` | Output interval in seconds (default: 1) |
 | `-h`, `--help` | Show help |
+
+The input is a Septentrio SBF stream with QZSRawL6D (4270), PVT and navigation blocks, written as `sbf://` followed by the stream URI (e.g. `sbf://serial://ttyACM0:115200`). Raw L6 byte streams (`-in` without `sbf://`, `-2ch`, `-pos`) were removed in v0.7.15: they carry no frame time, so a frame lost inside a CLAS subframe cannot be detected.
 
 **Stream URI formats:**
 
@@ -273,6 +302,7 @@ mrtk bias [options] obsfile navfile [l6file...]
 | `-out`, `--output FILE` | Output bias file (default: stdout) |
 | `-td Y/M/D` | Date (GPST, required) |
 | `-ts TSPAN` | Time span in **days** (not a start time) |
+| `-bds2prn`, `--bds2-sats LIST` | BDS-2 satellites in PRN 1–18, e.g. `C09,C10` (after 2026-04-21) or `C01-C18` (before 2026-04-10); `""` = none. Default none, with a warning. See [BeiDou PRN Reassignment](beidou-prn-reassignment.md) |
 | `-t`, `--trace LEVEL` | Trace level |
 | `-h`, `--help` | Show help |
 
@@ -304,10 +334,11 @@ mrtk dump [options] l6file [navfile...]
 
 ### mrtk l6extract
 
-Extract QZSS L6 frames from SBF or UBX binary logs into per-PRN `.l6` files.
+Extract QZSS L6 frames from SBF or UBX binary logs into per-PRN `.l6d` /
+`.l6e` files, and Galileo HAS pages from SBF into a `.has` file.
 
 ```bash
-mrtk l6extract [options]
+mrtk l6extract [options] [FILE]
 ```
 
 | Option | Description |
@@ -315,9 +346,32 @@ mrtk l6extract [options]
 | `-in`, `--input FILE` | Input SBF or UBX binary file (required) |
 | `-r FORMAT` | Receiver format: `sbf`, `ubx` (auto-detected from extension by default) |
 | `-o`, `--output PREFIX` | Output file prefix (default: `l6`) |
-| `-l6d` | Extract L6D frames only (CLAS) |
-| `-l6e` | Extract L6E frames only (MADOCA) |
+| `-l6d` | Extract L6D frames only (CLAS, MADOCA iono) |
+| `-l6e` | Extract L6E frames only (MADOCA, QZNMA) |
+| `-no-has` | Disable Galileo HAS extraction |
 | `-h`, `--help` | Show help |
+
+Output files:
+
+| File | Content |
+|------|---------|
+| `{prefix}.{PRN}.l6d` | 250-byte L6D frames of header PRN 193–202 |
+| `{prefix}.{PRN}.l6e` | 250-byte L6E frames of header PRN 203–212 |
+| `{input-basename}.has` | Galileo HAS pages (SBF block 4024), 64-byte records |
+
+The signal (L6D/L6E) and PRN come from the L6 frame header (IS-QZSS-L6),
+not from the SBF block ID, `Source` field or SVID, or the UBX svId. For
+example, a QZS-3 capture gives `l6.199.l6d` (CLAS) and `l6.209.l6e`
+(MADOCA-PPP and QZNMA). Both are `mrtk post` inputs: a `.l6d` file is routed
+by its content (CLAS, or MADOCA iono for PRN 200/201), and a `.l6e` file is
+MADOCA-PPP input (in CLAS mode it is reserved for CLAS CMA and ignored with a
+warning). A receiver channel that hands over from one QZS to another ends up
+in two files; `mrtk post` takes all of them and rebuilds the channels (see
+[CLAS channels](#mrtk-post)).
+
+!!! note "Changed in v0.7.12"
+    Earlier versions wrote `{prefix}_J{PRN}_{l6d|l6e}.l6`, named by the
+    satellite PRN and classified by receiver container.
 
 ---
 

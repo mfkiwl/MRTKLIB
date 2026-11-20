@@ -112,14 +112,15 @@ extern "C" {
 #define EPHOPT_SSRAPC 3 /* ephemeris option: broadcast + SSR_APC */
 #define EPHOPT_SSRCOM 4 /* ephemeris option: broadcast + SSR_COM */
 
-#define CORR_AUTO -1      /* correction source: infer from mode + sateph (default) */
-#define CORR_NONE 0       /* correction source: none (SPP/DGPS/RTK) */
-#define CORR_IGS 1        /* correction source: IGS precise products (files) */
-#define CORR_IGS_RTS 2    /* correction source: IGS Real-Time Service (RTCM-SSR) [reserved] */
-#define CORR_QZS_MADOCA 3 /* correction source: MADOCA-PPP (QZSS L6E / RTCM-SSR) */
-#define CORR_GAL_HAS 4    /* correction source: Galileo HAS (E6-B SSR) [reserved] */
-#define CORR_BDS_B2B 5    /* correction source: BeiDou PPP-B2b (B2b SSR) [reserved] */
-#define CORR_QZS_CLAS 6   /* correction source: QZSS CLAS (L6D CSSR) */
+#define CORR_AUTO -1        /* correction source: infer from mode + sateph (default) */
+#define CORR_NONE 0         /* correction source: none (SPP/DGPS/RTK) */
+#define CORR_IGS 1          /* correction source: IGS precise products (files) */
+#define CORR_IGS_RTS 2      /* correction source: IGS Real-Time Service (RTCM-SSR) [reserved] */
+#define CORR_QZS_MADOCA 3   /* correction source: MADOCA-PPP (QZSS L6E / RTCM-SSR) */
+#define CORR_GAL_HAS 4      /* correction source: Galileo HAS (E6-B SSR) [reserved] */
+#define CORR_BDS_B2B 5      /* correction source: BeiDou PPP-B2b (B2b SSR) [reserved] */
+#define CORR_QZS_CLAS 6     /* correction source: QZSS CLAS (L6D CSSR) */
+#define CORR_SOUTHPAN_PVS 7 /* correction source: SouthPAN PVS (DFMC L5 MT32) */
 
 /*============================================================================
  * AR Mode Constants
@@ -327,6 +328,13 @@ typedef struct prcopt_t {         /* processing options type */
      * (kept separate from err[5]/err[6], which are C/N0 weighting parameters). */
     double stats_erriono; /* ionosphere estimation-error term (m) */
     double stats_errtrop; /* troposphere estimation-error term (m) */
+
+    /* BeiDou PRN reassignment (MADOCALIB 2.2, #401; appended for ABI stability).
+     * Applied process-wide by set_bds2prn()/set_bds3igso() in postpos() and rtkinit(). */
+    char bds2prn[256];  /* BDS-2 satellites in PRN 1-18, e.g. "C09,C10" ("": no BDS-2) */
+    char bds3igso[256]; /* BDS-3 IGSO satellites ("": C06-C08) */
+    int bds2prn_set;    /* bds2prn given by the configuration (0: not given, see bds2prn_warning()) */
+    char bdsgeo[256];   /* BDS-3 GEO satellites, PPP-B2b transmitters ("": C01-C04; #417, appended) */
 } prcopt_t;
 
 /* enhanced_spp_seed profiles (applied to the PPP-RTK/VRS a-priori SPP seed only).
@@ -362,6 +370,7 @@ typedef struct {        /* solution options type */
     char sep[64];       /* field separator */
     char prog[64];      /* program name */
     double maxsolstd;   /* max std-dev for solution output (m) (0:all) */
+    int clasrefid;      /* CLAS L6 source id in NMEA GGA station id (0:off,1:on) */
 } solopt_t;
 
 /*============================================================================
@@ -399,6 +408,18 @@ extern const solopt_t solopt_default;
 /* resolve correction source (CORR_AUTO) and validate the (mode, correction)
  * combination; returns 1 on success, 0 with msg set on an invalid combination */
 extern int resolve_correction(prcopt_t* opt, char* msg, size_t msgsz);
+
+/**
+ * @brief Apply the BeiDou PRN-reassignment options process-wide.
+ *
+ * Calls set_bds2prn(opt->bds2prn), set_bds3igso(opt->bds3igso) and set_bdsgeo(opt->bdsgeo). With warn,
+ * also prints to stderr when a list is invalid, or when BeiDou is enabled
+ * (opt->navsys) but bds2prn was not given by the configuration (opt->bds2prn_set).
+ * @param[in] opt   Processing options
+ * @param[in] warn  Print warnings to stderr (0: trace only)
+ * @return 1: ok, 0: an invalid list was replaced by its default
+ */
+extern int set_bdsopt(const prcopt_t* opt, int warn);
 
 #ifdef __cplusplus
 }
